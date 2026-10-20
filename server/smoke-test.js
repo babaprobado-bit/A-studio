@@ -76,7 +76,7 @@ try {
 
   const afterLogout = await request('/');
   assert.equal(afterLogout.status, 303, 'New browser request without the cleared cookie must be locked');
-  assert.ok(logout.headers.get('set-cookie')?.includes('Max-Age=0'), 'Logout should clear the session cookie');
+  assert.ok(logout.headers.get('set-cookie')?.toLowerCase().includes('expires=thu, 01 jan 1970'), 'Logout should expire the session cookie');
   console.log('Private website smoke test passed: guest lock, bad password, login, session, and logout.');
 } catch (error) {
   console.error(error);
