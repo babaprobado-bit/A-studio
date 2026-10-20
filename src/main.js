@@ -224,6 +224,33 @@ function updateDashboard(){const connected=Object.keys(providers).filter(id=>id=
   $('dashboard').innerHTML='<article class="panel"><div class="row-actions"><strong>API sağlayıcıları</strong><span class="grow"></span><span class="pill">'+connected.length+' ayar</span></div><p class="muted">'+esc(connected.map(id=>providers[id].name).join(', ')||'Henüz anahtar ayarlanmadı.')+'</p><button class="btn ghost small" data-go="models">Bağlantıları yönet</button></article><article class="panel"><div class="row-actions"><strong>Sohbet geçmişi</strong><span class="grow"></span><span class="pill">'+chatHistory.length+' mesaj</span></div><p class="muted">Bu cihazdaki yerel geçmiş. Gerçek model sohbetleri de dışa aktarılabilir.</p></article>';
 }
 async function exportProjects(){downloadText('ai-studio-projects.json',JSON.stringify({format:'ai-studio-projects-v2',exportedAt:new Date().toISOString(),projects:projectList},null,2),'application/json;charset=utf-8');}
+function exportWorkspace(){
+  const snapshot={format:'ai-studio-workspace-v1',exportedAt:new Date().toISOString(),settings:{demoMode:settings.demoMode,models:settings.models,team:settings.team,ollamaUrl:settings.ollamaUrl,ollamaModel:settings.ollamaModel,systemPrompt:settings.systemPrompt},projects:projectList,chat:chatHistory,plugins:userPlugins.filter(p=>p.kind!=='builtin').map(p=>({name:p.name,prompt:p.prompt}))};
+  downloadText('ai-studio-workspace-backup.json',JSON.stringify(snapshot,null,2),'application/json;charset=utf-8');
+}
+async function importWorkspace(file){
+  try{
+    if(file.size>5000000)throw new Error('Yedek 5 MB sınırını aşıyor.');
+    const data=JSON.parse(await file.text());
+    if(data?.format!=='ai-studio-workspace-v1')throw new Error('Bu dosya tam AI Studio yedeği değil.');
+    const nextSettings={...clone(defaultSettings),...(data.settings&&typeof data.settings==='object'?data.settings:{})};
+    nextSettings.models={...clone(defaultSettings.models),...(nextSettings.models&&typeof nextSettings.models==='object'&&!Array.isArray(nextSettings.models)?nextSettings.models:{})};
+    nextSettings.team=(Array.isArray(nextSettings.team)?nextSettings.team:defaultSettings.team).filter(id=>providers[id]).slice(0,4);
+    nextSettings.ollamaUrl=typeof nextSettings.ollamaUrl==='string'?nextSettings.ollamaUrl.slice(0,500):'';
+    nextSettings.ollamaModel=typeof nextSettings.ollamaModel==='string'?nextSettings.ollamaModel.slice(0,140):providers.ollama.model;
+    nextSettings.systemPrompt=typeof nextSettings.systemPrompt==='string'?nextSettings.systemPrompt.slice(0,6000):defaultSettings.systemPrompt;
+    nextSettings.demoMode=nextSettings.demoMode!==false;
+    const nextProjects=(Array.isArray(data.projects)?data.projects:[]).filter(p=>typeof p?.name==='string'&&typeof p?.notes==='string').slice(0,300).map(p=>({id:crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random()),name:p.name.slice(0,100),notes:p.notes.slice(0,20000),updated:typeof p.updated==='string'?p.updated:new Date().toISOString()}));
+    const nextChat=(Array.isArray(data.chat)?data.chat:[]).filter(m=>(m?.role==='user'||m?.role==='assistant')&&typeof m.content==='string').slice(-80).map(m=>({role:m.role,content:m.content.slice(0,20000),provider:typeof m.provider==='string'?m.provider.slice(0,100):'',mode:['demo','live','error'].includes(m.mode)?m.mode:'demo',time:typeof m.time==='string'?m.time:new Date().toISOString()}));
+    const nextPlugins=(Array.isArray(data.plugins)?data.plugins:[]).filter(p=>typeof p?.name==='string'&&typeof p?.prompt==='string'&&p.name.trim()&&p.prompt.trim()).slice(-100).map((p,i)=>({id:crypto.randomUUID?crypto.randomUUID():String(Date.now()+i),name:p.name.trim().slice(0,80),prompt:p.prompt.trim().slice(0,6000),kind:'custom'}));
+    if(!confirm('Bu yedek mevcut proje, sohbet, ayar ve özel prompt kayıtlarını değiştirecek. API anahtarları yedeğe dahil değildir ve bu cihazdaki anahtarlar silinmeyecek. Devam?'))return;
+    await Promise.all([setPref(DB.settings,nextSettings),setPref(DB.projects,nextProjects),setPref(DB.chat,nextChat),setPref(DB.plugins,nextPlugins)]);
+    settings=nextSettings;projectList=nextProjects;chatHistory=nextChat;userPlugins=nextPlugins;
+    renderProviderCards();renderProjects();renderChat();renderPlugins();syncModeUI();updateDashboard();
+    $('compareSelectionCount').textContent=settings.team.length+' ajan seçili';
+    showToast('Tam çalışma alanı geri yüklendi. API anahtarları ayrı güvenli depoda kaldı.');
+  }catch(err){showToast('Yedek geri yüklenemedi: '+(err.message||'JSON dosyasını kontrol et.'));}
+}
 async function importProjects(file){try{const data=JSON.parse(await file.text());const incoming=Array.isArray(data)?data:data.projects;if(!Array.isArray(incoming))throw new Error('JSON içinde projects dizisi bulunamadı.');for(const p of incoming){if(typeof p?.name==='string'&&typeof p?.notes==='string'){projectList.push({id:crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random()),name:p.name.slice(0,100),notes:p.notes.slice(0,20000),updated:p.updated||new Date().toISOString()});}}await setPref(DB.projects,projectList);renderProjects();updateDashboard();showToast('Proje yedeği içe aktarıldı.');}catch(e){showToast('İçe aktarma başarısız: '+(e.message||'JSON dosyasını kontrol et.'));}}
 async function saveOllama(){settings.ollamaUrl=$('ollamaUrl').value.trim();settings.ollamaModel=$('ollamaModel').value.trim()||providers.ollama.model;settings.models.ollama=settings.ollamaModel;await setPref(DB.settings,settings);renderProviderCards();updateDashboard();showToast('Ollama ayarları kaydedildi.');}
 async function testProvider(id){if(settings.demoMode){showToast('Önce Demo modunu kapat; bu test tek gerçek API isteği gönderebilir.');return;}try{const result=await callProvider(id,'Yanıt olarak sadece OK yaz.',[]);showToast('Bağlantı yanıt verdi: '+result.slice(0,70));}catch(e){showToast('Bağlantı testi başarısız: '+(e.message||'Hata'));}}
@@ -274,6 +301,9 @@ $('copyCode').addEventListener('click',()=>copyText($('codePad').value));
 $('exportCode').addEventListener('click',()=>downloadText('ai-studio-code.'+({javascript:'js',python:'py',markdown:'md',text:'txt'}[$('codeLanguage').value]||$('codeLanguage').value),$('codePad').value));
 $('importCode').addEventListener('click',()=>$('codeFile').click());
 $('codeFile').addEventListener('change',async e=>{const f=e.target.files?.[0];if(f){if(f.size>1_000_000){showToast('Dosya 1 MB limitini aşıyor.');return;}$('codePad').value=await f.text();const ext=f.name.split('.').pop();const mapping={js:'javascript',ts:'javascript',py:'python',md:'markdown',txt:'text',json:'json',html:'html',css:'css'};$('codeLanguage').value=mapping[ext]||'text';showToast('Dosya içe aktarıldı.');}e.target.value='';});
+$('exportWorkspace').addEventListener('click',exportWorkspace);
+$('importWorkspaceBtn').addEventListener('click',()=> $('importWorkspaceFile').click());
+$('importWorkspaceFile').addEventListener('change',async e=>{if(e.target.files?.[0])await importWorkspace(e.target.files[0]);e.target.value='';});
 $('resetLocal').addEventListener('click',clearAllLocal);
 
 async function init(){

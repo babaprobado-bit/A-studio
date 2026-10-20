@@ -26,3 +26,7 @@ API keys are never written to GitHub or included in the source. Browser preview 
 - The default Ollama address is intentionally blank so a placeholder IP is not mistaken for a working connection. Enter the computer's actual trusted-LAN address.
 - The sequential agent chain is an orchestration feature, not an autonomous computer operator: it does not run shell commands, edit arbitrary files on the PC, or claim tests passed unless a connected model reports them. Demo mode returns templates rather than model inference.
 - Prompt plugin import accepts JSON instructions only and does not execute imported code. Backups never include provider API keys.
+
+
+## Full workspace backup
+The one-file workspace backup includes local settings, projects, conversation history, and custom prompt instructions. Provider API keys are excluded. Restoring a backup replaces those local records after an explicit confirmation; existing provider secrets remain separate in Android secure storage.
