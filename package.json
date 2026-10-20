@@ -2,6 +2,7 @@
   "name": "ai-studio-alpha-1-mobile",
   "version": "0.4.0",
   "private": true,
+  "type": "module",
   "description": "AI Studio Alpha 1 cross-platform multi-provider workspace with private web gateway",
   "engines": { "node": ">=20" },
   "scripts": {
