@@ -91,7 +91,7 @@ function readCookie(req, name) {
   for (const part of cookieHeader.split(';')) {
     const pivot = part.indexOf('=');
     if (pivot < 0) continue;
-    if (part.slice(0, pivot).trim() === name) return decodeURIComponent(part.slice(pivot + 1).trim());
+    if (part.slice(0, pivot).trim() === name) return part.slice(pivot + 1).trim();
   }
   return '';
 }

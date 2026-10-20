@@ -39,8 +39,16 @@ jobs:
           java-version: '21'
       - name: Install dependencies
         run: npm install --no-audit --no-fund
+      - name: Check website scripts and manifest
+        run: |
+          node --check server/server.js
+          node --check server/login.js
+          node --check public/sw.js
+          node -e "JSON.parse(require('node:fs').readFileSync('public/manifest.webmanifest','utf8'))"
       - name: Build web assets
         run: npm run build
+      - name: Test private website login gate
+        run: npm run test:site
       - name: Create Android project
         run: npx cap add android
       - name: Allow local Ollama HTTP on trusted networks
