@@ -1,0 +1,6 @@
+{
+  "appId": "com.aistudio.alpha1demo",
+  "appName": "AI Studio Alpha 1",
+  "webDir": "www",
+  "server": { "androidScheme": "https" }
+}

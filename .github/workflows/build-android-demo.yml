@@ -5,8 +5,11 @@ on:
   push:
     branches: [main]
     paths:
-      - 'AI-Studio-Alpha-1-Mobile-Demo-Source.zip'
+      - 'www/**'
+      - 'package.json'
+      - 'capacitor.config.json'
       - '.github/workflows/build-android-demo.yml'
+      - 'README.md'
 
 permissions:
   contents: read
@@ -28,24 +31,19 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-      - name: Unpack demo source
-        run: unzip -q AI-Studio-Alpha-1-Mobile-Demo-Source.zip
       - name: Install dependencies
-        working-directory: AI-Studio-Alpha-1-Demo
         run: npm install --no-audit --no-fund
       - name: Create Android project
-        working-directory: AI-Studio-Alpha-1-Demo
         run: npx cap add android
       - name: Sync Android project
-        working-directory: AI-Studio-Alpha-1-Demo
         run: npx cap sync android
       - name: Build debug APK
-        working-directory: AI-Studio-Alpha-1-Demo/android
+        working-directory: android
         run: chmod +x gradlew && ./gradlew --no-daemon assembleDebug
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: AI-Studio-Alpha-1-Demo-APK
-          path: AI-Studio-Alpha-1-Demo/android/app/build/outputs/apk/debug/app-debug.apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
