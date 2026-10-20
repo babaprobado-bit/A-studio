@@ -19,4 +19,10 @@ Ollama is a connection to a model running on another computer, not an on-device 
 
 ## Security boundaries
 API keys are never written to GitHub or included in the source. Browser preview stores keys only in memory, not localStorage. Project/chat backups do not contain provider keys. This standalone mobile workspace does not bundle the desktop LocalCoder/AirLLM runtime or video render engine.
-\n\n## Mobile Workspace 0.3 notes\n- Updated provider request compatibility for OpenAI-style calls and Anthropic direct-client requests. Providers can change API behavior; always check their current docs and model IDs.\n- The default Ollama address is intentionally blank so a placeholder IP is not mistaken for a working connection. Enter the computer's actual trusted-LAN address.\n- The sequential agent chain is an orchestration feature, not an autonomous computer operator: it does not run shell commands, edit arbitrary files on the PC, or claim tests passed unless a connected model reports them. Demo mode returns templates rather than model inference.\n- Prompt plugin import accepts JSON instructions only and does not execute imported code. Backups never include provider API keys.\n
+
+
+## Mobile Workspace 0.3 notes
+- Updated provider request compatibility for OpenAI-style calls and Anthropic direct-client requests. Providers can change API behavior; always check their current docs and model IDs.
+- The default Ollama address is intentionally blank so a placeholder IP is not mistaken for a working connection. Enter the computer's actual trusted-LAN address.
+- The sequential agent chain is an orchestration feature, not an autonomous computer operator: it does not run shell commands, edit arbitrary files on the PC, or claim tests passed unless a connected model reports them. Demo mode returns templates rather than model inference.
+- Prompt plugin import accepts JSON instructions only and does not execute imported code. Backups never include provider API keys.

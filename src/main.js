@@ -124,7 +124,10 @@ async function callProvider(id,prompt,history){
     const d=await fetchJson(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({systemInstruction:{parts:[{text:systemFor(id)}]},contents,generationConfig:{temperature:0.4,maxOutputTokens:2048}})});
     const text=(d.candidates?.[0]?.content?.parts||[]).map(x=>x.text||'').join('\n');if(!text)throw new Error(d.promptFeedback?.blockReason||'Gemini yanıtında metin bulunamadı.');return text;
   }
-  const openAiBody={model:providerModel(id),messages:[{role:'system',content:systemFor(id)},...msgs]};\n  if(id==='openai'){openAiBody.max_completion_tokens=2048;}\n  else {openAiBody.temperature=0.4;openAiBody.max_tokens=2048;}\n  const d=await fetchJson(p.endpoint,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify(openAiBody)});
+  const openAiBody={model:providerModel(id),messages:[{role:'system',content:systemFor(id)},...msgs]};
+  if(id==='openai'){openAiBody.max_completion_tokens=2048;}
+  else {openAiBody.temperature=0.4;openAiBody.max_tokens=2048;}
+  const d=await fetchJson(p.endpoint,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify(openAiBody)});
   const message=d.choices?.[0]?.message?.content;
   const text=Array.isArray(message)?message.map(x=>x.text||'').join('\n'):message;
   if(!text)throw new Error('Yanıtta metin bulunamadı. Model kimliğinin bu API üzerinde kullanılabildiğini doğrula.');return text;
@@ -248,7 +251,8 @@ document.addEventListener('change',async e=>{
   if(e.target.matches('[data-team]')){const id=e.target.dataset.team;let group=[...document.querySelectorAll('[data-team="'+id+'"]')];if(e.target.checked){if(!settings.team.includes(id)&&settings.team.length>=4){e.target.checked=false;group.forEach(x=>x.checked=false);showToast('Takım turu en fazla dört sağlayıcı çağırır.');return;}if(!settings.team.includes(id))settings.team.push(id);}else settings.team=settings.team.filter(x=>x!==id);group.forEach(x=>x.checked=e.target.checked);await setPref(DB.settings,settings);renderProviderCards();$('compareSelectionCount').textContent=settings.team.length+' ajan seçili';}
 });
 $('chatForm').addEventListener('submit',e=>{e.preventDefault();const p=$('chatInput').value.trim();if(!p)return;$('chatInput').value='';submitChat(p,$('chatProvider').value);});
-$('teamRun').addEventListener('click',()=>{const p=$('chatInput').value.trim();if(!p){showToast('Önce takımın görevini yaz.');return;}$('chatInput').value='';runTeam(p);});\n$('pipelineRun').addEventListener('click',()=>{const p=$('chatInput').value.trim();if(!p){showToast('Önce zincirin görevini yaz.');return;}$('chatInput').value='';runPipeline(p);});
+$('teamRun').addEventListener('click',()=>{const p=$('chatInput').value.trim();if(!p){showToast('Önce takımın görevini yaz.');return;}$('chatInput').value='';runTeam(p);});
+$('pipelineRun').addEventListener('click',()=>{const p=$('chatInput').value.trim();if(!p){showToast('Önce zincirin görevini yaz.');return;}$('chatInput').value='';runPipeline(p);});
 $('compareRun').addEventListener('click',runCompare);
 $('demoToggle').addEventListener('change',async e=>{settings.demoMode=e.target.checked;await setPref(DB.settings,settings);syncModeUI();});
 $('settingsDemoToggle').addEventListener('change',async e=>{settings.demoMode=e.target.checked;await setPref(DB.settings,settings);syncModeUI();});
@@ -258,7 +262,9 @@ $('exportProjects').addEventListener('click',exportProjects);
 $('importProjectsBtn').addEventListener('click',()=>$('importProjectsFile').click());
 $('importProjectsFile').addEventListener('change',async e=>{if(e.target.files?.[0])await importProjects(e.target.files[0]);e.target.value='';});
 $('pluginForm').addEventListener('submit',addPlugin);
-$('exportPlugins').addEventListener('click',()=>downloadText('ai-studio-prompt-plugins.json',JSON.stringify({format:'ai-studio-prompts-v1',plugins:userPlugins.filter(p=>p.kind!=='builtin')},null,2),'application/json;charset=utf-8'));\n$('importPluginsBtn').addEventListener('click',()=> $('importPluginsFile').click());\n$('importPluginsFile').addEventListener('change',async e=>{if(e.target.files?.[0])await importPlugins(e.target.files[0]);e.target.value='';});
+$('exportPlugins').addEventListener('click',()=>downloadText('ai-studio-prompt-plugins.json',JSON.stringify({format:'ai-studio-prompts-v1',plugins:userPlugins.filter(p=>p.kind!=='builtin')},null,2),'application/json;charset=utf-8'));
+$('importPluginsBtn').addEventListener('click',()=> $('importPluginsFile').click());
+$('importPluginsFile').addEventListener('change',async e=>{if(e.target.files?.[0])await importPlugins(e.target.files[0]);e.target.value='';});
 $('exportChat').addEventListener('click',()=>downloadText('ai-studio-chat.json',JSON.stringify({exportedAt:new Date().toISOString(),messages:chatHistory},null,2),'application/json;charset=utf-8'));
 $('clearChat').addEventListener('click',async()=>{if(confirm('Sohbet geçmişi temizlensin mi?')){chatHistory=[];await removePref(DB.chat);renderChat();}});
 $('saveOllama').addEventListener('click',saveOllama);
