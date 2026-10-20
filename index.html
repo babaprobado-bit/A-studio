@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b1020">
+  <meta name="description" content="AI Studio Alpha 1 - mobil çoklu model çalışma alanı">
+  <title>AI Studio Alpha 1</title>
+</head>
+<body>
+  <div id="app">
+    <header class="topbar">
+      <a class="brand" href="#home" aria-label="AI Studio ana ekran">
+        <span class="brand-mark">✳</span><span><strong>AI Studio</strong><small>ALPHA 1 · MOBILE WORKSPACE</small></span>
+      </a>
+      <span id="modePill" class="pill safe">DEMO MODU</span>
+    </header>
+    <main>
+      <section class="screen active" id="home">
+        <div class="hero">
+          <div class="eyebrow">ÇOKLU MODEL ÇALIŞMA ALANI</div>
+          <h1>Fikrini kur.<br><em>Ekibi çalıştır.</em></h1>
+          <p>Modelleri bağla, cevaplarını karşılaştır, proje ve kod dosyalarını tek yerden düzenle.</p>
+          <div class="actions"><button class="btn primary" data-go="chat">Sohbete geç ↗</button><button class="btn ghost" data-go="models">Modelleri bağla</button></div>
+          <div class="hero-stats"><div><strong id="connectedCount">0</strong><span>bağlı sağlayıcı</span></div><div><strong id="projectCount">0</strong><span>proje kaydı</span></div><div><strong>7+</strong><span>bağlantı seçeneği</span></div></div>
+        </div>
+        <div class="section-head"><div><div class="eyebrow">ÇALIŞMA ALANI</div><h2>Hızlı başlangıç</h2></div></div>
+        <div class="quick-grid">
+          <button class="quick-card" data-go="chat"><span class="quick-icon">◉</span><strong>Takım sohbeti</strong><small>Gerçek model veya demo yanıtı</small></button>
+          <button class="quick-card" data-go="compare"><span class="quick-icon">⇄</span><strong>Yanıtları karşılaştır</strong><small>Birden fazla sağlayıcı</small></button>
+          <button class="quick-card" data-go="projects"><span class="quick-icon">▤</span><strong>Projeler</strong><small>Not, görev ve dışa aktarma</small></button>
+          <button class="quick-card" data-go="tools"><span class="quick-icon">⌘</span><strong>Araçlar / eklentiler</strong><small>Hazır komutlar ve kod alanı</small></button>
+        </div>
+        <div class="notice"><strong>Gerçeklik kontrolü:</strong> Demo yanıtları çevrimdışı şablonlardır. Gerçek AI yanıtları için ilgili sağlayıcının API anahtarını ekleyip Demo modunu kapatmalısın. Ollama modeli telefona gömülü değildir; ağdaki bir bilgisayarda çalışması gerekir.</div>
+        <div class="section-head"><div><div class="eyebrow">SON DURUM</div><h2>Çalışma panosu</h2></div></div>
+        <div id="dashboard" class="stack"></div>
+      </section>
+
+      <section class="screen" id="chat">
+        <div class="page-title"><div class="eyebrow">CHAT / AGENT TEAM</div><h1>Takım sohbeti</h1><p>Bir görevi seçili sağlayıcıya gönder veya seçtiğin ajanlarla takım turu başlat.</p></div>
+        <div class="panel">
+          <div class="toolbar"><label class="field-label" for="chatProvider">Yanıt sağlayıcısı</label><select class="input" id="chatProvider"></select><span id="providerState" class="status-dot">Demo</span></div>
+          <div class="switch-row"><div><strong>Demo yanıtları</strong><small>Kapalıyken seçili modele gerçek istek gönderilir.</small></div><label class="switch"><input type="checkbox" id="demoToggle" checked><span></span></label></div>
+          <div class="notice compact">Gerçek çağrılar sağlayıcının kota veya ücretini kullanabilir. Anahtarı yalnızca kendi cihazında sakla; kimseyle paylaşma.</div>
+        </div>
+        <div class="chat-window" id="chatMessages" aria-live="polite"></div>
+        <form id="chatForm" class="compose">
+          <textarea id="chatInput" class="input compose-input" rows="3" maxlength="12000" placeholder="Görevi yaz... Örn. oyunum için modüler görev planı oluştur." required></textarea>
+          <div class="compose-actions"><button type="button" class="btn ghost small" id="exportChat">Sohbeti dışa aktar</button><span class="grow"></span><button type="button" class="btn secondary small" id="teamRun">Takım turu (en fazla 4)</button><button type="submit" class="btn primary">Gönder ↗</button></div>
+        </form>
+        <div class="row-actions"><button class="btn ghost small" id="clearChat">Sohbeti temizle</button><span class="muted">Geçmiş bu cihazda saklanır.</span></div>
+      </section>
+
+      <section class="screen" id="compare">
+        <div class="page-title"><div class="eyebrow">EVALUATION LAB</div><h1>Model karşılaştırma</h1><p>Aynı istemi seçtiğin sağlayıcılara gönder. Gerçek modda yalnızca anahtarı ayarlanmış sağlayıcılar çağrılır.</p></div>
+        <div class="panel">
+          <label class="field-label" for="comparePrompt">Karşılaştırılacak görev</label>
+          <textarea id="comparePrompt" class="input" rows="4" maxlength="8000" placeholder="Aynı soruya farklı modellerden cevap al..."></textarea>
+          <div class="row-actions"><span id="compareSelectionCount" class="muted">Takım seçimlerini Modeller ekranından düzenle.</span><span class="grow"></span><button class="btn primary" id="compareRun">Karşılaştırmayı başlat</button></div>
+        </div>
+        <div id="compareResults" class="stack"></div>
+      </section>
+
+      <section class="screen" id="models">
+        <div class="page-title"><div class="eyebrow">PROVIDER HUB</div><h1>Modeller ve anahtarlar</h1><p>API anahtarlarını Android'in güvenli anahtar deposunda sakla. Her model kimliğini ihtiyaç duyduğunda değiştirebilirsin.</p></div>
+        <div class="notice"><strong>Güvenlik:</strong> Android uygulamasında anahtarlar KeyStore tabanlı şifreli depoda saklanır. Yine de ele geçirilmiş/root erişimli bir cihaz veya uygulama incelemesi risktir. Kod depomuzda anahtarın yok; bu ekrana yalnızca kendi anahtarını gir. Gerçek kullanım ücretli olabilir.</div>
+        <div class="panel">
+          <div class="switch-row"><div><strong>Demo modu</strong><small>Varsayılan açık. Gerçek API çağrılarının önüne geçer.</small></div><label class="switch"><input type="checkbox" id="settingsDemoToggle" checked><span></span></label></div>
+          <div class="field-label spacer-label">Takım turuna katılacak ajanları seç (en fazla 4)</div>
+          <div class="team-chips" id="teamChips"></div>
+        </div>
+        <div id="providerGrid" class="stack"></div>
+        <div class="panel">
+          <h2>Yerel Ollama bağlantısı</h2>
+          <p class="muted">Model telefonda değil, aynı güvenilir Wi-Fi ağına bağlı bilgisayarda çalışır. Ollama sunucusunu o bilgisayarda başlat; bilgisayarın yerel IP adresini yaz.</p>
+          <label class="field-label" for="ollamaUrl">Sunucu adresi</label><input class="input" id="ollamaUrl" placeholder="http://192.168.1.25:11434" autocomplete="off">
+          <label class="field-label" for="ollamaModel">Model adı</label><input class="input" id="ollamaModel" placeholder="qwen2.5-coder:1.5b" autocomplete="off">
+          <div class="row-actions"><button class="btn secondary" id="saveOllama">Ayarları kaydet</button><button class="btn ghost" id="testOllama">Bağlantıyı test et</button></div>
+          <p class="fineprint">Yerel HTTP trafiği yalnızca güvendiğin ağda kullanılmalı. Bu ayar telefonuna model indirmez ve Ollama kurmaz.</p>
+        </div>
+      </section>
+
+      <section class="screen" id="projects">
+        <div class="page-title"><div class="eyebrow">PROJECT VAULT</div><h1>Projeler</h1><p>Fikirlerini, görevlerini ve kararlarını yerelde tut; JSON veya Markdown olarak dışa aktar.</p></div>
+        <form class="panel" id="projectForm">
+          <label class="field-label" for="projectName">Proje adı</label><input class="input" id="projectName" required maxlength="100" placeholder="Behind the Door, AI Studio...">
+          <label class="field-label" for="projectNotes">Notlar / görev planı</label><textarea class="input" id="projectNotes" required maxlength="20000" rows="5" placeholder="Amaç, modüller, yapılacaklar, kararlar..."></textarea>
+          <div class="row-actions"><button class="btn primary" type="submit">Projeyi kaydet +</button><button class="btn ghost" type="button" id="importProjectsBtn">JSON içe aktar</button><input id="importProjectsFile" type="file" accept=".json,application/json" hidden><span class="grow"></span><button class="btn secondary" type="button" id="exportProjects">Yedekle ↓</button></div>
+        </form>
+        <div id="projectList" class="stack"></div>
+      </section>
+
+      <section class="screen" id="tools">
+        <div class="page-title"><div class="eyebrow">TOOLBOX / PROMPT PLUGINS</div><h1>Araçlar ve eklentiler</h1><p>Hazır görev şablonları kullan, kendi prompt eklentilerini oluştur veya kod parçalarını dışa aktar.</p></div>
+        <div class="section-head"><h2>Hazır iş akışları</h2></div><div class="tool-grid" id="builtinTools"></div>
+        <form class="panel" id="pluginForm">
+          <h2>Kendi prompt eklentin</h2><label class="field-label" for="pluginName">Eklenti adı</label><input class="input" id="pluginName" required maxlength="80" placeholder="Örn. Babylon.js performans kontrolü">
+          <label class="field-label" for="pluginPrompt">Talimat şablonu</label><textarea class="input" id="pluginPrompt" required maxlength="6000" rows="4" placeholder="Modelin bu görevi nasıl yapmasını istiyorsun? {{gorev}} yazısı görevle değiştirilir."></textarea>
+          <button class="btn primary" type="submit">Eklentiyi kaydet</button>
+        </form>
+        <div class="section-head"><h2>Kayıtlı prompt eklentileri</h2><button class="btn ghost small" id="exportPlugins">Dışa aktar</button></div><div id="pluginList" class="stack"></div>
+        <div class="panel">
+          <div class="section-head"><div><div class="eyebrow">CODE PAD</div><h2>Kod alanı</h2></div></div>
+          <label class="field-label" for="codeLanguage">Dil</label><select class="input" id="codeLanguage"><option>javascript</option><option>html</option><option>css</option><option>python</option><option>json</option><option>markdown</option><option>text</option></select>
+          <textarea class="input code-area" id="codePad" spellcheck="false" rows="12" placeholder="// Kodunu burada taslak olarak düzenle. Bu editör kodu çalıştırmaz."></textarea>
+          <div class="row-actions"><button class="btn secondary" id="copyCode" type="button">Kopyala</button><button class="btn ghost" id="importCode" type="button">Dosya içe aktar</button><input type="file" id="codeFile" hidden accept=".js,.ts,.json,.html,.css,.py,.txt,.md"><span class="grow"></span><button class="btn primary" id="exportCode" type="button">Dosyayı indir</button></div>
+        </div>
+        <div class="panel"><h2>Proje verileri / gizlilik</h2><p class="muted">Proje notları, sohbet geçmişi ve prompt eklentileri bu cihazda saklanır. Yedekler API anahtarlarını içermez. Sohbeti gerçek modele gönderdiğinde, yazdığın içerik seçili sağlayıcıya iletilir.</p><button class="btn danger" id="resetLocal">Cihazdaki notları ve geçmişi sil</button></div>
+      </section>
+    </main>
+    <nav class="bottom-nav" aria-label="Ana gezinme">
+      <button class="nav-btn active" data-tab="home"><span>⌂</span>Ana ekran</button>
+      <button class="nav-btn" data-tab="chat"><span>◉</span>Sohbet</button>
+      <button class="nav-btn" data-tab="compare"><span>⇄</span>Karşılaştır</button>
+      <button class="nav-btn" data-tab="models"><span>✳</span>Modeller</button>
+      <button class="nav-btn" data-tab="projects"><span>▤</span>Projeler</button>
+      <button class="nav-btn" data-tab="tools"><span>⌘</span>Araçlar</button>
+    </nav>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  </div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
