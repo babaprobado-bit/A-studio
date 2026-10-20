@@ -1,12 +1,16 @@
 {
   "name": "ai-studio-alpha-1-mobile",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
-  "description": "AI Studio Alpha 1 mobile multi-provider workspace",
+  "description": "AI Studio Alpha 1 cross-platform multi-provider workspace with private web gateway",
+  "engines": { "node": ">=20" },
   "scripts": {
-    "build": "vite build"
+    "build": "vite build",
+    "start": "node server/server.js"
   },
   "dependencies": {
+    "express": "^5.1.0",
+    "helmet": "^8.1.0",
     "@capacitor/android": "7.4.0",
     "@capacitor/core": "7.4.0",
     "@capacitor/preferences": "^7.0.0",

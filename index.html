@@ -4,7 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#0b1020">
-  <meta name="description" content="AI Studio Alpha 1 - mobil çoklu model çalışma alanı">
+  <meta name="description" content="AI Studio Alpha 1 - çoklu model ve oyun geliştirme çalışma alanı">
+  <meta name="application-name" content="AI Studio Alpha 1">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
   <title>AI Studio Alpha 1</title>
 </head>
 <body>
@@ -13,7 +18,11 @@
       <a class="brand" href="#home" aria-label="AI Studio ana ekran">
         <span class="brand-mark">✳</span><span><strong>AI Studio</strong><small>ALPHA 1 · MOBILE WORKSPACE</small></span>
       </a>
-      <span id="modePill" class="pill safe">DEMO MODU</span>
+      <div class="topbar-actions">
+        <button id="installWebAppBtn" type="button" class="btn ghost small hidden">Uygulamayı yükle</button>
+        <button id="webLogoutBtn" type="button" class="btn ghost small hidden">Güvenli çıkış</button>
+        <span id="modePill" class="pill safe">DEMO MODU</span>
+      </div>
     </header>
     <main>
       <section class="screen active" id="home">

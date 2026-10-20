@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: ai-studio-alpha-1-private
+    runtime: node
+    buildCommand: npm install --no-audit --no-fund && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SITE_PASSWORD
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true

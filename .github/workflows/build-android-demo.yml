@@ -6,6 +6,11 @@ on:
     branches: [main]
     paths:
       - 'index.html'
+      - 'public/**'
+      - 'server/**'
+      - 'vite.config.js'
+      - 'render.yaml'
+      - '.env.example'
       - 'src/**'
       - 'package.json'
       - 'capacitor.config.json'

@@ -306,11 +306,50 @@ $('importWorkspaceBtn').addEventListener('click',()=> $('importWorkspaceFile').c
 $('importWorkspaceFile').addEventListener('change',async e=>{if(e.target.files?.[0])await importWorkspace(e.target.files[0]);e.target.value='';});
 $('resetLocal').addEventListener('click',clearAllLocal);
 
+let deferredInstallPrompt=null;
+window.addEventListener('beforeinstallprompt',event=>{
+  if(nativeApp)return;
+  event.preventDefault();
+  deferredInstallPrompt=event;
+  $('installWebAppBtn')?.classList.remove('hidden');
+});
+window.addEventListener('appinstalled',()=>{
+  deferredInstallPrompt=null;
+  $('installWebAppBtn')?.classList.add('hidden');
+  showToast('AI Studio ana ekrana eklendi.');
+});
+$('installWebAppBtn').addEventListener('click',async()=>{
+  if(!deferredInstallPrompt){showToast('Tarayıcı menüsünden “Ana ekrana ekle” seçeneğini kullanabilirsin.');return;}
+  try{await deferredInstallPrompt.prompt();await deferredInstallPrompt.userChoice;}catch(_){}
+  deferredInstallPrompt=null;
+  $('installWebAppBtn').classList.add('hidden');
+});
+$('webLogoutBtn').addEventListener('click',async()=>{
+  if(!confirm('Güvenli oturum kapatılsın mı? Açık API anahtarları da bu sekme kapanınca temizlenir.'))return;
+  try{
+    const response=await fetch('/api/logout',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:'{}'});
+    if(response.ok){window.location.assign('/login');return;}
+    showToast('Oturum kapatılamadı. Tarayıcıyı kapatıp yeniden açabilirsin.');
+  }catch(_){showToast('Sunucuya ulaşılamadı; bağlantını kontrol et.');}
+});
+async function prepareBrowserFeatures(){
+  if(nativeApp)return;
+  if('serviceWorker' in navigator&&window.isSecureContext){
+    navigator.serviceWorker.register('./sw.js',{scope:'./'}).catch(()=>{});
+  }
+  try{
+    const response=await fetch('/api/session',{credentials:'same-origin',headers:{'Accept':'application/json'}});
+    if(response.ok){
+      const data=await response.json();
+      if(data?.privateSite)$('webLogoutBtn').classList.remove('hidden');
+    }
+  }catch(_){}
+}
 async function init(){
   try{settings={...clone(defaultSettings),...(await getPref(DB.settings,{}))};settings.models={...clone(defaultSettings.models),...(settings.models||{})};settings.team=(settings.team||defaultSettings.team).filter(id=>providers[id]).slice(0,4);if(settings.ollamaUrl==='http://192.168.1.100:11434')settings.ollamaUrl='';}catch(_){}
-  if(!nativeApp){showToast('Tarayıcı önizlemesi: API anahtarları kalıcı saklanmaz; Android sürümü güvenli depo kullanır.');}
+  if(!nativeApp){showToast('Tarayıcıda API anahtarları yalnızca açık oturumda tutulur.');}
   await initKeys(); projectList=await getPref(DB.projects,[]);chatHistory=await getPref(DB.chat,[]);userPlugins=await getPref(DB.plugins,[]);
   if(!Array.isArray(projectList))projectList=[];if(!Array.isArray(chatHistory))chatHistory=[];if(!Array.isArray(userPlugins))userPlugins=[];
   renderProviderCards();renderProjects();renderChat();renderBuiltinTools();renderPlugins();syncModeUI();updateDashboard();$('compareSelectionCount').textContent=settings.team.length+' ajan seçili';
 }
-init().catch(()=>showToast('Başlangıç ayarları okunamadı; sayfayı yenileyebilirsin.'));
+prepareBrowserFeatures().then(init).catch(()=>showToast('Başlangıç ayarları okunamadı; sayfayı yenileyebilirsin.'));
