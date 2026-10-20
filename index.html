@@ -46,7 +46,7 @@
         <div class="chat-window" id="chatMessages" aria-live="polite"></div>
         <form id="chatForm" class="compose">
           <textarea id="chatInput" class="input compose-input" rows="3" maxlength="12000" placeholder="Görevi yaz... Örn. oyunum için modüler görev planı oluştur." required></textarea>
-          <div class="compose-actions"><button type="button" class="btn ghost small" id="exportChat">Sohbeti dışa aktar</button><span class="grow"></span><button type="button" class="btn secondary small" id="teamRun">Takım turu (en fazla 4)</button><button type="submit" class="btn primary">Gönder ↗</button></div>
+          <div class="compose-actions"><button type="button" class="btn ghost small" id="exportChat">Sohbeti dışa aktar</button><span class="grow"></span><button type="button" class="btn secondary small" id="teamRun">Paralel takım (en fazla 4)</button><button type="button" class="btn ghost small" id="pipelineRun">Sıralı ajan zinciri</button><button type="submit" class="btn primary">Gönder ↗</button></div>
         </form>
         <div class="row-actions"><button class="btn ghost small" id="clearChat">Sohbeti temizle</button><span class="muted">Geçmiş bu cihazda saklanır.</span></div>
       </section>
@@ -98,7 +98,7 @@
           <label class="field-label" for="pluginPrompt">Talimat şablonu</label><textarea class="input" id="pluginPrompt" required maxlength="6000" rows="4" placeholder="Modelin bu görevi nasıl yapmasını istiyorsun? {{gorev}} yazısı görevle değiştirilir."></textarea>
           <button class="btn primary" type="submit">Eklentiyi kaydet</button>
         </form>
-        <div class="section-head"><h2>Kayıtlı prompt eklentileri</h2><button class="btn ghost small" id="exportPlugins">Dışa aktar</button></div><div id="pluginList" class="stack"></div>
+        <div class="section-head"><h2>Kayıtlı prompt eklentileri</h2><div class="row-actions"><button class="btn ghost small" id="importPluginsBtn">İçe aktar</button><input type="file" id="importPluginsFile" accept=".json,application/json" hidden><button class="btn ghost small" id="exportPlugins">Dışa aktar</button></div></div><div id="pluginList" class="stack"></div>
         <div class="panel">
           <div class="section-head"><div><div class="eyebrow">CODE PAD</div><h2>Kod alanı</h2></div></div>
           <label class="field-label" for="codeLanguage">Dil</label><select class="input" id="codeLanguage"><option>javascript</option><option>html</option><option>css</option><option>python</option><option>json</option><option>markdown</option><option>text</option></select>

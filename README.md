@@ -1,12 +1,12 @@
-# AI Studio Alpha 1 — Mobile Workspace 0.2
+# AI Studio Alpha 1 — Mobile Workspace 0.3
 
 This mobile Android build includes:
 - Real API calls for OpenAI-compatible chat providers, Anthropic Messages, Google Gemini generateContent, and Ollama chat.
 - Encrypted Android API-key storage using Android Keystore-backed secure storage (web preview never persists API keys).
 - Demo mode enabled by default to avoid accidental API charges.
-- Multi-provider chat and comparison; a team run explicitly confirms when it may make multiple paid requests.
+- Multi-provider chat and comparison; parallel team runs and a sequential agent pipeline explicitly confirm when they may make multiple paid requests. Each sequential stage sees the prior stage's output.
 - Ollama endpoint settings for a model hosted on another computer in the same trusted network. No language model is bundled inside this APK.
-- Local project notes with JSON backup/import, chat export, custom prompt plugins, workflow templates, and a code scratchpad.
+- Local project notes with JSON backup/import, chat export, custom prompt plugins with JSON import/export, workflow templates, and a code scratchpad.
 
 ## Build Android APK
 GitHub Actions → **Build Android Demo APK** → **Run workflow** on `main`. Download the `AI-Studio-Alpha-1-Demo-APK` artifact and extract `app-debug.apk`.
@@ -19,3 +19,4 @@ Ollama is a connection to a model running on another computer, not an on-device 
 
 ## Security boundaries
 API keys are never written to GitHub or included in the source. Browser preview stores keys only in memory, not localStorage. Project/chat backups do not contain provider keys. This standalone mobile workspace does not bundle the desktop LocalCoder/AirLLM runtime or video render engine.
+\n\n## Mobile Workspace 0.3 notes\n- Updated provider request compatibility for OpenAI-style calls and Anthropic direct-client requests. Providers can change API behavior; always check their current docs and model IDs.\n- The default Ollama address is intentionally blank so a placeholder IP is not mistaken for a working connection. Enter the computer's actual trusted-LAN address.\n- The sequential agent chain is an orchestration feature, not an autonomous computer operator: it does not run shell commands, edit arbitrary files on the PC, or claim tests passed unless a connected model reports them. Demo mode returns templates rather than model inference.\n- Prompt plugin import accepts JSON instructions only and does not execute imported code. Backups never include provider API keys.\n

@@ -24,7 +24,7 @@ const defaultSettings = {
   demoMode: true,
   models: Object.fromEntries(Object.entries(providers).map(([id,p]) => [id,p.model])),
   team: ['openai','gemini','ollama'],
-  ollamaUrl: 'http://192.168.1.100:11434',
+  ollamaUrl: '',
   ollamaModel: 'qwen2.5-coder:1.5b',
   systemPrompt: 'Yanıtlarını açık ve uygulanabilir yaz. Bilmediğin şeyi uydurma. Kod istenince küçük, test edilebilir adımlar öner.'
 };
@@ -90,7 +90,7 @@ function demoAnswer(providerId,prompt,roleOverride){
   return '['+role+' · DEMO ŞABLONU]\n\n'+(base[providerId]||base.openai)+'\n\nGörev: '+prompt+'\n\nNot: Bu gerçek model çağrısı değildir; Demo modu açıktır.';
 }
 function pushMessage(role,content,meta){ chatHistory.push({role,content,provider:meta?.provider||'',mode:meta?.mode||'demo',time:new Date().toISOString()}); if(chatHistory.length>80)chatHistory=chatHistory.slice(-80); renderChat(); persistChat(); }
-function renderChat(){ const out=$('chatMessages'); if(!chatHistory.length){out.innerHTML='<div class="result-card"><div class="result-label">AI STUDIO</div><p>Selam! Demo modu açık. Bir görev yazabilir ya da Modeller ekranından sağlayıcı bağlayabilirsin.</p></div>';return;} out.innerHTML=chatHistory.map(m=>'<article class="chat-bubble '+(m.role==='user'?'user':'assistant')+'"><div class="chat-meta">'+(m.role==='user'?'SEN':esc(m.provider||'AI STUDIO'))+' · '+(m.mode==='live'?'GERÇEK MODEL':'DEMO')+'</div><div class="chat-text">'+esc(m.content)+'</div></article>').join(''); out.scrollTop=out.scrollHeight; }
+function renderChat(){ const out=$('chatMessages'); if(!chatHistory.length){out.innerHTML='<div class="result-card"><div class="result-label">AI STUDIO</div><p>Selam! Demo modu açık. Bir görev yazabilir ya da Modeller ekranından sağlayıcı bağlayabilirsin.</p></div>';return;} out.innerHTML=chatHistory.map(m=>'<article class="chat-bubble '+(m.role==='user'?'user':'assistant')+'"><div class="chat-meta">'+(m.role==='user'?'SEN':esc(m.provider||'AI STUDIO'))+' · '+(m.mode==='error'?'HATA':m.mode==='live'?'GERÇEK MODEL':'DEMO')+'</div><div class="chat-text '+(m.mode==='error'?'error':'')+'">'+esc(m.content)+'</div></article>').join(''); out.scrollTop=out.scrollHeight; }
 let chatPersistTimer;
 function persistChat(){clearTimeout(chatPersistTimer);chatPersistTimer=setTimeout(()=>setPref(DB.chat,chatHistory).catch(()=>showToast('Sohbet kaydı başarısız oldu.')),250);}
 function chatContext(){return chatHistory.slice(-10).filter(m=>m.role==='user'||m.role==='assistant').map(m=>({role:m.role,content:m.content}));}
@@ -115,7 +115,7 @@ async function callProvider(id,prompt,history){
   const p=providers[id]; const key=await getSecret(id); if(!key)throw new Error(p.name+' için API anahtarı ayarlanmamış. Modeller ekranından ekle.');
   const msgs=history.slice(-8).filter(m=>m.role==='user'||m.role==='assistant').map(m=>({role:m.role,content:m.content})); msgs.push({role:'user',content:prompt});
   if(p.kind==='anthropic'){
-    const d=await fetchJson(p.endpoint,{method:'POST',headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01'},body:JSON.stringify({model:providerModel(id),max_tokens:2048,system:systemFor(id),messages:msgs.filter(m=>m.role==='user'||m.role==='assistant')})});
+    const d=await fetchJson(p.endpoint,{method:'POST',headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:providerModel(id),max_tokens:2048,system:systemFor(id),messages:msgs.filter(m=>m.role==='user'||m.role==='assistant')})});
     const text=(d.content||[]).filter(x=>x.type==='text').map(x=>x.text).join('\n');if(!text)throw new Error('Claude yanıtında metin bulunamadı.');return text;
   }
   if(p.kind==='gemini'){
@@ -124,7 +124,7 @@ async function callProvider(id,prompt,history){
     const d=await fetchJson(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({systemInstruction:{parts:[{text:systemFor(id)}]},contents,generationConfig:{temperature:0.4,maxOutputTokens:2048}})});
     const text=(d.candidates?.[0]?.content?.parts||[]).map(x=>x.text||'').join('\n');if(!text)throw new Error(d.promptFeedback?.blockReason||'Gemini yanıtında metin bulunamadı.');return text;
   }
-  const d=await fetchJson(p.endpoint,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model:providerModel(id),messages:[{role:'system',content:systemFor(id)},...msgs],temperature:0.4,max_tokens:2048})});
+  const openAiBody={model:providerModel(id),messages:[{role:'system',content:systemFor(id)},...msgs]};\n  if(id==='openai'){openAiBody.max_completion_tokens=2048;}\n  else {openAiBody.temperature=0.4;openAiBody.max_tokens=2048;}\n  const d=await fetchJson(p.endpoint,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify(openAiBody)});
   const message=d.choices?.[0]?.message?.content;
   const text=Array.isArray(message)?message.map(x=>x.text||'').join('\n'):message;
   if(!text)throw new Error('Yanıtta metin bulunamadı. Model kimliğinin bu API üzerinde kullanılabildiğini doğrula.');return text;
@@ -153,6 +153,50 @@ async function runTeam(prompt){
   load.remove(); results.forEach(r=>pushMessage('assistant',r.error?'Hata: '+r.error:r.answer,{provider:providers[r.id].name,mode:r.error?'error':'live'}));
   busy=false;
 }
+async function runPipeline(prompt){
+  if(busy)return;
+  const task=prompt.trim();
+  const selected=settings.team.slice(0,4);
+  if(!task){showToast('Önce iş akışının görevini yaz.');return;}
+  if(selected.length<2){showToast('Sıralı zincir için en az iki ajan seç.');go('models');return;}
+  if(!settings.demoMode&&!confirm('Sıralı ajan zinciri '+selected.length+' gerçek API isteği gönderebilir ve ücret oluşturabilir. Her ajan bir öncekinin çıktısını görür. Devam?'))return;
+  busy=true;
+  $('chatInput').disabled=true;
+  $('chatForm').querySelector('[type=submit]').disabled=true;
+  $('teamRun').disabled=true;
+  $('pipelineRun').disabled=true;
+  pushMessage('user',task,{mode:settings.demoMode?'demo':'live'});
+  const out=$('chatMessages');
+  const loading=document.createElement('article');
+  loading.className='result-card';
+  loading.innerHTML='<div class="result-label">SIRALI AJAN ZİNCİRİ</div><p>Planla → geliştir → eleştir → test et aşamaları çalışıyor…</p>';
+  out.append(loading);
+  let previous='';
+  const stageRoles=['Mimar / planlayıcı','Uygulayıcı','Bağımsız gözden geçirici','Testçi / son kontrol'];
+  try{
+    for(let i=0;i<selected.length;i++){
+      const id=selected[i];
+      const stagePrompt='İş akışı aşaması '+(i+1)+'/'+selected.length+'. Rolün: '+stageRoles[Math.min(i,stageRoles.length-1)]+'.\nAsıl görev: '+task+'\n'+(previous?'Önceki ajanın çıktısı:\n'+previous+'\n':'')+'Görev: '+(i===0?'Uygulanabilir bir plan ve riskleri çıkar.':i===1?'Planı somut, modüler ve test edilebilir sonuca dönüştür.':i===2?'Önceki çıktıyı bağımsız değerlendir; hataları ve eksikleri düzelt.':'Son çıktıyı kontrol et; test senaryolarını, kalan işleri ve kabul ölçütlerini listele.')+'\nBilmediğin şeyi uydurma, kodu gerçekten çalıştırmadıysan çalıştırdığını iddia etme.';
+      const answer=settings.demoMode
+        ? demoAnswer(id,stagePrompt,stageRoles[Math.min(i,stageRoles.length-1)])
+        : await callProvider(id,stagePrompt,chatContext().slice(0,-1));
+      previous=answer;
+      pushMessage('assistant','AŞAMA '+(i+1)+'/'+selected.length+'\n'+answer,{provider:providers[id].name,mode:settings.demoMode?'demo':'live'});
+      loading.querySelector('p').textContent='Tamamlanan aşama: '+(i+1)+'/'+selected.length+' · '+providers[id].name;
+    }
+    loading.remove();
+    showToast('Sıralı ajan zinciri tamamlandı.');
+  }catch(err){
+    loading.remove();
+    pushMessage('assistant','Zincir durdu: '+(err?.message||'Bilinmeyen hata')+'\nÖnceki aşamalar sohbet geçmişinde duruyor; kalan aşamaları kontrol edip yeniden deneyebilirsin.',{provider:'AI STUDIO',mode:'error'});
+  }finally{
+    busy=false;
+    $('chatInput').disabled=false;
+    $('chatForm').querySelector('[type=submit]').disabled=false;
+    $('teamRun').disabled=false;
+    $('pipelineRun').disabled=false;
+  }
+}
 function renderCompareResults(results){$('compareResults').innerHTML=results.map(r=>'<article class="result-card"><div class="result-label">'+esc(providers[r.id].name)+' · '+(r.error?'HATA':r.mode==='live'?'GERÇEK MODEL':'DEMO ŞABLONU')+'</div><p>'+esc(r.error||r.answer)+'</p></article>').join('');}
 async function runCompare(){
   const prompt=$('comparePrompt').value.trim();if(!prompt){showToast('Önce karşılaştırılacak görevi yaz.');return;}
@@ -171,7 +215,7 @@ function renderBuiltinTools(){ $('builtinTools').innerHTML=builtinTools.map(t=>'
 function renderPlugins(){ const out=$('pluginList'); if(!userPlugins.length){out.innerHTML='<div class="panel"><p class="muted">Henüz özel eklenti yok. Eklentiler yalnızca metin talimatlarıdır; keyfi kod çalıştırmaz.</p></div>';return;}
   out.innerHTML=userPlugins.map((p,i)=>'<article class="plugin-card"><div class="plugin-head"><h3>'+esc(p.name)+'</h3><span class="pill">'+(p.kind==='builtin'?'HAZIR':'ÖZEL')+'</span></div><p>'+esc(p.prompt)+'</p><div class="row-actions"><button class="btn secondary small" data-plugin-run="'+i+'">Sohbette kullan</button><span class="grow"></span>'+(p.kind==='builtin'?'':'<button class="btn danger small" data-plugin-delete="'+i+'">Sil</button>')+'</div></article>').join('');
 }
-async function addPlugin(e){e.preventDefault();const name=$('pluginName').value.trim(),prompt=$('pluginPrompt').value.trim();if(!name||!prompt)return;userPlugins.push({id:crypto.randomUUID?crypto.randomUUID():String(Date.now()),name,prompt,kind:'custom'});await setPref(DB.plugins,userPlugins);$('pluginForm').reset();renderPlugins();showToast('Prompt eklentisi kaydedildi.');}
+async function addPlugin(e){e.preventDefault();const name=$('pluginName').value.trim(),prompt=$('pluginPrompt').value.trim();if(!name||!prompt)return;userPlugins.push({id:crypto.randomUUID?crypto.randomUUID():String(Date.now()),name,prompt,kind:'custom'});await setPref(DB.plugins,userPlugins);$('pluginForm').reset();renderPlugins();showToast('Prompt eklentisi kaydedildi.');}\nasync function importPlugins(file){try{const data=JSON.parse(await file.text());const incoming=Array.isArray(data)?data:data.plugins;if(!Array.isArray(incoming))throw new Error('JSON içinde plugins dizisi bulunamadı.');let count=0;for(const p of incoming){if(typeof p?.name==='string'&&typeof p?.prompt==='string'&&p.name.trim()&&p.prompt.trim()){userPlugins.push({id:crypto.randomUUID?crypto.randomUUID():String(Date.now()+count),name:p.name.trim().slice(0,80),prompt:p.prompt.trim().slice(0,6000),kind:'custom'});count++;}}userPlugins=userPlugins.slice(-100);await setPref(DB.plugins,userPlugins);renderPlugins();showToast(count+' prompt eklentisi içe aktarıldı.');}catch(err){showToast('Eklenti içe aktarılamadı: '+(err.message||'JSON dosyasını kontrol et.'));}}
 function updateDashboard(){const connected=Object.keys(providers).filter(id=>id==='ollama'?!!settings.ollamaUrl:!!runtimeKeys[id]);$('connectedCount').textContent=connected.length;$('projectCount').textContent=projectList.length;
   $('dashboard').innerHTML='<article class="panel"><div class="row-actions"><strong>API sağlayıcıları</strong><span class="grow"></span><span class="pill">'+connected.length+' ayar</span></div><p class="muted">'+esc(connected.map(id=>providers[id].name).join(', ')||'Henüz anahtar ayarlanmadı.')+'</p><button class="btn ghost small" data-go="models">Bağlantıları yönet</button></article><article class="panel"><div class="row-actions"><strong>Sohbet geçmişi</strong><span class="grow"></span><span class="pill">'+chatHistory.length+' mesaj</span></div><p class="muted">Bu cihazdaki yerel geçmiş. Gerçek model sohbetleri de dışa aktarılabilir.</p></article>';
 }
@@ -204,7 +248,7 @@ document.addEventListener('change',async e=>{
   if(e.target.matches('[data-team]')){const id=e.target.dataset.team;let group=[...document.querySelectorAll('[data-team="'+id+'"]')];if(e.target.checked){if(!settings.team.includes(id)&&settings.team.length>=4){e.target.checked=false;group.forEach(x=>x.checked=false);showToast('Takım turu en fazla dört sağlayıcı çağırır.');return;}if(!settings.team.includes(id))settings.team.push(id);}else settings.team=settings.team.filter(x=>x!==id);group.forEach(x=>x.checked=e.target.checked);await setPref(DB.settings,settings);renderProviderCards();$('compareSelectionCount').textContent=settings.team.length+' ajan seçili';}
 });
 $('chatForm').addEventListener('submit',e=>{e.preventDefault();const p=$('chatInput').value.trim();if(!p)return;$('chatInput').value='';submitChat(p,$('chatProvider').value);});
-$('teamRun').addEventListener('click',()=>{const p=$('chatInput').value.trim();if(!p){showToast('Önce takımın görevini yaz.');return;}$('chatInput').value='';runTeam(p);});
+$('teamRun').addEventListener('click',()=>{const p=$('chatInput').value.trim();if(!p){showToast('Önce takımın görevini yaz.');return;}$('chatInput').value='';runTeam(p);});\n$('pipelineRun').addEventListener('click',()=>{const p=$('chatInput').value.trim();if(!p){showToast('Önce zincirin görevini yaz.');return;}$('chatInput').value='';runPipeline(p);});
 $('compareRun').addEventListener('click',runCompare);
 $('demoToggle').addEventListener('change',async e=>{settings.demoMode=e.target.checked;await setPref(DB.settings,settings);syncModeUI();});
 $('settingsDemoToggle').addEventListener('change',async e=>{settings.demoMode=e.target.checked;await setPref(DB.settings,settings);syncModeUI();});
@@ -214,7 +258,7 @@ $('exportProjects').addEventListener('click',exportProjects);
 $('importProjectsBtn').addEventListener('click',()=>$('importProjectsFile').click());
 $('importProjectsFile').addEventListener('change',async e=>{if(e.target.files?.[0])await importProjects(e.target.files[0]);e.target.value='';});
 $('pluginForm').addEventListener('submit',addPlugin);
-$('exportPlugins').addEventListener('click',()=>downloadText('ai-studio-prompt-plugins.json',JSON.stringify({format:'ai-studio-prompts-v1',plugins:userPlugins.filter(p=>p.kind!=='builtin')},null,2),'application/json;charset=utf-8'));
+$('exportPlugins').addEventListener('click',()=>downloadText('ai-studio-prompt-plugins.json',JSON.stringify({format:'ai-studio-prompts-v1',plugins:userPlugins.filter(p=>p.kind!=='builtin')},null,2),'application/json;charset=utf-8'));\n$('importPluginsBtn').addEventListener('click',()=> $('importPluginsFile').click());\n$('importPluginsFile').addEventListener('change',async e=>{if(e.target.files?.[0])await importPlugins(e.target.files[0]);e.target.value='';});
 $('exportChat').addEventListener('click',()=>downloadText('ai-studio-chat.json',JSON.stringify({exportedAt:new Date().toISOString(),messages:chatHistory},null,2),'application/json;charset=utf-8'));
 $('clearChat').addEventListener('click',async()=>{if(confirm('Sohbet geçmişi temizlensin mi?')){chatHistory=[];await removePref(DB.chat);renderChat();}});
 $('saveOllama').addEventListener('click',saveOllama);
@@ -226,7 +270,7 @@ $('codeFile').addEventListener('change',async e=>{const f=e.target.files?.[0];if
 $('resetLocal').addEventListener('click',clearAllLocal);
 
 async function init(){
-  try{settings={...clone(defaultSettings),...(await getPref(DB.settings,{}))};settings.models={...clone(defaultSettings.models),...(settings.models||{})};settings.team=(settings.team||defaultSettings.team).filter(id=>providers[id]).slice(0,4);}catch(_){}
+  try{settings={...clone(defaultSettings),...(await getPref(DB.settings,{}))};settings.models={...clone(defaultSettings.models),...(settings.models||{})};settings.team=(settings.team||defaultSettings.team).filter(id=>providers[id]).slice(0,4);if(settings.ollamaUrl==='http://192.168.1.100:11434')settings.ollamaUrl='';}catch(_){}
   if(!nativeApp){showToast('Tarayıcı önizlemesi: API anahtarları kalıcı saklanmaz; Android sürümü güvenli depo kullanır.');}
   await initKeys(); projectList=await getPref(DB.projects,[]);chatHistory=await getPref(DB.chat,[]);userPlugins=await getPref(DB.plugins,[]);
   if(!Array.isArray(projectList))projectList=[];if(!Array.isArray(chatHistory))chatHistory=[];if(!Array.isArray(userPlugins))userPlugins=[];

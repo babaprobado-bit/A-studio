@@ -1,6 +1,6 @@
 {
   "name": "ai-studio-alpha-1-mobile",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "AI Studio Alpha 1 mobile multi-provider workspace",
   "scripts": {
