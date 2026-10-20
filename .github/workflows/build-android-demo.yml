@@ -1,0 +1,51 @@
+name: Build Android Demo APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'AI-Studio-Alpha-1-Mobile-Demo-Source.zip'
+      - '.github/workflows/build-android-demo.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build-debug-apk:
+    name: Build debug APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Unpack demo source
+        run: unzip -q AI-Studio-Alpha-1-Mobile-Demo-Source.zip
+      - name: Install dependencies
+        working-directory: AI-Studio-Alpha-1-Demo
+        run: npm install --no-audit --no-fund
+      - name: Create Android project
+        working-directory: AI-Studio-Alpha-1-Demo
+        run: npx cap add android
+      - name: Sync Android project
+        working-directory: AI-Studio-Alpha-1-Demo
+        run: npx cap sync android
+      - name: Build debug APK
+        working-directory: AI-Studio-Alpha-1-Demo/android
+        run: chmod +x gradlew && ./gradlew --no-daemon assembleDebug
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AI-Studio-Alpha-1-Demo-APK
+          path: AI-Studio-Alpha-1-Demo/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
