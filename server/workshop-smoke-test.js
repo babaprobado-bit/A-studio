@@ -6,7 +6,10 @@ import { reuseCatalog, buildLocalCoderStages, extractCodeArtifact, normalizeSnip
 const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
 const main=readFileSync(new URL('../src/main.js',import.meta.url),'utf8');
 for(const id of ['localCoderTask','localCoderRun','localCoderOutput','localCoderReview','reuseCatalogGrid','snippetForm','snippetList','agentActivityList','savedCodeFileSelect','savedCodeFileName','newCodeFile','saveCodeFile','deleteCodeFile','exportCodeFiles','importCodeFilesBtn','importCodeFilesFile']) assert.match(html,new RegExp('id="'+id+'"'),'Missing UI: '+id);
-assert.match(main,/buildLocalCoderStages/);assert.match(main,/callProvider\('ollama'/);assert.match(main,/DB\.snippets/);assert.match(main,/DB\.activity/);\nassert.match(main,/DB\.codeFiles/);\nassert.match(main,/function saveCurrentCodeFile/);\nassert.match(main,/function importCodeFileCollection/);
+assert.match(main,/buildLocalCoderStages/);assert.match(main,/callProvider\('ollama'/);assert.match(main,/DB\.snippets/);assert.match(main,/DB\.activity/);
+assert.match(main,/DB\.codeFiles/);
+assert.match(main,/function saveCurrentCodeFile/);
+assert.match(main,/function importCodeFileCollection/);
 for(const event of ['Tekli sohbet','Paralel takım','Sıralı ajan zinciri','Model karşılaştırma']) assert.ok(main.includes(event),'Missing activity instrumentation: '+event);
 assert.ok(reuseCatalog.some(x=>x.id==='babylonjs'));assert.ok(reuseCatalog.some(x=>x.id==='kenney'));
 assert.equal(buildLocalCoderStages({task:'test',language:'javascript'}).length,3);
