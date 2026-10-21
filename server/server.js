@@ -198,6 +198,22 @@ function agentWriteGuard(req, res, next) {
   if (req.vaultAgent?.scope !== 'readwrite') return res.status(403).json({ error: 'Bu agent salt okunur. Yazmak için readwrite token oluştur.' });
   return next();
 }
+const NATIVE_AGENT_ORIGINS = new Set(['https://localhost', 'http://localhost', 'capacitor://localhost', 'ionic://localhost']);
+function nativeAgentCors(req, res, next) {
+  const origin = req.get('origin') || '';
+  if (origin && NATIVE_AGENT_ORIGINS.has(origin)) {
+    res.set('Access-Control-Allow-Origin', origin);
+    res.set('Vary', 'Origin');
+    res.set('Access-Control-Allow-Headers', 'Authorization, Content-Type, Accept');
+    res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  }
+  if (req.method === 'OPTIONS') {
+    if (!origin || !NATIVE_AGENT_ORIGINS.has(origin)) return res.status(403).end();
+    return res.status(204).end();
+  }
+  return next();
+}
+app.use('/api/agent/v1', nativeAgentCors);
 app.use('/api/agent/v1', agentAuthGuard);
 app.get('/api/agent/v1/openapi.json', (req, res) => {
   res.set('Cache-Control', 'no-store');

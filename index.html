@@ -117,6 +117,23 @@
           <label class="field-label" for="localCoderReview">İnceleme ve test önerileri</label>
           <textarea id="localCoderReview" class="input" rows="5" readonly placeholder="Son aşamada inceleme ve test listesi gelecek."></textarea>
         </div>
+        <div class="panel hidden" id="nativeVaultPanel">
+          <div class="section-head"><div><div class="eyebrow">MOBILE SHARED VAULT</div><h2>AI Studio’yu ortak kasaya bağla</h2></div><span class="pill">HTTPS + token</span></div>
+          <p class="muted">Özel web sitesinde oluşturduğun agent tokenını buraya gir. Token Android’in güvenli anahtar deposunda saklanır; çalışma alanı yedeğine veya kaynak koduna eklenmez. Salt okunur token kayıtları okur; readwrite token kayıt ekleyip silebilir.</p>
+          <label class="field-label" for="nativeVaultBaseUrl">Özel site adresi (HTTPS)</label><input id="nativeVaultBaseUrl" class="input" type="url" maxlength="500" placeholder="https://senin-ai-studio-siten.onrender.com" autocomplete="url">
+          <label class="field-label" for="nativeVaultToken">Agent tokenı (sitede bir kez oluşturulur)</label><input id="nativeVaultToken" class="input" type="password" maxlength="180" placeholder="aiav_… — mevcut token kayıtlıysa boş bırak" autocomplete="new-password" autocapitalize="off" spellcheck="false">
+          <div class="row-actions"><button id="nativeVaultConnect" class="btn primary" type="button">Bağlan ve güvenli kaydet</button><button id="nativeVaultDisconnect" class="btn ghost small" type="button">Bağlantıyı kes</button><span class="grow"></span><button id="nativeVaultRefresh" class="btn secondary small" type="button">Kayıtları yenile</button></div>
+          <label class="team-check"><input id="nativeShareVaultContext" type="checkbox"> İlgili kayıtları gerçek AI isteklerine bağlam olarak ekle</label>
+          <p class="fineprint">Varsayılan kapalıdır. Açıldığında eşleşen en fazla 3 kasa notu seçili model sağlayıcısına gönderilebilir. Demo modu gerçek istek yapmaz.</p>
+          <p id="nativeVaultStatus" class="fineprint" role="status">Henüz ortak kasaya bağlanmadı.</p>
+          <form id="nativeVaultForm" class="panel hidden">
+            <label class="field-label" for="nativeVaultTitle">Yeni kayıt başlığı</label><input id="nativeVaultTitle" class="input" required maxlength="120" placeholder="Örn. AI Studio ortak kararları">
+            <label class="field-label" for="nativeVaultTags">Etiketler (virgülle ayır)</label><input id="nativeVaultTags" class="input" maxlength="500" placeholder="plan, kod, oyun">
+            <label class="field-label" for="nativeVaultContent">Not / içerik</label><textarea id="nativeVaultContent" class="input" required maxlength="20000" rows="4" placeholder="Ajanların kaydedip paylaşacağı bilgi..."></textarea>
+            <div class="row-actions"><span class="grow"></span><button class="btn primary" type="submit">Ortak kasaya kaydet</button></div>
+          </form>
+          <div id="nativeVaultItems" class="stack"></div>
+        </div>
         <div class="section-head"><div><div class="eyebrow">SHARED AI VAULT</div><h2>Şifreli ortak AI kasası</h2></div><span class="pill">AES-256-GCM</span></div>
         <div class="panel" id="sharedVaultPanel" data-web-only>
           <p class="muted">AI Studio web sitesi ve yetki verdiğin agentlar aynı kayıtları okuyup yeni notlar/kod açıklamaları kaydedebilir. Kayıtlar sunucuda AES-256-GCM ile şifreli tutulur; API anahtarı gibi sırları notlara koyma. Bu, uçtan uca şifreleme değildir: yetkili sunucu API isteği işlerken içeriği açar.</p>

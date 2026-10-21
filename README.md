@@ -123,3 +123,8 @@ This is **encrypted-at-rest shared storage, not end-to-end encryption**: the aut
 ### AI Studio model-context link
 
 The private website can optionally attach up to three relevant shared-vault notes to live model calls. The switch in the **Şifreli ortak AI kasası** panel is **off by default**. When enabled, the browser sends only a bounded, task-relevant selection to whichever provider is active; Demo mode does not call a real model. Refreshing the web app fetches the latest 30 vault notes, and search filters only the visible list, not the context pool. Avoid putting API keys or sensitive personal data in notes.
+
+
+### Android ↔ shared vault
+
+The Android app has a mobile connection panel in Tools. Create an agent token in the private website (a `readwrite` token can save notes; `readonly` can only read), then enter the site's HTTPS origin and paste the token into the Android panel. The token is stored through Android secure storage, not in Preferences or workspace backups. Agent API CORS is limited to the Capacitor localhost origins used by the app. The device can read/search/save notes, optionally inject up to three relevant notes into real model requests, and revoke the device token from the web admin. `VAULT_ENCRYPTION_KEY` and durable storage must be configured on the web server first.

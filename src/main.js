@@ -36,6 +36,7 @@ const defaultSettings = {
   ollamaModel: 'qwen2.5-coder:1.5b',
   shareReusableContext: false,
   shareVaultContext: false,
+  vaultBaseUrl: '',
   systemPrompt: 'Yanıtlarını açık ve uygulanabilir yaz. Bilmediğin şeyi uydurma. Kod istenince küçük, test edilebilir adımlar öner.'
 };
 let settings = structuredClone(defaultSettings);
@@ -381,6 +382,111 @@ function downloadLocalCoderDraft(){const draft=$('localCoderOutput').value.trim(
 async function saveLocalCoderDraft(){const code=$('localCoderOutput').value.trim();if(!code){showToast('Kasaya kaydedilecek bir taslak yok.');return;}try{await persistSnippetRecord({name:'LocalCoder - '+($('localCoderTask').value.trim()||'taslak').slice(0,70),language:$('codeLanguage').value,sourceUrl:'',license:'AI tarafından oluşturulmuş taslak; kullanmadan önce incele ve test et',code});}catch(error){showToast('Taslak kasaya kaydedilemedi: '+(error.message||'Hata'));}}
 
 
+
+const NATIVE_VAULT_TOKEN_KEY = 'ai-studio-shared-vault-agent-token';
+let nativeVaultToken = '';
+let nativeVaultScope = 'readonly';
+async function getStoredNativeVaultToken() {
+  if (!nativeApp) return '';
+  try { const result=await SecureStoragePlugin.get({key:NATIVE_VAULT_TOKEN_KEY});return result?.value||''; }
+  catch (_) { return ''; }
+}
+function normalizeVaultBaseUrl(raw) {
+  let parsed;
+  try { parsed=new URL(String(raw||'').trim()); } catch (_) { throw new Error('Site adresi geçerli URL olmalı.'); }
+  if(parsed.protocol!=='https:')throw new Error('Agent tokenı korumak için site adresi HTTPS olmalı.');
+  if(parsed.username||parsed.password||parsed.search||parsed.hash)throw new Error('Site adresine kullanıcı adı, parola, sorgu veya # bölümü ekleme.');
+  return parsed.origin;
+}
+async function nativeVaultRequest(pathname,options={}) {
+  const base=normalizeVaultBaseUrl(settings.vaultBaseUrl);
+  const token=nativeVaultToken||await getStoredNativeVaultToken();
+  if(!token)throw new Error('Agent tokenı yok. Web sitesinde token oluşturup buraya gir.');
+  const response=await fetch(base+'/api/agent/v1'+pathname,{
+    ...options,
+    headers:{
+      'Accept':'application/json',
+      'Authorization':'Bearer '+token,
+      ...(options.body?{'Content-Type':'application/json'}:{}),
+      ...(options.headers||{})
+    }
+  });
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok)throw new Error(data.error||('HTTP '+response.status));
+  return data;
+}
+function renderNativeVaultItems() {
+  const out=$('nativeVaultItems');if(!out)return;
+  if(!sharedVaultItems.length){out.innerHTML='<div class="panel"><p class="muted">Ortak kasada henüz kayıt yok.</p></div>';return;}
+  out.innerHTML=sharedVaultItems.map(item=>'<article class="project-card"><div class="project-head"><h3>'+esc(item.title)+'</h3><time>'+esc(new Date(item.updatedAt||Date.now()).toLocaleString('tr-TR'))+'</time></div><p class="fineprint">Kaydeden: '+esc(item.updatedBy||item.createdBy||'agent')+' · '+(item.tags||[]).map(tag=>'<span class="pill">'+esc(tag)+'</span>').join(' ')+'</p><p>'+esc(String(item.content||'').slice(0,650))+(String(item.content||'').length>650?'…':'')+'</p><div class="row-actions"><button class="btn secondary small" type="button" data-native-vault-to-chat="'+esc(item.id)+'">Sohbete aktar</button>'+(nativeVaultScope==='readwrite'?'<span class="grow"></span><button class="btn danger small" type="button" data-native-vault-delete="'+esc(item.id)+'">Sil</button>':'')+'</div></article>').join('');
+}
+async function loadNativeVault({quiet=false}={}) {
+  if(!nativeApp)return;
+  const status=$('nativeVaultStatus');const form=$('nativeVaultForm');
+  settings.vaultBaseUrl=typeof settings.vaultBaseUrl==='string'?settings.vaultBaseUrl:'';
+  $('nativeVaultBaseUrl').value=settings.vaultBaseUrl;
+  $('nativeShareVaultContext').checked=settings.shareVaultContext===true;
+  nativeVaultToken=await getStoredNativeVaultToken();
+  if(!settings.vaultBaseUrl||!nativeVaultToken){
+    if(status)status.textContent='Henüz bağlı değil. Özel sitede bir agent tokenı oluştur ve yukarıya gir.';
+    if(form)form.classList.add('hidden');
+    sharedVaultItems=[];renderNativeVaultItems();return;
+  }
+  if(!quiet&&status)status.textContent='Ortak kasa kontrol ediliyor…';
+  try{
+    const identity=await nativeVaultRequest('/whoami');
+    nativeVaultScope=identity.agent?.scope==='readwrite'?'readwrite':'readonly';
+    const result=await nativeVaultRequest('/items?limit=30');
+    sharedVaultItems=Array.isArray(result.items)?result.items:[];
+    if(form)form.classList.toggle('hidden',nativeVaultScope!=='readwrite');
+    renderNativeVaultItems();
+    if(status)status.textContent='Bağlandı: '+String(identity.agent?.name||'AI agent')+' · '+(nativeVaultScope==='readwrite'?'okuma ve yazma':'salt okunur')+' · '+sharedVaultItems.length+' kayıt.';
+  }catch(error){
+    if(status)status.textContent='Ortak kasa bağlantısı başarısız: '+(error.message||'Site adresi ve tokenı kontrol et.');
+    if(form)form.classList.add('hidden');
+    sharedVaultItems=[];renderNativeVaultItems();
+  }
+}
+async function connectNativeVault() {
+  const typedToken=$('nativeVaultToken').value.trim();
+  try{
+    const base=normalizeVaultBaseUrl($('nativeVaultBaseUrl').value);
+    if(typedToken&&!/^aiav_[A-Za-z0-9_-]{32,}$/.test(typedToken))throw new Error('Agent token biçimi yanlış. Siteden oluşturulan aiav_ tokenını kullan.');
+    settings.vaultBaseUrl=base;
+    await setPref(DB.settings,settings);
+    if(typedToken){
+      await SecureStoragePlugin.set({key:NATIVE_VAULT_TOKEN_KEY,value:typedToken});
+      nativeVaultToken=typedToken;
+    }
+    $('nativeVaultToken').value='';
+    await loadNativeVault();
+    if(sharedVaultItems.length>=0&&nativeVaultToken)showToast('Ortak kasa bağlantı ayarı kaydedildi. Bağlantı durumunu yukarıda kontrol et.');
+  }catch(error){showToast('Bağlantı kaydedilemedi: '+(error.message||'Site adresini ve tokenı kontrol et.'));}
+}
+async function disconnectNativeVault() {
+  if(!confirm('Bu cihazdaki ortak kasa bağlantısı ve saklanan agent tokenı silinsin mi? Web sitesindeki token ayrıca iptal edebilirsin.'))return;
+  try{await SecureStoragePlugin.remove({key:NATIVE_VAULT_TOKEN_KEY});}catch(_){}
+  nativeVaultToken='';settings.vaultBaseUrl='';settings.shareVaultContext=false;
+  await setPref(DB.settings,settings);$('nativeVaultToken').value='';$('nativeVaultBaseUrl').value='';$('nativeShareVaultContext').checked=false;
+  sharedVaultItems=[];renderNativeVaultItems();$('nativeVaultForm').classList.add('hidden');
+  $('nativeVaultStatus').textContent='Bağlantı kesildi; cihazdaki token silindi.';
+}
+async function saveNativeVaultItem(event) {
+  event.preventDefault();
+  const title=$('nativeVaultTitle').value.trim(),content=$('nativeVaultContent').value.trim();
+  if(!title||!content)return;
+  const tags=$('nativeVaultTags').value.split(',').map(tag=>tag.trim()).filter(Boolean).slice(0,12);
+  try{
+    await nativeVaultRequest('/items',{method:'POST',body:JSON.stringify({title,content,tags})});
+    $('nativeVaultForm').reset();await loadNativeVault({quiet:true});showToast('Kayıt ortak şifreli kasaya kaydedildi.');
+  }catch(error){showToast('Ortak kasa kaydedemedi: '+(error.message||'Agent yetkisini kontrol et.'));}
+}
+async function deleteNativeVaultItem(id) {
+  if(!confirm('Bu ortak kasa kaydı silinsin mi?'))return;
+  try{await nativeVaultRequest('/items/'+encodeURIComponent(id),{method:'DELETE'});await loadNativeVault({quiet:true});showToast('Ortak kayıt silindi.');}
+  catch(error){showToast('Kayıt silinemedi: '+(error.message||'Agent yetkisini kontrol et.'));}
+}
+
 async function vaultRequest(url, options = {}) {
   const response = await fetch(url, {
     credentials: 'same-origin',
@@ -488,7 +594,7 @@ function updateDashboard(){const connected=Object.keys(providers).filter(id=>id=
 }
 async function exportProjects(){downloadText('ai-studio-projects.json',JSON.stringify({format:'ai-studio-projects-v2',exportedAt:new Date().toISOString(),projects:projectList},null,2),'application/json;charset=utf-8');}
 function buildWorkspaceSnapshot(){
-  return {format:'ai-studio-workspace-v1',exportedAt:new Date().toISOString(),settings:{demoMode:settings.demoMode,models:settings.models,team:settings.team,ollamaUrl:settings.ollamaUrl,ollamaModel:settings.ollamaModel,systemPrompt:settings.systemPrompt,shareReusableContext:settings.shareReusableContext===true,shareVaultContext:settings.shareVaultContext===true},projects:projectList,activeProjectId,chat:chatHistory,plugins:userPlugins.filter(p=>p.kind!=='builtin').map(p=>({name:p.name,prompt:p.prompt})),snippets:reusableSnippets,activity:agentActivity,codeFiles,activeCodeFileId};
+  return {format:'ai-studio-workspace-v1',exportedAt:new Date().toISOString(),settings:{demoMode:settings.demoMode,models:settings.models,team:settings.team,ollamaUrl:settings.ollamaUrl,ollamaModel:settings.ollamaModel,systemPrompt:settings.systemPrompt,shareReusableContext:settings.shareReusableContext===true,shareVaultContext:settings.shareVaultContext===true,vaultBaseUrl:settings.vaultBaseUrl||''},projects:projectList,activeProjectId,chat:chatHistory,plugins:userPlugins.filter(p=>p.kind!=='builtin').map(p=>({name:p.name,prompt:p.prompt})),snippets:reusableSnippets,activity:agentActivity,codeFiles,activeCodeFileId};
 }
 async function exportWorkspace(){
   await saveCurrentCodeFile(false);
@@ -534,6 +640,8 @@ async function importWorkspace(file){
     nextSettings.team=(Array.isArray(nextSettings.team)?nextSettings.team:defaultSettings.team).filter(id=>providers[id]).slice(0,4);
     nextSettings.ollamaUrl=typeof nextSettings.ollamaUrl==='string'?nextSettings.ollamaUrl.slice(0,500):'';
     nextSettings.ollamaModel=typeof nextSettings.ollamaModel==='string'?nextSettings.ollamaModel.slice(0,140):providers.ollama.model;
+    nextSettings.vaultBaseUrl=typeof nextSettings.vaultBaseUrl==='string'?nextSettings.vaultBaseUrl.slice(0,500):'';
+    nextSettings.shareVaultContext=nextSettings.shareVaultContext===true;
     nextSettings.systemPrompt=typeof nextSettings.systemPrompt==='string'?nextSettings.systemPrompt.slice(0,6000):defaultSettings.systemPrompt;
     nextSettings.demoMode=nextSettings.demoMode!==false;
     const nextProjects=(Array.isArray(data.projects)?data.projects:[]).filter(p=>typeof p?.name==='string'&&typeof p?.notes==='string').slice(0,300).map((p,i)=>({id:typeof p.id==='string'&&p.id.trim()?p.id.slice(0,100):(crypto.randomUUID?crypto.randomUUID():String(Date.now()+i)),name:p.name.slice(0,100),notes:p.notes.slice(0,20000),updated:typeof p.updated==='string'?p.updated:new Date().toISOString()}));
@@ -567,6 +675,8 @@ function copyText(text){if(navigator.clipboard?.writeText){navigator.clipboard.w
 function fallbackCopy(text){const t=document.createElement('textarea');t.value=text;t.style.position='fixed';t.style.opacity='0';document.body.append(t);t.select();try{document.execCommand('copy');showToast('Kopyalandı.');}catch(_){showToast('Kopyalanamadı; dosya olarak dışa aktarabilirsin.');}t.remove();}
 document.addEventListener('click',async e=>{
   const nav=e.target.closest('[data-go],[data-tab]');if(nav){go(nav.dataset.go||nav.dataset.tab);return;}
+  const nativeVaultToChat=e.target.closest('[data-native-vault-to-chat]');if(nativeVaultToChat){const item=sharedVaultItems.find(x=>x.id===nativeVaultToChat.dataset.nativeVaultToChat);if(item){go('chat');$('chatInput').value=('Ortak kasadan alınan proje kaydı: '+item.title+'\n\n'+String(item.content||'')).slice(0,12000);$('chatInput').focus();}return;}
+  const nativeVaultDelete=e.target.closest('[data-native-vault-delete]');if(nativeVaultDelete){await deleteNativeVaultItem(nativeVaultDelete.dataset.nativeVaultDelete);return;}
   const vaultToChat=e.target.closest('[data-vault-to-chat]');if(vaultToChat){const item=sharedVaultItems.find(x=>x.id===vaultToChat.dataset.vaultToChat);if(item){go('chat');$('chatInput').value=('Ortak kasadan alınan proje kaydı: '+item.title+'\n\n'+String(item.content||'')).slice(0,12000);$('chatInput').focus();}return;}
   const vaultDelete=e.target.closest('[data-vault-delete]');if(vaultDelete){await deleteSharedVaultItem(vaultDelete.dataset.vaultDelete);return;}
   const agentRevoke=e.target.closest('[data-agent-revoke]');if(agentRevoke){await revokeSharedVaultAgent(agentRevoke.dataset.agentRevoke);return;}
@@ -599,6 +709,11 @@ $('settingsDemoToggle').addEventListener('change',async e=>{settings.demoMode=e.
 $('chatProvider').addEventListener('change',syncModeUI);
 $('projectForm').addEventListener('submit',saveProject);
 $('sharedVaultForm').addEventListener('submit',saveSharedVaultItem);
+$('nativeVaultConnect').addEventListener('click',connectNativeVault);
+$('nativeVaultDisconnect').addEventListener('click',disconnectNativeVault);
+$('nativeVaultRefresh').addEventListener('click',()=>loadNativeVault());
+$('nativeVaultForm').addEventListener('submit',saveNativeVaultItem);
+$('nativeShareVaultContext').addEventListener('change',async e=>{settings.shareVaultContext=e.target.checked;await setPref(DB.settings,settings);showToast(settings.shareVaultContext?'Ortak kasadan eşleşen notlar gerçek AI isteklerine eklenebilir.':'Ortak kasa notları otomatik gönderilmeyecek.');});
 $('shareVaultContext').addEventListener('change',async e=>{settings.shareVaultContext=e.target.checked;await setPref(DB.settings,settings);showToast(settings.shareVaultContext?'Eşleşen kasa notları gerçek model isteklerine eklenecek.':'Kasa notları modele otomatik gönderilmeyecek.');});
 $('sharedVaultRefresh').addEventListener('click',()=>loadSharedVault());
 $('sharedVaultSearch').addEventListener('input',()=>loadSharedVault({quiet:true}));
@@ -691,11 +806,11 @@ async function prepareBrowserFeatures(){
   }catch(_){}
 }
 async function init(){
-  try{settings={...clone(defaultSettings),...(await getPref(DB.settings,{}))};settings.models={...clone(defaultSettings.models),...(settings.models||{})};settings.team=(settings.team||defaultSettings.team).filter(id=>providers[id]).slice(0,4);if(settings.ollamaUrl==='http://192.168.1.100:11434')settings.ollamaUrl='';}catch(_){}
+  try{settings={...clone(defaultSettings),...(await getPref(DB.settings,{}))};settings.models={...clone(defaultSettings.models),...(settings.models||{})};settings.team=(settings.team||defaultSettings.team).filter(id=>providers[id]).slice(0,4);settings.vaultBaseUrl=typeof settings.vaultBaseUrl==='string'?settings.vaultBaseUrl.slice(0,500):'';if(settings.ollamaUrl==='http://192.168.1.100:11434')settings.ollamaUrl='';}catch(_){}
   if(!nativeApp){showToast('Tarayıcıda API anahtarları yalnızca açık oturumda tutulur.');}
   await initKeys(); projectList=await getPref(DB.projects,[]);activeProjectId=await getPref(DB.activeProject,'');chatHistory=await getPref(DB.chat,[]);userPlugins=await getPref(DB.plugins,[]);reusableSnippets=await getPref(DB.snippets,[]);agentActivity=await getPref(DB.activity,[]);codeFiles=normalizeCodeFileList(await getPref(DB.codeFiles,[]),true);if(!codeFiles.length)codeFiles=[makeCodeFile()];activeCodeFileId=codeFiles[0].id;await setPref(DB.codeFiles,codeFiles);
   if(!Array.isArray(projectList))projectList=[];if(!projectList.some(p=>p&&p.id===activeProjectId))activeProjectId=projectList[0]?.id||'';await setPref(DB.activeProject,activeProjectId);if(!Array.isArray(chatHistory))chatHistory=[];if(!Array.isArray(userPlugins))userPlugins=[];if(!Array.isArray(reusableSnippets))reusableSnippets=[];if(!Array.isArray(agentActivity))agentActivity=[];
   renderProviderCards();renderProjects();renderChat();renderBuiltinTools();renderPlugins();renderReuseCatalog();renderSnippetVault();renderAgentActivity();loadActiveCodeFile();syncModeUI();updateDashboard();$('compareSelectionCount').textContent=settings.team.length+' ajan seçili';
-  if(!nativeApp)await loadSharedVault({quiet:true});else $('sharedVaultPanel')?.classList.add('hidden');
+  if(!nativeApp){$('nativeVaultPanel')?.classList.add('hidden');await loadSharedVault({quiet:true});}else{$('sharedVaultPanel')?.classList.add('hidden');$('nativeVaultPanel')?.classList.remove('hidden');await loadNativeVault({quiet:true});}
 }
 prepareBrowserFeatures().then(init).catch(()=>showToast('Başlangıç ayarları okunamadı; sayfayı yenileyebilirsin.'));

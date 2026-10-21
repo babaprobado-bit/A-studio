@@ -69,6 +69,11 @@ try {
   assert.equal(session.status, 200, 'Valid session should be recognized');
   assert.equal((await session.json()).privateSite, true);
 
+  const nativePreflight = await request('/api/agent/v1/whoami', {method:'OPTIONS',headers:{Origin:'https://localhost','Access-Control-Request-Method':'GET','Access-Control-Request-Headers':'authorization'}});
+  assert.equal(nativePreflight.status, 204, 'Capacitor origin should pass CORS preflight');
+  assert.equal(nativePreflight.headers.get('access-control-allow-origin'),'https://localhost');
+  const hostilePreflight = await request('/api/agent/v1/whoami', {method:'OPTIONS',headers:{Origin:'https://evil.example','Access-Control-Request-Method':'GET'}});
+  assert.equal(hostilePreflight.status, 403, 'Untrusted origins must not get CORS access');
   const unauthenticatedAgent = await request('/api/agent/v1/whoami');
   assert.equal(unauthenticatedAgent.status, 401, 'Agent API must reject missing tokens');
   const emptyVault = await request('/api/vault/items', { headers: { Cookie: cookie } });
