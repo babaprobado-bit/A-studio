@@ -202,22 +202,54 @@ app.use('/api/agent/v1', agentAuthGuard);
 app.get('/api/agent/v1/openapi.json', (req, res) => {
   res.set('Cache-Control', 'no-store');
   const baseUrl = req.protocol + '://' + req.get('host') + '/api/agent/v1';
+  const itemSchema = {
+    type: 'object',
+    required: ['title', 'content'],
+    properties: {
+      title: { type: 'string', maxLength: 120 },
+      content: { type: 'string', maxLength: 20000 },
+      tags: { type: 'array', items: { type: 'string', maxLength: 40 } }
+    }
+  };
+  const idParameter = { name: 'id', in: 'path', required: true, schema: { type: 'string' } };
   res.json({
     openapi: '3.1.0',
     info: { title: 'AI Studio Shared Vault API', version: '1.0.0', description: 'Agentların yetkilendirilmiş biçimde ortak kasa kayıtlarını okuma ve kaydetme API’si.' },
     servers: [{ url: baseUrl }],
     security: [{ BearerAuth: [] }],
-    components: { securitySchemes: { BearerAuth: { type: 'http', scheme: 'bearer', bearerFormat: 'AI Studio agent token' } } },
+    components: {
+      securitySchemes: {
+        BearerAuth: { type: 'http', scheme: 'bearer', bearerFormat: 'AI Studio agent token' }
+      }
+    },
     paths: {
-      '/whoami': { get: { summary: 'Bu tokenın agent kimliğini göster', responses: { '200': { description: 'Agent kimliği' }, '401': { description: 'Token geçersiz' } } } },
+      '/whoami': {
+        get: { summary: 'Bu tokenın agent kimliğini göster', responses: { '200': { description: 'Agent kimliği' }, '401': { description: 'Token geçersiz' } } }
+      },
       '/items': {
-        get: { summary: 'Kayıtları listele/ara', parameters: [{ name: 'q', in: 'query', schema: { type: 'string' } }, { name: 'limit', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 30 } }], responses: { '200': { description: 'Kasa kayıtları' } } },
-        post: { summary: 'Kayıt oluştur (readwrite token)', requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['title','content'], properties: { title: { type: 'string', maxLength: 120 }, content: { type: 'string', maxLength: 20000 }, tags: { type: 'array', items: { type: 'string', maxLength: 40 } } } } } }, responses: { '201': { description: 'Kayıt oluşturuldu' }, '403': { description: 'Salt okunur token' } } }
+        get: {
+          summary: 'Kayıtları listele/ara',
+          parameters: [
+            { name: 'q', in: 'query', schema: { type: 'string' } },
+            { name: 'limit', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 30 } }
+          ],
+          responses: { '200': { description: 'Kasa kayıtları' } }
+        },
+        post: {
+          summary: 'Kayıt oluştur (readwrite token)',
+          requestBody: { required: true, content: { 'application/json': { schema: itemSchema } } },
+          responses: { '201': { description: 'Kayıt oluşturuldu' }, '403': { description: 'Salt okunur token' } }
+        }
       },
       '/items/{id}': {
-        get: { summary: 'Tek bir kayıt oku', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': { description: 'Kayıt' }, '404': { description: 'Bulunamadı' } } },
-        put: { summary: 'Kayıt güncelle (readwrite token)', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', properties: { title: { type: 'string' }, content: { type: 'string' }, tags: { type: 'array', items: { type: 'string' } } } } } }, responses: { '200': { description: 'Güncellendi' }, '403': { description: 'Salt okunur token' } } },
-        delete: { summary: 'Kayıt sil (readwrite token)', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': { description: 'Silindi' }, '403': { description: 'Salt okunur token' } } }
+        get: { summary: 'Tek bir kayıt oku', parameters: [idParameter], responses: { '200': { description: 'Kayıt' }, '404': { description: 'Bulunamadı' } } },
+        put: {
+          summary: 'Kayıt güncelle (readwrite token)',
+          parameters: [idParameter],
+          requestBody: { required: true, content: { 'application/json': { schema: itemSchema } } },
+          responses: { '200': { description: 'Güncellendi' }, '403': { description: 'Salt okunur token' } }
+        },
+        delete: { summary: 'Kayıt sil (readwrite token)', parameters: [idParameter], responses: { '200': { description: 'Silindi' }, '403': { description: 'Salt okunur token' } } }
       }
     }
   });
