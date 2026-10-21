@@ -1,14 +1,17 @@
 {
   "name": "ai-studio-alpha-1-mobile",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "private": true,
   "type": "module",
-  "description": "AI Studio Alpha 1 cross-platform multi-provider workspace with private web gateway",
-  "engines": { "node": ">=20" },
+  "description": "AI Studio Alpha 1 multi-provider workspace with Local Coder, reusable source catalog, snippet vault and private web gateway",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "build": "vite build",
     "start": "node server/server.js",
-    "test:site": "node server/smoke-test.js"
+    "test:site": "node server/smoke-test.js",
+    "test:workshop": "node server/workshop-smoke-test.js"
   },
   "dependencies": {
     "express": "^5.1.0",

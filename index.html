@@ -39,6 +39,7 @@
           <button class="quick-card" data-go="compare"><span class="quick-icon">⇄</span><strong>Yanıtları karşılaştır</strong><small>Birden fazla sağlayıcı</small></button>
           <button class="quick-card" data-go="projects"><span class="quick-icon">▤</span><strong>Projeler</strong><small>Not, görev ve dışa aktarma</small></button>
           <button class="quick-card" data-go="tools"><span class="quick-icon">⌘</span><strong>Araçlar / eklentiler</strong><small>Hazır komutlar ve kod alanı</small></button>
+          <button class="quick-card" data-go="tools"><span class="quick-icon">⌘</span><strong>Local Coder + tekrar kullanım</strong><small>Yerel kod zinciri ve kaynak kasası</small></button>
         </div>
         <div class="notice"><strong>Gerçeklik kontrolü:</strong> Demo yanıtları çevrimdışı şablonlardır. Gerçek AI yanıtları için ilgili sağlayıcının API anahtarını ekleyip Demo modunu kapatmalısın. Ollama modeli telefona gömülü değildir; ağdaki bir bilgisayarda çalışması gerekir.</div>
         <div class="section-head"><div><div class="eyebrow">SON DURUM</div><h2>Çalışma panosu</h2></div></div>
@@ -101,6 +102,33 @@
 
       <section class="screen" id="tools">
         <div class="page-title"><div class="eyebrow">TOOLBOX / PROMPT PLUGINS</div><h1>Araçlar ve eklentiler</h1><p>Hazır görev şablonları kullan, kendi prompt eklentilerini oluştur veya kod parçalarını dışa aktar.</p></div>
+        <div class="section-head"><div><div class="eyebrow">LOCAL CODER / OFFLINE WORKFLOW</div><h2>Local Coder atölyesi</h2></div><span class="pill">Ollama</span></div>
+        <div class="panel">
+          <p class="muted">Planla → kod taslağı üret → incele. Modelin Ollama ile bu cihazda veya güvendiğin yerel ağdaki bilgisayarda çalışıyor olmalı.</p>
+          <div class="notice compact"><strong>Gerçek durum:</strong> Model APK’ya veya siteye gömülü değil. Bu araç dosyaları otomatik yazmaz, kodu çalıştırmaz; taslağı gösterir ve sen onaylayınca Kod Alanı’na aktarır. HTTPS web sitesi yerel HTTP Ollama bağlantısını tarayıcı güvenlik kuralları nedeniyle engelleyebilir.</div>
+          <label class="field-label" for="localCoderTask">Ne geliştirelim veya düzeltelim?</label>
+          <textarea id="localCoderTask" class="input" rows="3" maxlength="3000" placeholder="Örn. Behind the Door için modüler bir kapı etkileşim fonksiyonu yaz."></textarea>
+          <label class="team-check"><input id="localCoderUseCode" type="checkbox" checked> Kod Alanı’ndaki dosyayı bağlam olarak kullan</label>
+          <div class="row-actions"><button class="btn primary" id="localCoderRun" type="button">Yerel ajan zincirini çalıştır</button><span class="grow"></span><span id="localCoderStatus" class="muted">Model ayarı Modeller ekranından yapılır.</span></div>
+          <label class="field-label" for="localCoderOutput">Kod taslağı · önce gözden geçir</label>
+          <textarea id="localCoderOutput" class="input code-area" rows="10" spellcheck="false" placeholder="Yerel modelin ürettiği taslak burada görünecek."></textarea>
+          <div class="row-actions"><button class="btn secondary small" id="localCoderApply" type="button">Kod Alanı’na aktar</button><button class="btn ghost small" id="localCoderDownload" type="button">Taslağı indir</button><button class="btn ghost small" id="localCoderSaveSnippet" type="button">Snippet kasasına kaydet</button></div>
+          <label class="field-label" for="localCoderReview">İnceleme ve test önerileri</label>
+          <textarea id="localCoderReview" class="input" rows="5" readonly placeholder="Son aşamada inceleme ve test listesi gelecek."></textarea>
+        </div>
+        <div class="section-head"><div><div class="eyebrow">REUSE INSTEAD OF REBUILD</div><h2>Açık kaynak / varlık kataloğu</h2></div></div>
+        <div class="panel"><p class="muted">Motor, kütüphane ve varlık kaynaklarına hızlı erişim. Otomatik indirme/kopyalama yok; her varlığın lisansını ayrıca kontrol et.</p><label class="field-label" for="reuseCatalogSearch">Kaynakları filtrele</label><input id="reuseCatalogSearch" class="input" type="search" placeholder="Örn. 3D, GLB, ses, CC0"><div id="reuseCatalogGrid" class="reuse-grid"></div></div>
+        <div class="section-head"><div><div class="eyebrow">PERSONAL REUSE VAULT</div><h2>Kod parçası kasası</h2></div><div class="row-actions"><button id="snippetImportBtn" class="btn ghost small" type="button">JSON içe aktar</button><input id="snippetImportFile" type="file" accept=".json,application/json" hidden><button id="snippetExportAll" class="btn secondary small" type="button">Kasayı yedekle</button></div></div>
+        <form id="snippetForm" class="panel"><p class="muted">Kod parçalarını kaynak ve lisans notuyla sakla; sonra başka projeye aktar.</p>
+          <label class="field-label" for="snippetName">Parça adı</label><input id="snippetName" class="input" maxlength="100" required placeholder="Örn. FPS kamera kontrolü">
+          <label class="field-label" for="snippetLanguage">Dil</label><select id="snippetLanguage" class="input"><option value="javascript">JavaScript</option><option value="html">HTML</option><option value="css">CSS</option><option value="python">Python</option><option value="json">JSON</option><option value="markdown">Markdown</option><option value="text">Metin</option></select>
+          <label class="field-label" for="snippetSourceUrl">Kaynak URL (isteğe bağlı, yalnızca HTTPS)</label><input id="snippetSourceUrl" class="input" type="url" maxlength="500" placeholder="https://github.com/...">
+          <label class="field-label" for="snippetLicense">Lisans / atıf notu</label><input id="snippetLicense" class="input" maxlength="180" placeholder="Örn. MIT — LICENSE dosyasını sakla">
+          <label class="field-label" for="snippetCode">Kod veya metin</label><textarea id="snippetCode" class="input code-area" rows="6" maxlength="50000" required placeholder="Kendi kodunu veya lisansı uygun parçayı buraya kaydet."></textarea><button class="btn primary" type="submit">Kasaya kaydet +</button>
+        </form>
+        <div id="snippetList" class="stack"></div>
+        <div class="section-head"><div><div class="eyebrow">AGENT ACTIVITY</div><h2>Ajan etkinliği</h2></div><span class="muted">Son çalışmalar</span></div><div id="agentActivityList" class="stack"></div>
+
         <div class="section-head"><h2>Hazır iş akışları</h2></div><div class="tool-grid" id="builtinTools"></div>
         <form class="panel" id="pluginForm">
           <h2>Kendi prompt eklentin</h2><label class="field-label" for="pluginName">Eklenti adı</label><input class="input" id="pluginName" required maxlength="80" placeholder="Örn. Babylon.js performans kontrolü">

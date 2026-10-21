@@ -2,13 +2,16 @@ import { Capacitor } from '@capacitor/core';
 import { Preferences } from '@capacitor/preferences';
 import { SecureStoragePlugin } from 'capacitor-secure-storage-plugin';
 import './style.css';
+import { reuseCatalog, buildLocalCoderStages, extractCodeArtifact, normalizeSnippet } from './workshop-data.js';
 
 const $ = (id) => document.getElementById(id);
 const DB = {
   settings: 'ai-studio-settings-v2',
   projects: 'ai-studio-projects-v2',
   chat: 'ai-studio-chat-v2',
-  plugins: 'ai-studio-prompt-plugins-v2'
+  plugins: 'ai-studio-prompt-plugins-v2',
+  snippets: 'ai-studio-snippet-v1',
+  activity: 'ai-studio-agent-activity-v1'
 };
 const nativeApp = Capacitor.isNativePlatform();
 const providers = {
@@ -32,6 +35,8 @@ let settings = structuredClone(defaultSettings);
 let chatHistory = [];
 let projectList = [];
 let userPlugins = [];
+let reusableSnippets = [];
+let agentActivity = [];
 let busy = false;
 let toastTimer;
 const runtimeKeys = Object.create(null);
@@ -214,6 +219,47 @@ function renderProjects(){const out=$('projectList');$('projectCount').textConte
 }
 async function saveProject(e){e.preventDefault();const name=$('projectName').value.trim(),notes=$('projectNotes').value.trim();if(!name||!notes)return;projectList.unshift({id:crypto.randomUUID?crypto.randomUUID():String(Date.now()),name,notes,updated:new Date().toISOString()});try{await setPref(DB.projects,projectList);$('projectForm').reset();renderProjects();updateDashboard();showToast('Proje bu cihaza kaydedildi.');}catch(_){showToast('Proje kaydedilemedi. Cihaz depolamasını kontrol et.');}}
 function projectMarkdown(p){return '# '+p.name+'\n\n'+p.notes+'\n\n---\nAI Studio Alpha 1 · '+new Date(p.updated||Date.now()).toLocaleString('tr-TR')+'\n';}
+function renderReuseCatalog() {
+  const out = $('reuseCatalogGrid'); if (!out) return;
+  const query = ($('reuseCatalogSearch')?.value || '').trim().toLowerCase();
+  const results = reuseCatalog.filter(item => [item.name,item.group,item.license,item.description,...(item.tags||[])].join(' ').toLowerCase().includes(query));
+  if (!results.length) { out.innerHTML='<div class="panel"><p class="muted">Bu aramayla kaynak bulunamadı.</p></div>'; return; }
+  out.innerHTML=results.map(item=>'<article class="reuse-card"><div class="reuse-top"><h3>'+esc(item.name)+'</h3><span class="pill">'+esc(item.group)+'</span></div><p>'+esc(item.description)+'</p><p class="reuse-license">'+esc(item.license)+'</p><div class="row-actions"><a href="'+esc(item.url)+'" target="_blank" rel="noopener noreferrer">Kaynağı aç ↗</a><a href="'+esc(item.licenseUrl)+'" target="_blank" rel="noopener noreferrer">Lisans ↗</a><span class="grow"></span><button class="btn secondary small" type="button" data-catalog-use="'+esc(item.id)+'">AI görevine ekle</button></div></article>').join('');
+}
+function renderSnippetVault() {
+  const out=$('snippetList'); if(!out)return;
+  if(!reusableSnippets.length){out.innerHTML='<div class="panel"><p class="muted">Kasa boş. Kaydettiğin parçalar bu cihazda kalır; JSON yedeğiyle başka cihaza taşıyabilirsin.</p></div>';return;}
+  out.innerHTML=reusableSnippets.map((snippet,i)=>'<article class="snippet-card"><div class="reuse-top"><h3>'+esc(snippet.name)+'</h3><span class="pill">'+esc(snippet.language)+'</span></div><p class="reuse-license">'+esc(snippet.license||'Lisans belirtilmedi')+'</p>'+(snippet.sourceUrl?'<p><a href="'+esc(snippet.sourceUrl)+'" target="_blank" rel="noopener noreferrer">Kaynak ↗</a></p>':'')+'<pre>'+esc(snippet.code.slice(0,500))+(snippet.code.length>500?'\n…':'')+'</pre><div class="row-actions"><button class="btn secondary small" type="button" data-snippet-load="'+i+'">Kod Alanı’na yükle</button><button class="btn ghost small" type="button" data-snippet-use="'+i+'">AI ile incele</button><button class="btn ghost small" type="button" data-snippet-download="'+i+'">İndir</button><span class="grow"></span><button class="btn danger small" type="button" data-snippet-delete="'+i+'">Sil</button></div></article>').join('');
+}
+async function logAgentActivity(event,status,detail){
+  agentActivity.unshift({id:crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random()),event:String(event||'Ajan').slice(0,100),status:String(status||'').slice(0,40),detail:String(detail||'').slice(0,260),time:new Date().toISOString()});
+  agentActivity=agentActivity.slice(0,80);renderAgentActivity();try{await setPref(DB.activity,agentActivity);}catch(_){showToast('Ajan etkinliği cihaza kaydedilemedi.');}
+}
+function renderAgentActivity(){
+  const out=$('agentActivityList');if(!out)return;
+  if(!agentActivity.length){out.innerHTML='<div class="panel"><p class="muted">Henüz Local Coder çalıştırılmadı. Her aşama burada tarihçeye eklenir.</p></div>';return;}
+  out.innerHTML=agentActivity.slice(0,12).map(item=>'<article class="activity-card"><div class="reuse-top"><strong>'+esc(item.event)+'</strong><span class="pill">'+esc(item.status)+'</span></div><time>'+esc(new Date(item.time||Date.now()).toLocaleString('tr-TR'))+'</time><p>'+esc(item.detail||'')+'</p></article>').join('');
+}
+async function persistSnippetRecord(raw,notify=true){
+  const cleaned=normalizeSnippet(raw);if(!cleaned)throw new Error('Ad ve kod/metin boş olamaz; kaynak URL varsa HTTPS olmalı.');
+  cleaned.id=crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random());cleaned.updated=new Date().toISOString();reusableSnippets.unshift(cleaned);reusableSnippets=reusableSnippets.slice(0,100);await setPref(DB.snippets,reusableSnippets);renderSnippetVault();if(notify)showToast('Kod parçası kasaya kaydedildi.');
+}
+async function saveSnippetFromForm(event){event.preventDefault();try{await persistSnippetRecord({name:$('snippetName').value,language:$('snippetLanguage').value,sourceUrl:$('snippetSourceUrl').value,license:$('snippetLicense').value||'Lisans belirtilmedi — yeniden kullanmadan önce kontrol et',code:$('snippetCode').value});$('snippetForm').reset();}catch(error){showToast('Parça kaydedilemedi: '+(error.message||'Alanları kontrol et.'));}}
+function exportSnippetsAll(){downloadText('ai-studio-snippet-vault.json',JSON.stringify({format:'ai-studio-snippets-v1',exportedAt:new Date().toISOString(),snippets:reusableSnippets},null,2),'application/json;charset=utf-8');}
+async function importSnippetFile(file){
+ try{if(!file||file.size>5000000)throw new Error('Dosya eksik veya 5 MB sınırını aşıyor.');const parsed=JSON.parse(await file.text());const incoming=Array.isArray(parsed)?parsed:parsed.snippets;if(!Array.isArray(incoming))throw new Error('JSON içinde snippets dizisi bulunamadı.');let count=0;for(const raw of incoming){const item=normalizeSnippet(raw);if(!item)continue;item.id=crypto.randomUUID?crypto.randomUUID():String(Date.now()+count);item.updated=new Date().toISOString();reusableSnippets.unshift(item);count++;}reusableSnippets=reusableSnippets.slice(0,100);await setPref(DB.snippets,reusableSnippets);renderSnippetVault();showToast(count+' kod parçası içe aktarıldı.');}catch(error){showToast('Kasa içe aktarılamadı: '+(error.message||'JSON dosyasını kontrol et.'));}
+}
+async function runLocalCoderWorkshop(){
+ if(busy){showToast('Başka bir ajan zinciri çalışıyor.');return;}const task=$('localCoderTask').value.trim();if(!task){showToast('Önce Local Coder görevini yaz.');return;}if(!settings.ollamaUrl){showToast('Önce Modeller ekranından Ollama adresini ayarla.');go('models');return;}
+ const sourceCode=$('localCoderUseCode').checked?$('codePad').value.slice(0,10000):'';const stages=buildLocalCoderStages({task,language:$('codeLanguage').value,sourceCode});let previous='';busy=true;$('localCoderRun').disabled=true;$('localCoderRun').textContent='Yerel ajan çalışıyor…';$('localCoderStatus').textContent='Ollama modeline bağlanılıyor; küçük bilgisayarda yanıt yavaş gelebilir.';$('localCoderReview').value='';$('localCoderOutput').value='';
+ try{await logAgentActivity('Local Coder','Başladı',task);for(const stage of stages){$('localCoderStatus').textContent=stage.title+' çalışıyor…';await logAgentActivity(stage.title,'Çalışıyor',task);const prompt=stage.makePrompt?stage.makePrompt(previous):stage.prompt;const answer=await callProvider('ollama',prompt,[]);if(stage.id==='code')$('localCoderOutput').value=extractCodeArtifact(answer);if(stage.id==='review')$('localCoderReview').value=answer;previous=answer;await logAgentActivity(stage.title,'Tamamlandı',answer.slice(0,220));} $('localCoderStatus').textContent='Zincir bitti. Taslağı gözden geçir; otomatik test çalıştırılmadı.';await logAgentActivity('Local Coder','Tamamlandı','Kod taslağı ve inceleme notları hazır; dosyalar otomatik değiştirilmedi.');showToast('Local Coder tamamlandı. Taslağı inceleyip gerekirse Kod Alanı’na aktar.');}
+ catch(error){$('localCoderStatus').textContent='Zincir durdu; ayarları ve Ollama bağlantısını kontrol et.';await logAgentActivity('Local Coder','Hata',error.message||'Bilinmeyen yerel model hatası');showToast('Local Coder çalışamadı: '+(error.message||'Ollama bağlantısını kontrol et.'));}
+ finally{busy=false;$('localCoderRun').disabled=false;$('localCoderRun').textContent='Yerel ajan zincirini çalıştır';}
+}
+function applyLocalCoderDraft(){const draft=$('localCoderOutput').value.trim();if(!draft){showToast('Aktarılacak bir kod taslağı yok.');return;}if($('codePad').value.trim()&&!confirm('Kod Alanı içeriği yeni taslakla değiştirilsin mi? Önce mevcut dosyanı dışa aktarabilirsin.'))return;$('codePad').value=draft;showToast('Taslak Kod Alanı’na aktarıldı; henüz çalıştırılmadı.');}
+function downloadLocalCoderDraft(){const draft=$('localCoderOutput').value.trim();if(!draft){showToast('İndirilecek bir taslak yok.');return;}const ext=({javascript:'js',html:'html',css:'css',python:'py',json:'json',markdown:'md',text:'txt'})[$('codeLanguage').value]||'txt';downloadText('local-coder-draft.'+ext,draft);}
+async function saveLocalCoderDraft(){const code=$('localCoderOutput').value.trim();if(!code){showToast('Kasaya kaydedilecek bir taslak yok.');return;}try{await persistSnippetRecord({name:'LocalCoder - '+($('localCoderTask').value.trim()||'taslak').slice(0,70),language:$('codeLanguage').value,sourceUrl:'',license:'AI tarafından oluşturulmuş taslak; kullanmadan önce incele ve test et',code});}catch(error){showToast('Taslak kasaya kaydedilemedi: '+(error.message||'Hata'));}}
+
 function renderBuiltinTools(){ $('builtinTools').innerHTML=builtinTools.map(t=>'<button class="tool-card" data-tool="'+t.id+'"><span class="tool-symbol">'+esc(t.icon)+'</span><strong>'+esc(t.name)+'</strong><small>'+esc(t.desc)+'</small></button>').join('');}
 function renderPlugins(){ const out=$('pluginList'); if(!userPlugins.length){out.innerHTML='<div class="panel"><p class="muted">Henüz özel eklenti yok. Eklentiler yalnızca metin talimatlarıdır; keyfi kod çalıştırmaz.</p></div>';return;}
   out.innerHTML=userPlugins.map((p,i)=>'<article class="plugin-card"><div class="plugin-head"><h3>'+esc(p.name)+'</h3><span class="pill">'+(p.kind==='builtin'?'HAZIR':'ÖZEL')+'</span></div><p>'+esc(p.prompt)+'</p><div class="row-actions"><button class="btn secondary small" data-plugin-run="'+i+'">Sohbette kullan</button><span class="grow"></span>'+(p.kind==='builtin'?'':'<button class="btn danger small" data-plugin-delete="'+i+'">Sil</button>')+'</div></article>').join('');
@@ -225,7 +271,7 @@ function updateDashboard(){const connected=Object.keys(providers).filter(id=>id=
 }
 async function exportProjects(){downloadText('ai-studio-projects.json',JSON.stringify({format:'ai-studio-projects-v2',exportedAt:new Date().toISOString(),projects:projectList},null,2),'application/json;charset=utf-8');}
 function exportWorkspace(){
-  const snapshot={format:'ai-studio-workspace-v1',exportedAt:new Date().toISOString(),settings:{demoMode:settings.demoMode,models:settings.models,team:settings.team,ollamaUrl:settings.ollamaUrl,ollamaModel:settings.ollamaModel,systemPrompt:settings.systemPrompt},projects:projectList,chat:chatHistory,plugins:userPlugins.filter(p=>p.kind!=='builtin').map(p=>({name:p.name,prompt:p.prompt}))};
+  const snapshot={format:'ai-studio-workspace-v1',exportedAt:new Date().toISOString(),settings:{demoMode:settings.demoMode,models:settings.models,team:settings.team,ollamaUrl:settings.ollamaUrl,ollamaModel:settings.ollamaModel,systemPrompt:settings.systemPrompt},projects:projectList,chat:chatHistory,plugins:userPlugins.filter(p=>p.kind!=='builtin').map(p=>({name:p.name,prompt:p.prompt})),snippets:reusableSnippets,activity:agentActivity};
   downloadText('ai-studio-workspace-backup.json',JSON.stringify(snapshot,null,2),'application/json;charset=utf-8');
 }
 async function importWorkspace(file){
@@ -243,10 +289,12 @@ async function importWorkspace(file){
     const nextProjects=(Array.isArray(data.projects)?data.projects:[]).filter(p=>typeof p?.name==='string'&&typeof p?.notes==='string').slice(0,300).map(p=>({id:crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random()),name:p.name.slice(0,100),notes:p.notes.slice(0,20000),updated:typeof p.updated==='string'?p.updated:new Date().toISOString()}));
     const nextChat=(Array.isArray(data.chat)?data.chat:[]).filter(m=>(m?.role==='user'||m?.role==='assistant')&&typeof m.content==='string').slice(-80).map(m=>({role:m.role,content:m.content.slice(0,20000),provider:typeof m.provider==='string'?m.provider.slice(0,100):'',mode:['demo','live','error'].includes(m.mode)?m.mode:'demo',time:typeof m.time==='string'?m.time:new Date().toISOString()}));
     const nextPlugins=(Array.isArray(data.plugins)?data.plugins:[]).filter(p=>typeof p?.name==='string'&&typeof p?.prompt==='string'&&p.name.trim()&&p.prompt.trim()).slice(-100).map((p,i)=>({id:crypto.randomUUID?crypto.randomUUID():String(Date.now()+i),name:p.name.trim().slice(0,80),prompt:p.prompt.trim().slice(0,6000),kind:'custom'}));
+    const nextSnippets=(Array.isArray(data.snippets)?data.snippets:[]).map(normalizeSnippet).filter(Boolean).slice(0,100).map((item,i)=>({...item,id:crypto.randomUUID?crypto.randomUUID():String(Date.now()+i)}));
+    const nextActivity=(Array.isArray(data.activity)?data.activity:[]).slice(0,80).filter(item=>item&&typeof item.event==='string').map((item,i)=>({id:crypto.randomUUID?crypto.randomUUID():String(Date.now()+i),event:item.event.slice(0,100),status:typeof item.status==='string'?item.status.slice(0,40):'',detail:typeof item.detail==='string'?item.detail.slice(0,260):'',time:typeof item.time==='string'?item.time:new Date().toISOString()}));
     if(!confirm('Bu yedek mevcut proje, sohbet, ayar ve özel prompt kayıtlarını değiştirecek. API anahtarları yedeğe dahil değildir ve bu cihazdaki anahtarlar silinmeyecek. Devam?'))return;
-    await Promise.all([setPref(DB.settings,nextSettings),setPref(DB.projects,nextProjects),setPref(DB.chat,nextChat),setPref(DB.plugins,nextPlugins)]);
-    settings=nextSettings;projectList=nextProjects;chatHistory=nextChat;userPlugins=nextPlugins;
-    renderProviderCards();renderProjects();renderChat();renderPlugins();syncModeUI();updateDashboard();
+    await Promise.all([setPref(DB.settings,nextSettings),setPref(DB.projects,nextProjects),setPref(DB.chat,nextChat),setPref(DB.plugins,nextPlugins),setPref(DB.snippets,nextSnippets),setPref(DB.activity,nextActivity)]);
+    settings=nextSettings;projectList=nextProjects;chatHistory=nextChat;userPlugins=nextPlugins;reusableSnippets=nextSnippets;agentActivity=nextActivity;
+    renderProviderCards();renderProjects();renderChat();renderPlugins();renderSnippetVault();renderAgentActivity();renderReuseCatalog();syncModeUI();updateDashboard();
     $('compareSelectionCount').textContent=settings.team.length+' ajan seçili';
     showToast('Tam çalışma alanı geri yüklendi. API anahtarları ayrı güvenli depoda kaldı.');
   }catch(err){showToast('Yedek geri yüklenemedi: '+(err.message||'JSON dosyasını kontrol et.'));}
@@ -260,11 +308,17 @@ async function saveProviderCard(id){
   const field=$('key-'+id),key=field?.value.trim();
   try{if(key){await saveSecret(id,key);field.value='';}await setPref(DB.settings,settings);renderProviderCards();updateDashboard();showToast(key?'Model ayarı ve anahtar kaydedildi.':'Model ayarı kaydedildi.');}
   catch(e){showToast('Kaydedilemedi: '+(e.message||'Güvenli depoya erişilemiyor.'));}}
-async function clearAllLocal(){if(!confirm('Proje notları, sohbet geçmişi ve özel prompt eklentileri bu cihazdan silinsin mi? API anahtarlarını silmek için Modeller ekranını kullan.'))return;projectList=[];chatHistory=[];userPlugins=[];await Promise.all([removePref(DB.projects),removePref(DB.chat),removePref(DB.plugins)]);renderProjects();renderChat();renderPlugins();updateDashboard();showToast('Yerel notlar ve geçmiş silindi.');}
+async function clearAllLocal(){if(!confirm('Proje notları, sohbet, özel eklentiler, kod kasası ve ajan etkinlikleri bu cihazdan silinsin mi? API anahtarlarını silmek için Modeller ekranını kullan.'))return;projectList=[];chatHistory=[];userPlugins=[];reusableSnippets=[];agentActivity=[];await Promise.all([removePref(DB.projects),removePref(DB.chat),removePref(DB.plugins),removePref(DB.snippets),removePref(DB.activity)]);renderProjects();renderChat();renderPlugins();renderSnippetVault();renderAgentActivity();updateDashboard();showToast('Yerel notlar, kasa ve etkinlik geçmişi silindi.');}
 function copyText(text){if(navigator.clipboard?.writeText){navigator.clipboard.writeText(text).then(()=>showToast('Kopyalandı.')).catch(()=>fallbackCopy(text));}else fallbackCopy(text);}
 function fallbackCopy(text){const t=document.createElement('textarea');t.value=text;t.style.position='fixed';t.style.opacity='0';document.body.append(t);t.select();try{document.execCommand('copy');showToast('Kopyalandı.');}catch(_){showToast('Kopyalanamadı; dosya olarak dışa aktarabilirsin.');}t.remove();}
 document.addEventListener('click',async e=>{
   const nav=e.target.closest('[data-go],[data-tab]');if(nav){go(nav.dataset.go||nav.dataset.tab);return;}
+  const catalogUse=e.target.closest('[data-catalog-use]');if(catalogUse){const item=reuseCatalog.find(x=>x.id===catalogUse.dataset.catalogUse);if(item){$('localCoderTask').value='Bu kaynağı mevcut projeme uygun şekilde değerlendir: '+item.name+'.\nKaynak: '+item.url+'\nLisans notu: '+item.license+'\nYeniden kullanılabilir kısmı öner; gerekli lisans/atıf şartlarını ayrıca kontrol et.';showToast(item.name+' görev bağlamına eklendi.');}return;}
+  const snippetLoad=e.target.closest('[data-snippet-load]');if(snippetLoad){const item=reusableSnippets[Number(snippetLoad.dataset.snippetLoad)];if(item){$('codePad').value=item.code;if([...$('codeLanguage').options].some(o=>o.value===item.language))$('codeLanguage').value=item.language;showToast('Kod parçası Kod Alanı’na yüklendi.');}return;}
+  const snippetUse=e.target.closest('[data-snippet-use]');if(snippetUse){const item=reusableSnippets[Number(snippetUse.dataset.snippetUse)];if(item){$('localCoderTask').value='Bu kod parçasını incele, projeye entegrasyon ve test önerilerini ver. Kaynak: '+(item.sourceUrl||'belirtilmedi')+'. Lisans: '+(item.license||'belirtilmedi')+'.\n\nKod:\n'+item.code.slice(0,10000);showToast('Kod parçası Local Coder görevine eklendi.');}return;}
+  const snippetDownload=e.target.closest('[data-snippet-download]');if(snippetDownload){const item=reusableSnippets[Number(snippetDownload.dataset.snippetDownload)];if(item){const ext=({javascript:'js',html:'html',css:'css',python:'py',json:'json',markdown:'md',text:'txt'})[item.language]||'txt';downloadText((item.name||'snippet').replace(/[^a-z0-9-_]+/gi,'_')+'.'+ext,item.code);}return;}
+  const snippetDelete=e.target.closest('[data-snippet-delete]');if(snippetDelete){reusableSnippets.splice(Number(snippetDelete.dataset.snippetDelete),1);await setPref(DB.snippets,reusableSnippets);renderSnippetVault();showToast('Kod parçası kasadan silindi.');return;}
+
   const save=e.target.closest('[data-save-key]');if(save){await saveProviderCard(save.dataset.saveKey);return;}
   const test=e.target.closest('[data-test-provider]');if(test){await testProvider(test.dataset.testProvider);return;}
   const del=e.target.closest('[data-delete-key]');if(del){const id=del.dataset.deleteKey;if(confirm(providers[id].name+' anahtarı bu uygulamadan silinsin mi?')){await deleteSecret(id);renderProviderCards();updateDashboard();showToast('Anahtar silindi.');}return;}
@@ -305,6 +359,15 @@ $('exportWorkspace').addEventListener('click',exportWorkspace);
 $('importWorkspaceBtn').addEventListener('click',()=> $('importWorkspaceFile').click());
 $('importWorkspaceFile').addEventListener('change',async e=>{if(e.target.files?.[0])await importWorkspace(e.target.files[0]);e.target.value='';});
 $('resetLocal').addEventListener('click',clearAllLocal);
+$('localCoderRun').addEventListener('click',runLocalCoderWorkshop);
+$('localCoderApply').addEventListener('click',applyLocalCoderDraft);
+$('localCoderDownload').addEventListener('click',downloadLocalCoderDraft);
+$('localCoderSaveSnippet').addEventListener('click',saveLocalCoderDraft);
+$('reuseCatalogSearch').addEventListener('input',renderReuseCatalog);
+$('snippetForm').addEventListener('submit',saveSnippetFromForm);
+$('snippetExportAll').addEventListener('click',exportSnippetsAll);
+$('snippetImportBtn').addEventListener('click',()=>$('snippetImportFile').click());
+$('snippetImportFile').addEventListener('change',async e=>{if(e.target.files?.[0])await importSnippetFile(e.target.files[0]);e.target.value='';});
 
 let deferredInstallPrompt=null;
 window.addEventListener('beforeinstallprompt',event=>{
@@ -348,8 +411,8 @@ async function prepareBrowserFeatures(){
 async function init(){
   try{settings={...clone(defaultSettings),...(await getPref(DB.settings,{}))};settings.models={...clone(defaultSettings.models),...(settings.models||{})};settings.team=(settings.team||defaultSettings.team).filter(id=>providers[id]).slice(0,4);if(settings.ollamaUrl==='http://192.168.1.100:11434')settings.ollamaUrl='';}catch(_){}
   if(!nativeApp){showToast('Tarayıcıda API anahtarları yalnızca açık oturumda tutulur.');}
-  await initKeys(); projectList=await getPref(DB.projects,[]);chatHistory=await getPref(DB.chat,[]);userPlugins=await getPref(DB.plugins,[]);
-  if(!Array.isArray(projectList))projectList=[];if(!Array.isArray(chatHistory))chatHistory=[];if(!Array.isArray(userPlugins))userPlugins=[];
-  renderProviderCards();renderProjects();renderChat();renderBuiltinTools();renderPlugins();syncModeUI();updateDashboard();$('compareSelectionCount').textContent=settings.team.length+' ajan seçili';
+  await initKeys(); projectList=await getPref(DB.projects,[]);chatHistory=await getPref(DB.chat,[]);userPlugins=await getPref(DB.plugins,[]);reusableSnippets=await getPref(DB.snippets,[]);agentActivity=await getPref(DB.activity,[]);
+  if(!Array.isArray(projectList))projectList=[];if(!Array.isArray(chatHistory))chatHistory=[];if(!Array.isArray(userPlugins))userPlugins=[];if(!Array.isArray(reusableSnippets))reusableSnippets=[];if(!Array.isArray(agentActivity))agentActivity=[];
+  renderProviderCards();renderProjects();renderChat();renderBuiltinTools();renderPlugins();renderReuseCatalog();renderSnippetVault();renderAgentActivity();syncModeUI();updateDashboard();$('compareSelectionCount').textContent=settings.team.length+' ajan seçili';
 }
 prepareBrowserFeatures().then(init).catch(()=>showToast('Başlangıç ayarları okunamadı; sayfayı yenileyebilirsin.'));

@@ -2,6 +2,8 @@ name: Build Android Demo APK
 
 on:
   workflow_dispatch:
+  pull_request:
+    branches: [main]
   push:
     branches: [main]
     paths:
@@ -44,9 +46,13 @@ jobs:
           node --check server/server.js
           node --check server/login.js
           node --check public/sw.js
+          node --check src/workshop-data.js
+          node --check server/workshop-smoke-test.js
           node -e "JSON.parse(require('node:fs').readFileSync('public/manifest.webmanifest','utf8'))"
       - name: Build web assets
         run: npm run build
+      - name: Test Local Coder and reuse workspace
+        run: npm run test:workshop
       - name: Test private website login gate
         run: npm run test:site
       - name: Create Android project
