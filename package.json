@@ -1,6 +1,6 @@
 {
   "name": "ai-studio-alpha-1-mobile",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "private": true,
   "type": "module",
   "description": "AI Studio Alpha 1 multi-provider workspace with Local Coder, reusable source catalog, snippet vault and private web gateway",

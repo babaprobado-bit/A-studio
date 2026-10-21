@@ -12,7 +12,8 @@ const DB = {
   chat: 'ai-studio-chat-v2',
   plugins: 'ai-studio-prompt-plugins-v2',
   snippets: 'ai-studio-snippet-v1',
-  activity: 'ai-studio-agent-activity-v1'
+  activity: 'ai-studio-agent-activity-v1',
+  codeFiles: 'ai-studio-code-files-v1'
 };
 const nativeApp = Capacitor.isNativePlatform();
 const providers = {
@@ -38,6 +39,10 @@ let projectList = [];
 let userPlugins = [];
 let reusableSnippets = [];
 let agentActivity = [];
+let codeFiles = [];
+let activeCodeFileId = '';
+let codeFileSaveTimer = null;
+let codeFileLoadLock = false;
 let busy = false;
 let toastTimer;
 const runtimeKeys = Object.create(null);
@@ -57,6 +62,117 @@ function downloadText(name,content,type='text/plain;charset=utf-8'){ const blob=
 async function getPref(key,fallback){try{const r=await Preferences.get({key}); return r.value==null?fallback:JSON.parse(r.value);}catch(_){return fallback;}}
 async function setPref(key,value){await Preferences.set({key,value:JSON.stringify(value)});}
 async function removePref(key){try{await Preferences.remove({key});}catch(_){}}
+const CODE_LANGUAGES = ['javascript','html','css','python','json','markdown','text'];
+function makeRecordId(){return crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random());}
+function safeCodeFileName(value){
+  const name=String(value||'untitled.js').trim().replace(/[\\/:*?"<>|]/g,'_').slice(0,120);
+  return name||'untitled.js';
+}
+function uniqueCodeFileName(value,names){
+  const existing=new Set(names.map(n=>String(n).toLowerCase()));
+  const name=safeCodeFileName(value);
+  if(!existing.has(name.toLowerCase()))return name;
+  const dot=name.lastIndexOf('.');
+  const base=dot>0?name.slice(0,dot):name,ext=dot>0?name.slice(dot):'';
+  let n=2,candidate='';
+  do{candidate=base+' ('+n+++')'+ext;}while(existing.has(candidate.toLowerCase()));
+  return candidate;
+}
+function inferCodeLanguage(name,fallback='text'){
+  const ext=String(name||'').split('.').pop().toLowerCase();
+  const map={js:'javascript',mjs:'javascript',cjs:'javascript',ts:'javascript',html:'html',htm:'html',css:'css',py:'python',json:'json',md:'markdown',txt:'text'};
+  return map[ext]|| (CODE_LANGUAGES.includes(fallback)?fallback:'text');
+}
+function makeCodeFile(name='main.js',language='javascript',content=''){
+  return {id:makeRecordId(),name:safeCodeFileName(name),language:CODE_LANGUAGES.includes(language)?language:inferCodeLanguage(name),content:String(content||'').slice(0,100000),updated:new Date().toISOString()};
+}
+function normalizeCodeFileList(rawFiles,preserveIds=true){
+  if(!Array.isArray(rawFiles))return [];
+  const out=[];
+  for(const raw of rawFiles.slice(0,100)){
+    if(!raw||typeof raw.name!=='string'||typeof raw.content!=='string')continue;
+    const name=uniqueCodeFileName(raw.name,out.map(f=>f.name));
+    let id=preserveIds&&typeof raw.id==='string'&&raw.id.trim()?raw.id.slice(0,100):makeRecordId();
+    if(out.some(f=>f.id===id))id=makeRecordId();
+    out.push({id,name,language:inferCodeLanguage(name,raw.language),content:raw.content.slice(0,100000),updated:typeof raw.updated==='string'?raw.updated.slice(0,50):new Date().toISOString()});
+  }
+  return out;
+}
+function renderCodeFileSelector(){
+  const select=$('savedCodeFileSelect');if(!select)return;
+  select.innerHTML=codeFiles.map(f=>'<option value="'+esc(f.id)+'">'+esc(f.name)+'</option>').join('');
+  if(!codeFiles.some(f=>f.id===activeCodeFileId))activeCodeFileId=codeFiles[0]?.id||'';
+  select.value=activeCodeFileId;
+}
+function loadActiveCodeFile(){
+  const file=codeFiles.find(f=>f.id===activeCodeFileId);
+  codeFileLoadLock=true;
+  $('savedCodeFileName').value=file?.name||'main.js';
+  $('codeLanguage').value=file?.language||'javascript';
+  $('codePad').value=file?.content||'';
+  renderCodeFileSelector();
+  codeFileLoadLock=false;
+}
+async function saveCurrentCodeFile(notify=false){
+  if(codeFileLoadLock)return;
+  let file=codeFiles.find(f=>f.id===activeCodeFileId);
+  if(!file){file=makeCodeFile($('savedCodeFileName').value||'main.js',$('codeLanguage').value,$('codePad').value);codeFiles.unshift(file);activeCodeFileId=file.id;}
+  file.name=uniqueCodeFileName($('savedCodeFileName').value||file.name,codeFiles.filter(f=>f.id!==file.id).map(f=>f.name));
+  file.language=CODE_LANGUAGES.includes($('codeLanguage').value)?$('codeLanguage').value:'text';
+  file.content=$('codePad').value.slice(0,100000);
+  file.updated=new Date().toISOString();
+  $('savedCodeFileName').value=file.name;
+  await setPref(DB.codeFiles,codeFiles);
+  renderCodeFileSelector();
+  if(notify)showToast('Dosya bu cihazın çalışma alanına kaydedildi.');
+}
+function scheduleCodeFileSave(){
+  if(codeFileLoadLock)return;
+  clearTimeout(codeFileSaveTimer);
+  codeFileSaveTimer=setTimeout(()=>saveCurrentCodeFile(false).catch(()=>showToast('Kod dosyası otomatik kaydedilemedi; Kaydet düğmesini dene.')),700);
+}
+async function createCodeFile(){
+  await saveCurrentCodeFile(false);
+  const name=uniqueCodeFileName('new-file.js',codeFiles.map(f=>f.name));
+  const file=makeCodeFile(name,'javascript','');
+  codeFiles.unshift(file);activeCodeFileId=file.id;
+  await setPref(DB.codeFiles,codeFiles);loadActiveCodeFile();showToast('Yeni kod dosyası oluşturuldu.');
+}
+async function selectCodeFile(id){
+  if(!id||!codeFiles.some(f=>f.id===id))return;
+  await saveCurrentCodeFile(false);activeCodeFileId=id;loadActiveCodeFile();
+}
+async function deleteActiveCodeFile(){
+  const file=codeFiles.find(f=>f.id===activeCodeFileId);
+  if(!file)return;
+  if(!confirm('"'+file.name+'" dosyası bu cihazın çalışma alanından silinsin mi?'))return;
+  codeFiles=codeFiles.filter(f=>f.id!==file.id);
+  if(!codeFiles.length)codeFiles=[makeCodeFile()];
+  activeCodeFileId=codeFiles[0].id;
+  await setPref(DB.codeFiles,codeFiles);loadActiveCodeFile();showToast('Dosya kasadan silindi.');
+}
+async function exportCodeFiles(){
+  await saveCurrentCodeFile(false);
+  downloadText('ai-studio-code-files.json',JSON.stringify({format:'ai-studio-code-files-v1',exportedAt:new Date().toISOString(),activeFileId:activeCodeFileId,files:codeFiles},null,2),'application/json;charset=utf-8');
+}
+async function importCodeFileCollection(file){
+  try{
+    if(!file||file.size>5_000_000)throw new Error('Dosya eksik veya 5 MB sınırını aşıyor.');
+    const data=JSON.parse(await file.text());
+    const incoming=Array.isArray(data)?data:(data?.format==='ai-studio-code-files-v1'?data.files:null);
+    if(!Array.isArray(incoming))throw new Error('JSON içinde dosya listesi bulunamadı.');
+    const normalized=normalizeCodeFileList(incoming,false);
+    if(!normalized.length)throw new Error('İçe aktarılabilir dosya bulunamadı.');
+    for(const item of normalized){
+      item.name=uniqueCodeFileName(item.name,codeFiles.map(f=>f.name));
+      item.id=makeRecordId();codeFiles.unshift(item);
+    }
+    codeFiles=codeFiles.slice(0,100);activeCodeFileId=normalized[0].id;
+    await setPref(DB.codeFiles,codeFiles);loadActiveCodeFile();
+    showToast(normalized.length+' kod dosyası içe aktarıldı.');
+  }catch(error){showToast('Dosya kasası içe aktarılamadı: '+(error.message||'JSON dosyasını kontrol et.'));}
+}
+
 function providerModel(id){return id==='ollama' ? (settings.ollamaModel||settings.models.ollama||providers.ollama.model) : (settings.models[id]||providers[id].model);}
 function syncModeUI(){ $('demoToggle').checked=!!settings.demoMode; $('settingsDemoToggle').checked=!!settings.demoMode; $('modePill').textContent=settings.demoMode?'DEMO MODU':'GERÇEK MODEL'; $('modePill').className='pill '+(settings.demoMode?'safe':'live'); $('connectedCount').textContent=Object.keys(providers).filter(id=>id==='ollama'?!!settings.ollamaUrl:!!runtimeKeys[id]).length; $('providerState').textContent=settings.demoMode?'Demo yanıtı':(runtimeKeys[$('chatProvider').value]?'Anahtar hazır':($('chatProvider').value==='ollama'?'Yerel uç nokta':'Anahtar gerekli')); }
 async function getSecret(id){ if(!nativeApp)return runtimeKeys[id]||''; try{const r=await SecureStoragePlugin.get({key:'ai-studio-provider-'+id}); return r?.value||'';}catch(_){return '';} }
@@ -250,9 +366,10 @@ function updateDashboard(){const connected=Object.keys(providers).filter(id=>id=
 }
 async function exportProjects(){downloadText('ai-studio-projects.json',JSON.stringify({format:'ai-studio-projects-v2',exportedAt:new Date().toISOString(),projects:projectList},null,2),'application/json;charset=utf-8');}
 function buildWorkspaceSnapshot(){
-  return {format:'ai-studio-workspace-v1',exportedAt:new Date().toISOString(),settings:{demoMode:settings.demoMode,models:settings.models,team:settings.team,ollamaUrl:settings.ollamaUrl,ollamaModel:settings.ollamaModel,systemPrompt:settings.systemPrompt},projects:projectList,chat:chatHistory,plugins:userPlugins.filter(p=>p.kind!=='builtin').map(p=>({name:p.name,prompt:p.prompt})),snippets:reusableSnippets,activity:agentActivity};
+  return {format:'ai-studio-workspace-v1',exportedAt:new Date().toISOString(),settings:{demoMode:settings.demoMode,models:settings.models,team:settings.team,ollamaUrl:settings.ollamaUrl,ollamaModel:settings.ollamaModel,systemPrompt:settings.systemPrompt},projects:projectList,chat:chatHistory,plugins:userPlugins.filter(p=>p.kind!=='builtin').map(p=>({name:p.name,prompt:p.prompt})),snippets:reusableSnippets,activity:agentActivity,codeFiles,activeCodeFileId};
 }
-function exportWorkspace(){
+async function exportWorkspace(){
+  await saveCurrentCodeFile(false);
   const snapshot=buildWorkspaceSnapshot();
   downloadText('ai-studio-workspace-backup.json',JSON.stringify(snapshot,null,2),'application/json;charset=utf-8');
 }
@@ -261,6 +378,7 @@ async function exportEncryptedWorkspace(){
   const confirmation=$('encryptedBackupConfirm').value;
   if(password!==confirmation){showToast('Parolalar eşleşmiyor.');return;}
   try{
+    await saveCurrentCodeFile(false);
     const envelope=await encryptWorkspaceBackup(buildWorkspaceSnapshot(),password);
     downloadText('ai-studio-workspace-backup.encrypted.json',JSON.stringify(envelope,null,2),'application/json;charset=utf-8');
     $('encryptedBackupPassword').value='';$('encryptedBackupConfirm').value='';
@@ -301,10 +419,13 @@ async function importWorkspace(file){
     const nextPlugins=(Array.isArray(data.plugins)?data.plugins:[]).filter(p=>typeof p?.name==='string'&&typeof p?.prompt==='string'&&p.name.trim()&&p.prompt.trim()).slice(-100).map((p,i)=>({id:crypto.randomUUID?crypto.randomUUID():String(Date.now()+i),name:p.name.trim().slice(0,80),prompt:p.prompt.trim().slice(0,6000),kind:'custom'}));
     const nextSnippets=(Array.isArray(data.snippets)?data.snippets:[]).map(normalizeSnippet).filter(Boolean).slice(0,100).map((item,i)=>({...item,id:crypto.randomUUID?crypto.randomUUID():String(Date.now()+i)}));
     const nextActivity=(Array.isArray(data.activity)?data.activity:[]).slice(0,80).filter(item=>item&&typeof item.event==='string').map((item,i)=>({id:crypto.randomUUID?crypto.randomUUID():String(Date.now()+i),event:item.event.slice(0,100),status:typeof item.status==='string'?item.status.slice(0,40):'',detail:typeof item.detail==='string'?item.detail.slice(0,260):'',time:typeof item.time==='string'?item.time:new Date().toISOString()}));
-    if(!confirm('Bu yedek mevcut proje, sohbet, ayar ve özel prompt kayıtlarını değiştirecek. API anahtarları yedeğe dahil değildir ve bu cihazdaki anahtarlar silinmeyecek. Devam?'))return;
-    await Promise.all([setPref(DB.settings,nextSettings),setPref(DB.projects,nextProjects),setPref(DB.chat,nextChat),setPref(DB.plugins,nextPlugins),setPref(DB.snippets,nextSnippets),setPref(DB.activity,nextActivity)]);
-    settings=nextSettings;projectList=nextProjects;chatHistory=nextChat;userPlugins=nextPlugins;reusableSnippets=nextSnippets;agentActivity=nextActivity;
-    renderProviderCards();renderProjects();renderChat();renderPlugins();renderSnippetVault();renderAgentActivity();renderReuseCatalog();syncModeUI();updateDashboard();
+    const nextFiles=Array.isArray(data.codeFiles)?normalizeCodeFileList(data.codeFiles,true):codeFiles;
+    if(!nextFiles.length)nextFiles.push(makeCodeFile());
+    const nextActiveFileId=nextFiles.some(file=>file.id===data.activeCodeFileId)?data.activeCodeFileId:nextFiles[0].id;
+    if(!confirm('Bu yedek mevcut proje, sohbet, kod dosyaları, ayar ve özel prompt kayıtlarını değiştirecek. API anahtarları yedeğe dahil değildir ve bu cihazdaki anahtarlar silinmeyecek. Devam?'))return;
+    await Promise.all([setPref(DB.settings,nextSettings),setPref(DB.projects,nextProjects),setPref(DB.chat,nextChat),setPref(DB.plugins,nextPlugins),setPref(DB.snippets,nextSnippets),setPref(DB.activity,nextActivity),setPref(DB.codeFiles,nextFiles)]);
+    settings=nextSettings;projectList=nextProjects;chatHistory=nextChat;userPlugins=nextPlugins;reusableSnippets=nextSnippets;agentActivity=nextActivity;codeFiles=nextFiles;activeCodeFileId=nextActiveFileId;
+    renderProviderCards();renderProjects();renderChat();renderPlugins();renderSnippetVault();renderAgentActivity();renderReuseCatalog();renderCodeFileSelector();loadActiveCodeFile();syncModeUI();updateDashboard();
     $('compareSelectionCount').textContent=settings.team.length+' ajan seçili';
     showToast('Tam çalışma alanı geri yüklendi. API anahtarları ayrı güvenli depoda kaldı.');
   }catch(err){showToast('Yedek geri yüklenemedi: '+(err.message||'JSON dosyasını kontrol et.'));}
@@ -318,7 +439,7 @@ async function saveProviderCard(id){
   const field=$('key-'+id),key=field?.value.trim();
   try{if(key){await saveSecret(id,key);field.value='';}await setPref(DB.settings,settings);renderProviderCards();updateDashboard();showToast(key?'Model ayarı ve anahtar kaydedildi.':'Model ayarı kaydedildi.');}
   catch(e){showToast('Kaydedilemedi: '+(e.message||'Güvenli depoya erişilemiyor.'));}}
-async function clearAllLocal(){if(!confirm('Proje notları, sohbet, özel eklentiler, kod kasası ve ajan etkinlikleri bu cihazdan silinsin mi? API anahtarlarını silmek için Modeller ekranını kullan.'))return;projectList=[];chatHistory=[];userPlugins=[];reusableSnippets=[];agentActivity=[];await Promise.all([removePref(DB.projects),removePref(DB.chat),removePref(DB.plugins),removePref(DB.snippets),removePref(DB.activity)]);renderProjects();renderChat();renderPlugins();renderSnippetVault();renderAgentActivity();updateDashboard();showToast('Yerel notlar, kasa ve etkinlik geçmişi silindi.');}
+async function clearAllLocal(){if(!confirm('Proje notları, sohbet, özel eklentiler, kod dosyaları, kod kasası ve ajan etkinlikleri bu cihazdan silinsin mi? API anahtarlarını silmek için Modeller ekranını kullan.'))return;projectList=[];chatHistory=[];userPlugins=[];reusableSnippets=[];agentActivity=[];codeFiles=[makeCodeFile()];activeCodeFileId=codeFiles[0].id;await Promise.all([removePref(DB.projects),removePref(DB.chat),removePref(DB.plugins),removePref(DB.snippets),removePref(DB.activity),setPref(DB.codeFiles,codeFiles)]);renderProjects();renderChat();renderPlugins();renderSnippetVault();renderAgentActivity();loadActiveCodeFile();updateDashboard();showToast('Yerel notlar, kod dosyaları, kasa ve etkinlik geçmişi silindi.');}
 function copyText(text){if(navigator.clipboard?.writeText){navigator.clipboard.writeText(text).then(()=>showToast('Kopyalandı.')).catch(()=>fallbackCopy(text));}else fallbackCopy(text);}
 function fallbackCopy(text){const t=document.createElement('textarea');t.value=text;t.style.position='fixed';t.style.opacity='0';document.body.append(t);t.select();try{document.execCommand('copy');showToast('Kopyalandı.');}catch(_){showToast('Kopyalanamadı; dosya olarak dışa aktarabilirsin.');}t.remove();}
 document.addEventListener('click',async e=>{
@@ -362,9 +483,9 @@ $('clearChat').addEventListener('click',async()=>{if(confirm('Sohbet geçmişi t
 $('saveOllama').addEventListener('click',saveOllama);
 $('testOllama').addEventListener('click',testOllama);
 $('copyCode').addEventListener('click',()=>copyText($('codePad').value));
-$('exportCode').addEventListener('click',()=>downloadText('ai-studio-code.'+({javascript:'js',python:'py',markdown:'md',text:'txt'}[$('codeLanguage').value]||$('codeLanguage').value),$('codePad').value));
+$('exportCode').addEventListener('click',async()=>{await saveCurrentCodeFile(false);const f=codeFiles.find(x=>x.id===activeCodeFileId);downloadText(f?.name||'ai-studio-code.txt',$('codePad').value);});
 $('importCode').addEventListener('click',()=>$('codeFile').click());
-$('codeFile').addEventListener('change',async e=>{const f=e.target.files?.[0];if(f){if(f.size>1_000_000){showToast('Dosya 1 MB limitini aşıyor.');return;}$('codePad').value=await f.text();const ext=f.name.split('.').pop();const mapping={js:'javascript',ts:'javascript',py:'python',md:'markdown',txt:'text',json:'json',html:'html',css:'css'};$('codeLanguage').value=mapping[ext]||'text';showToast('Dosya içe aktarıldı.');}e.target.value='';});
+$('codeFile').addEventListener('change',async e=>{const f=e.target.files?.[0];if(f){if(f.size>100_000){showToast('Tek dosya 100 KB sınırını aşıyor.');e.target.value='';return;}const content=await f.text();const language=inferCodeLanguage(f.name,'text');const name=uniqueCodeFileName(f.name,codeFiles.map(x=>x.name));const imported=makeCodeFile(name,language,content);codeFiles.unshift(imported);codeFiles=codeFiles.slice(0,100);activeCodeFileId=imported.id;await setPref(DB.codeFiles,codeFiles);loadActiveCodeFile();showToast('Dosya çalışma alanına ayrı dosya olarak eklendi.');}e.target.value='';});
 $('exportWorkspace').addEventListener('click',exportWorkspace);
 $('exportEncryptedWorkspace').addEventListener('click',exportEncryptedWorkspace);
 $('importEncryptedWorkspaceBtn').addEventListener('click',()=>$('importEncryptedWorkspaceFile').click());
@@ -383,6 +504,16 @@ $('snippetImportBtn').addEventListener('click',()=>$('snippetImportFile').click(
 $('snippetImportFile').addEventListener('change',async e=>{if(e.target.files?.[0])await importSnippetFile(e.target.files[0]);e.target.value='';});
 $('activityExport').addEventListener('click',exportAgentActivity);
 $('activityClear').addEventListener('click',clearAgentActivity);
+$('savedCodeFileSelect').addEventListener('change',async e=>{const id=e.target.value;await selectCodeFile(id);});
+$('savedCodeFileName').addEventListener('blur',()=>saveCurrentCodeFile(false).catch(()=>showToast('Dosya adı kaydedilemedi.')));
+$('codeLanguage').addEventListener('change',()=>scheduleCodeFileSave());
+$('codePad').addEventListener('input',()=>scheduleCodeFileSave());
+$('newCodeFile').addEventListener('click',()=>createCodeFile().catch(()=>showToast('Yeni dosya oluşturulamadı.')));
+$('saveCodeFile').addEventListener('click',()=>saveCurrentCodeFile(true).catch(()=>showToast('Dosya kaydedilemedi.')));
+$('deleteCodeFile').addEventListener('click',()=>deleteActiveCodeFile().catch(()=>showToast('Dosya silinemedi.')));
+$('exportCodeFiles').addEventListener('click',()=>exportCodeFiles().catch(()=>showToast('Dosya kasası yedeklenemedi.')));
+$('importCodeFilesBtn').addEventListener('click',()=>$('importCodeFilesFile').click());
+$('importCodeFilesFile').addEventListener('change',async e=>{if(e.target.files?.[0])await importCodeFileCollection(e.target.files[0]);e.target.value='';});
 
 let deferredInstallPrompt=null;
 window.addEventListener('beforeinstallprompt',event=>{
@@ -426,8 +557,8 @@ async function prepareBrowserFeatures(){
 async function init(){
   try{settings={...clone(defaultSettings),...(await getPref(DB.settings,{}))};settings.models={...clone(defaultSettings.models),...(settings.models||{})};settings.team=(settings.team||defaultSettings.team).filter(id=>providers[id]).slice(0,4);if(settings.ollamaUrl==='http://192.168.1.100:11434')settings.ollamaUrl='';}catch(_){}
   if(!nativeApp){showToast('Tarayıcıda API anahtarları yalnızca açık oturumda tutulur.');}
-  await initKeys(); projectList=await getPref(DB.projects,[]);chatHistory=await getPref(DB.chat,[]);userPlugins=await getPref(DB.plugins,[]);reusableSnippets=await getPref(DB.snippets,[]);agentActivity=await getPref(DB.activity,[]);
+  await initKeys(); projectList=await getPref(DB.projects,[]);chatHistory=await getPref(DB.chat,[]);userPlugins=await getPref(DB.plugins,[]);reusableSnippets=await getPref(DB.snippets,[]);agentActivity=await getPref(DB.activity,[]);codeFiles=normalizeCodeFileList(await getPref(DB.codeFiles,[]),true);if(!codeFiles.length)codeFiles=[makeCodeFile()];activeCodeFileId=codeFiles[0].id;await setPref(DB.codeFiles,codeFiles);
   if(!Array.isArray(projectList))projectList=[];if(!Array.isArray(chatHistory))chatHistory=[];if(!Array.isArray(userPlugins))userPlugins=[];if(!Array.isArray(reusableSnippets))reusableSnippets=[];if(!Array.isArray(agentActivity))agentActivity=[];
-  renderProviderCards();renderProjects();renderChat();renderBuiltinTools();renderPlugins();renderReuseCatalog();renderSnippetVault();renderAgentActivity();syncModeUI();updateDashboard();$('compareSelectionCount').textContent=settings.team.length+' ajan seçili';
+  renderProviderCards();renderProjects();renderChat();renderBuiltinTools();renderPlugins();renderReuseCatalog();renderSnippetVault();renderAgentActivity();loadActiveCodeFile();syncModeUI();updateDashboard();$('compareSelectionCount').textContent=settings.team.length+' ajan seçili';
 }
 prepareBrowserFeatures().then(init).catch(()=>showToast('Başlangıç ayarları okunamadı; sayfayı yenileyebilirsin.'));

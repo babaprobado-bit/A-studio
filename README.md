@@ -79,3 +79,11 @@ Still not implemented: unattended agents continuously inventing tasks; unrestric
 - Each record stores the operation, status, brief result/error detail, and timestamp in this device's app storage.
 - Export recent activity as JSON or clear it from the Tools screen. The history is an audit trail, not proof of shell execution or automated tests on the PC.
 - Activity details are bounded to keep the history small. It is not cloud-synced and follows the same local-storage privacy limits as the rest of the workspace.
+
+
+## Workspace 0.8: persistent multi-file code workspace
+
+- The Code Pad now manages up to 100 named files separately (for example `player.js`, `enemy.js`, `dialogue.js`) and auto-saves edits to device/app storage.
+- Create, select, rename, delete, import and download individual files. Export/import the file collection as JSON to move the modular workspace between devices.
+- Full workspace backup and encrypted backup now include saved code files and the active selection. Older backups without the `codeFiles` field preserve the existing file collection instead of deleting it.
+- Individual file content is limited to 100 KB, with up to 100 files stored locally. This is a local editor/backup manager, not a PC filesystem bridge; it does not execute code or write to arbitrary folders.
