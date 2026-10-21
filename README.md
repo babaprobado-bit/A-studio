@@ -71,3 +71,11 @@ Still not implemented: unattended agents continuously inventing tasks; unrestric
 - The passphrase is not saved or sent to the server. There is no password recovery, so keep the passphrase in a safe place separate from the backup.
 - This protects the downloaded encrypted backup only. Working browser records still use the browser's local storage and are not encrypted at rest by this feature; the site's shared password is not local-data encryption. API keys remain excluded from both backup formats.
 - The ordinary JSON backup remains available for convenience and is **not encrypted**. Use the encrypted backup when storing a copy in cloud drives or sharing it with your future devices.
+
+
+## Workspace 0.7: unified agent activity history
+
+- Activity records now include single-provider chat, parallel team requests, sequential agent stages, comparison results, and the Local Coder workflow.
+- Each record stores the operation, status, brief result/error detail, and timestamp in this device's app storage.
+- Export recent activity as JSON or clear it from the Tools screen. The history is an audit trail, not proof of shell execution or automated tests on the PC.
+- Activity details are bounded to keep the history small. It is not cloud-synced and follows the same local-storage privacy limits as the rest of the workspace.

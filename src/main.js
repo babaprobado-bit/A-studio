@@ -139,81 +139,57 @@ async function callProvider(id,prompt,history){
   if(!text)throw new Error('Yanıtta metin bulunamadı. Model kimliğinin bu API üzerinde kullanılabildiğini doğrula.');return text;
 }
 async function submitChat(prompt,providerId,roleOverride){
-  if(busy)return; const text=prompt.trim(); if(!text)return;
-  busy=true; $('chatInput').disabled=true; $('chatForm').querySelector('[type=submit]').disabled=true;
-  pushMessage('user',text,{mode:settings.demoMode?'demo':'live'});
-  const out=$('chatMessages'); const loading=document.createElement('article'); loading.className='result-card';loading.innerHTML='<div class="result-label">YANIT HAZIRLANIYOR</div><p>Seçili sağlayıcıdan yanıt bekleniyor…</p>';out.append(loading);
-  try{
-    let answer,mode;
-    if(settings.demoMode){answer=demoAnswer(providerId,text,roleOverride);mode='demo';}
-    else {answer=await callProvider(providerId,text,chatContext().slice(0,-1));mode='live';}
-    loading.remove();pushMessage('assistant',answer,{provider:providers[providerId].name,mode});
-  }catch(err){loading.remove();pushMessage('assistant','Hata: '+(err?.message||'Bilinmeyen hata')+'\n\nGerçek yanıt alınmadı. Model, anahtar, kota ve bağlantıyı kontrol et.',{provider:providers[providerId].name,mode:'error'});}
+  if(busy)return;const text=prompt.trim();if(!text)return;busy=true;$('chatInput').disabled=true;$('chatForm').querySelector('[type=submit]').disabled=true;
+  pushMessage('user',text,{mode:settings.demoMode?'demo':'live'});const out=$('chatMessages'),loading=document.createElement('article');loading.className='result-card';loading.innerHTML='<div class="result-label">YANIT HAZIRLANIYOR</div><p>Seçili sağlayıcıdan yanıt bekleniyor…</p>';out.append(loading);
+  await logAgentActivity('Tekli sohbet · '+providers[providerId].name,'Başladı',text);
+  try{let answer,mode;if(settings.demoMode){answer=demoAnswer(providerId,text,roleOverride);mode='demo';}else{answer=await callProvider(providerId,text,chatContext().slice(0,-1));mode='live';}
+    loading.remove();pushMessage('assistant',answer,{provider:providers[providerId].name,mode});await logAgentActivity('Tekli sohbet · '+providers[providerId].name,'Tamamlandı',(mode==='demo'?'Demo şablonu üretildi. ':'Gerçek model yanıt verdi. ')+answer.slice(0,180));
+  }catch(err){loading.remove();pushMessage('assistant','Hata: '+(err?.message||'Bilinmeyen hata')+'\n\nGerçek yanıt alınmadı. Model, anahtar, kota ve bağlantıyı kontrol et.',{provider:providers[providerId].name,mode:'error'});await logAgentActivity('Tekli sohbet · '+providers[providerId].name,'Hata',err?.message||'Bilinmeyen hata');}
   finally{busy=false;$('chatInput').disabled=false;$('chatForm').querySelector('[type=submit]').disabled=false;$('chatInput').focus();syncModeUI();}
 }
 async function runTeam(prompt){
-  if(busy)return;const selected=settings.team.slice(0,4); if(!selected.length){showToast('Önce Modeller ekranında takım ajanı seç.');return;}
+  if(busy)return;const task=String(prompt||'').trim(),selected=settings.team.slice(0,4);if(!task){showToast('Önce takımın görevini yaz.');return;}if(!selected.length){showToast('Önce Modeller ekranında takım ajanı seç.');return;}
   if(!settings.demoMode&&!confirm('Takım turu en fazla '+selected.length+' gerçek API isteği gönderebilir; ücret oluşabilir. Devam edilsin mi?'))return;
-  if(settings.demoMode){pushMessage('user',prompt,{mode:'demo'}); selected.forEach(id=>pushMessage('assistant',demoAnswer(id,prompt),{provider:providers[id].name,mode:'demo'}));return;}
-  busy=true;pushMessage('user',prompt,{mode:'live'});
-  const out=$('chatMessages'),load=document.createElement('article');load.className='result-card';load.innerHTML='<div class="result-label">TAKIM TURU</div><p>Seçili ajanlar çalışıyor…</p>';out.append(load);
+  busy=true;await logAgentActivity('Paralel takım','Başladı',selected.map(id=>providers[id].name).join(', ')+': '+task);
+  if(settings.demoMode){pushMessage('user',task,{mode:'demo'});selected.forEach(id=>pushMessage('assistant',demoAnswer(id,task),{provider:providers[id].name,mode:'demo'}));await logAgentActivity('Paralel takım','Tamamlandı',selected.length+' demo şablonu üretildi; gerçek model çağrısı yapılmadı.');busy=false;return;}
+  pushMessage('user',task,{mode:'live'});const out=$('chatMessages'),load=document.createElement('article');load.className='result-card';load.innerHTML='<div class="result-label">TAKIM TURU</div><p>Seçili ajanlar çalışıyor…</p>';out.append(load);
   const history=chatContext().slice(0,-1);
-  const results=await Promise.all(selected.map(async id=>{try{return {id,answer:await callProvider(id,prompt,history)};}catch(e){return {id,error:e?.message||'Hata'};}}));
-  load.remove(); results.forEach(r=>pushMessage('assistant',r.error?'Hata: '+r.error:r.answer,{provider:providers[r.id].name,mode:r.error?'error':'live'}));
-  busy=false;
+  try{const results=await Promise.all(selected.map(async id=>{try{return{id,answer:await callProvider(id,task,history)};}catch(e){return{id,error:e?.message||'Hata'};}}));load.remove();
+    results.forEach(r=>pushMessage('assistant',r.error?'Hata: '+r.error:r.answer,{provider:providers[r.id].name,mode:r.error?'error':'live'}));
+    for(const r of results)await logAgentActivity('Paralel ajan · '+providers[r.id].name,r.error?'Hata':'Tamamlandı',r.error||String(r.answer||'').slice(0,180));
+    await logAgentActivity('Paralel takım',results.some(r=>r.error)?'Kısmi başarı':'Tamamlandı',results.filter(r=>!r.error).length+'/'+results.length+' ajan başarılı.');
+  }catch(error){load.remove();await logAgentActivity('Paralel takım','Hata',error?.message||'Bilinmeyen hata');showToast('Takım çalışması tamamlanamadı.');}finally{busy=false;syncModeUI();}
 }
 async function runPipeline(prompt){
-  if(busy)return;
-  const task=prompt.trim();
-  const selected=settings.team.slice(0,4);
-  if(!task){showToast('Önce iş akışının görevini yaz.');return;}
-  if(selected.length<2){showToast('Sıralı zincir için en az iki ajan seç.');go('models');return;}
+  if(busy)return;const task=prompt.trim(),selected=settings.team.slice(0,4);if(!task){showToast('Önce iş akışının görevini yaz.');return;}if(selected.length<2){showToast('Sıralı zincir için en az iki ajan seç.');go('models');return;}
   if(!settings.demoMode&&!confirm('Sıralı ajan zinciri '+selected.length+' gerçek API isteği gönderebilir ve ücret oluşturabilir. Her ajan bir öncekinin çıktısını görür. Devam?'))return;
-  busy=true;
-  $('chatInput').disabled=true;
-  $('chatForm').querySelector('[type=submit]').disabled=true;
-  $('teamRun').disabled=true;
-  $('pipelineRun').disabled=true;
-  pushMessage('user',task,{mode:settings.demoMode?'demo':'live'});
-  const out=$('chatMessages');
-  const loading=document.createElement('article');
-  loading.className='result-card';
-  loading.innerHTML='<div class="result-label">SIRALI AJAN ZİNCİRİ</div><p>Planla → geliştir → eleştir → test et aşamaları çalışıyor…</p>';
-  out.append(loading);
-  let previous='';
-  const stageRoles=['Mimar / planlayıcı','Uygulayıcı','Bağımsız gözden geçirici','Testçi / son kontrol'];
-  try{
-    for(let i=0;i<selected.length;i++){
-      const id=selected[i];
+  busy=true;$('chatInput').disabled=true;$('chatForm').querySelector('[type=submit]').disabled=true;$('teamRun').disabled=true;$('pipelineRun').disabled=true;
+  await logAgentActivity('Sıralı ajan zinciri','Başladı',selected.length+' aşama: '+task);pushMessage('user',task,{mode:settings.demoMode?'demo':'live'});
+  const out=$('chatMessages'),loading=document.createElement('article');loading.className='result-card';loading.innerHTML='<div class="result-label">SIRALI AJAN ZİNCİRİ</div><p>Planla → geliştir → eleştir → test et aşamaları çalışıyor…</p>';out.append(loading);
+  let previous='';const stageRoles=['Mimar / planlayıcı','Uygulayıcı','Bağımsız gözden geçirici','Testçi / son kontrol'];
+  try{for(let i=0;i<selected.length;i++){const id=selected[i],title='Aşama '+(i+1)+' · '+providers[id].name;
+      await logAgentActivity('Sıralı zincir · '+title,'Çalışıyor',stageRoles[Math.min(i,stageRoles.length-1)]);
       const stagePrompt='İş akışı aşaması '+(i+1)+'/'+selected.length+'. Rolün: '+stageRoles[Math.min(i,stageRoles.length-1)]+'.\nAsıl görev: '+task+'\n'+(previous?'Önceki ajanın çıktısı:\n'+previous+'\n':'')+'Görev: '+(i===0?'Uygulanabilir bir plan ve riskleri çıkar.':i===1?'Planı somut, modüler ve test edilebilir sonuca dönüştür.':i===2?'Önceki çıktıyı bağımsız değerlendir; hataları ve eksikleri düzelt.':'Son çıktıyı kontrol et; test senaryolarını, kalan işleri ve kabul ölçütlerini listele.')+'\nBilmediğin şeyi uydurma, kodu gerçekten çalıştırmadıysan çalıştırdığını iddia etme.';
-      const answer=settings.demoMode
-        ? demoAnswer(id,stagePrompt,stageRoles[Math.min(i,stageRoles.length-1)])
-        : await callProvider(id,stagePrompt,chatContext().slice(0,-1));
-      previous=answer;
+      const answer=settings.demoMode?demoAnswer(id,stagePrompt,stageRoles[Math.min(i,stageRoles.length-1)]):await callProvider(id,stagePrompt,chatContext().slice(0,-1));previous=answer;
       pushMessage('assistant','AŞAMA '+(i+1)+'/'+selected.length+'\n'+answer,{provider:providers[id].name,mode:settings.demoMode?'demo':'live'});
-      loading.querySelector('p').textContent='Tamamlanan aşama: '+(i+1)+'/'+selected.length+' · '+providers[id].name;
+      await logAgentActivity('Sıralı zincir · '+title,'Tamamlandı',answer.slice(0,180));loading.querySelector('p').textContent='Tamamlanan aşama: '+(i+1)+'/'+selected.length+' · '+providers[id].name;
     }
-    loading.remove();
-    showToast('Sıralı ajan zinciri tamamlandı.');
-  }catch(err){
-    loading.remove();
-    pushMessage('assistant','Zincir durdu: '+(err?.message||'Bilinmeyen hata')+'\nÖnceki aşamalar sohbet geçmişinde duruyor; kalan aşamaları kontrol edip yeniden deneyebilirsin.',{provider:'AI STUDIO',mode:'error'});
-  }finally{
-    busy=false;
-    $('chatInput').disabled=false;
-    $('chatForm').querySelector('[type=submit]').disabled=false;
-    $('teamRun').disabled=false;
-    $('pipelineRun').disabled=false;
-  }
+    loading.remove();await logAgentActivity('Sıralı ajan zinciri','Tamamlandı',selected.length+' aşama tamamlandı. Testler otomatik çalıştırılmadı.');showToast('Sıralı ajan zinciri tamamlandı.');
+  }catch(err){loading.remove();pushMessage('assistant','Zincir durdu: '+(err?.message||'Bilinmeyen hata')+'\nÖnceki aşamalar sohbet geçmişinde duruyor; kalan aşamaları kontrol edip yeniden deneyebilirsin.',{provider:'AI STUDIO',mode:'error'});await logAgentActivity('Sıralı ajan zinciri','Hata',err?.message||'Bilinmeyen hata');}
+  finally{busy=false;$('chatInput').disabled=false;$('chatForm').querySelector('[type=submit]').disabled=false;$('teamRun').disabled=false;$('pipelineRun').disabled=false;syncModeUI();}
 }
 function renderCompareResults(results){$('compareResults').innerHTML=results.map(r=>'<article class="result-card"><div class="result-label">'+esc(providers[r.id].name)+' · '+(r.error?'HATA':r.mode==='live'?'GERÇEK MODEL':'DEMO ŞABLONU')+'</div><p>'+esc(r.error||r.answer)+'</p></article>').join('');}
 async function runCompare(){
-  const prompt=$('comparePrompt').value.trim();if(!prompt){showToast('Önce karşılaştırılacak görevi yaz.');return;}
+  if(busy){showToast('Başka bir ajan işi çalışıyor.');return;}const prompt=$('comparePrompt').value.trim();if(!prompt){showToast('Önce karşılaştırılacak görevi yaz.');return;}
   const selected=settings.team.slice(0,4);if(selected.length<2){showToast('Karşılaştırmak için en az iki ajan seç.');go('models');return;}
   if(!settings.demoMode&&!confirm('Karşılaştırma '+selected.length+' gerçek API isteği gönderebilir; ücret oluşabilir. Devam?'))return;
-  $('compareRun').disabled=true;$('compareRun').textContent='Çalışıyor…';$('compareResults').innerHTML='<div class="panel"><p>Sonuçlar bekleniyor…</p></div>';
-  const results=await Promise.all(selected.map(async id=>{try{return {id,answer:settings.demoMode?demoAnswer(id,prompt):await callProvider(id,prompt,[]),mode:settings.demoMode?'demo':'live'};}catch(e){return {id,error:e?.message||'Hata',mode:'error'};}}));
-  renderCompareResults(results);$('compareRun').disabled=false;$('compareRun').textContent='Karşılaştırmayı başlat';
+  busy=true;$('compareRun').disabled=true;$('compareRun').textContent='Çalışıyor…';$('compareResults').innerHTML='<div class="panel"><p>Sonuçlar bekleniyor…</p></div>';
+  await logAgentActivity('Model karşılaştırma','Başladı',selected.map(id=>providers[id].name).join(', ')+': '+prompt);
+  try{const results=await Promise.all(selected.map(async id=>{try{return{id,answer:settings.demoMode?demoAnswer(id,prompt):await callProvider(id,prompt,[]),mode:settings.demoMode?'demo':'live'};}catch(e){return{id,error:e?.message||'Hata',mode:'error'};}}));
+    renderCompareResults(results);for(const r of results)await logAgentActivity('Karşılaştırma · '+providers[r.id].name,r.error?'Hata':'Tamamlandı',r.error||String(r.answer||'').slice(0,180));
+    await logAgentActivity('Model karşılaştırma',results.some(r=>r.error)?'Kısmi başarı':'Tamamlandı',results.filter(r=>!r.error).length+'/'+results.length+' yanıt başarılı.');
+  }catch(error){await logAgentActivity('Model karşılaştırma','Hata',error?.message||'Bilinmeyen hata');showToast('Karşılaştırma başarısız oldu.');}
+  finally{$('compareRun').disabled=false;$('compareRun').textContent='Karşılaştırmayı başlat';busy=false;syncModeUI();}
 }
 function renderProjects(){const out=$('projectList');$('projectCount').textContent=projectList.length;if(!projectList.length){out.innerHTML='<div class="panel"><p class="muted">Henüz proje yok. İlk fikrini yukarıdan kaydet.</p></div>';return;}
   out.innerHTML=projectList.map((p,i)=>'<article class="project-card"><div class="project-head"><h3>'+esc(p.name)+'</h3><time>'+esc(new Date(p.updated||Date.now()).toLocaleDateString('tr-TR'))+'</time></div><p>'+esc(p.notes)+'</p><div class="row-actions"><button class="btn secondary small" data-project-export="'+i+'">Markdown indir</button><button class="btn ghost small" data-project-open="'+i+'">Sohbette kullan</button><span class="grow"></span><button class="btn danger small" data-project-delete="'+i+'">Sil</button></div></article>').join('');
@@ -236,6 +212,8 @@ async function logAgentActivity(event,status,detail){
   agentActivity.unshift({id:crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random()),event:String(event||'Ajan').slice(0,100),status:String(status||'').slice(0,40),detail:String(detail||'').slice(0,260),time:new Date().toISOString()});
   agentActivity=agentActivity.slice(0,80);renderAgentActivity();try{await setPref(DB.activity,agentActivity);}catch(_){showToast('Ajan etkinliği cihaza kaydedilemedi.');}
 }
+function exportAgentActivity(){downloadText('ai-studio-agent-activity.json',JSON.stringify({format:'ai-studio-agent-activity-v1',exportedAt:new Date().toISOString(),activity:agentActivity},null,2),'application/json;charset=utf-8');}
+async function clearAgentActivity(){if(!confirm('Kayıtlı ajan etkinlik geçmişi bu cihazdan silinsin mi?'))return;agentActivity=[];await removePref(DB.activity);renderAgentActivity();showToast('Ajan geçmişi temizlendi.');}
 function renderAgentActivity(){
   const out=$('agentActivityList');if(!out)return;
   if(!agentActivity.length){out.innerHTML='<div class="panel"><p class="muted">Henüz Local Coder çalıştırılmadı. Her aşama burada tarihçeye eklenir.</p></div>';return;}
@@ -403,6 +381,8 @@ $('snippetForm').addEventListener('submit',saveSnippetFromForm);
 $('snippetExportAll').addEventListener('click',exportSnippetsAll);
 $('snippetImportBtn').addEventListener('click',()=>$('snippetImportFile').click());
 $('snippetImportFile').addEventListener('change',async e=>{if(e.target.files?.[0])await importSnippetFile(e.target.files[0]);e.target.value='';});
+$('activityExport').addEventListener('click',exportAgentActivity);
+$('activityClear').addEventListener('click',clearAgentActivity);
 
 let deferredInstallPrompt=null;
 window.addEventListener('beforeinstallprompt',event=>{
