@@ -96,3 +96,25 @@ Still not implemented: unattended agents continuously inventing tasks; unrestric
 - A separate opt-in switch can attach short excerpts from up to three saved code files and two saved snippets. It is off by default to avoid sending code unexpectedly. Context size is bounded; it is a reference for the model, not proof the model has read or executed files.
 - The selected project is persisted locally and included in standard/encrypted workspace backups. Older backups remain compatible; when no active ID exists, the first imported project becomes active.
 - Local file reuse still does not copy third-party code automatically. Check licenses and source notes before adding third-party snippets to a shipped project.
+
+
+## v1.0 — Shared encrypted AI vault
+
+### What it provides
+
+- The existing site password continues to protect the human web UI. After signing in, the **Şifreli ortak AI kasası** panel lets the admin create, search, and delete shared project notes.
+- The admin can issue separate named agent tokens with either `readwrite` or `readonly` scope. The raw token is returned only once; only a SHA-256 token hash is persisted inside the encrypted vault. Revoking a token immediately blocks subsequent API calls.
+- Agents use `Authorization: Bearer <token>` with the REST API under `/api/agent/v1`. The token-authenticated OpenAPI document is available at `/api/agent/v1/openapi.json`; identity is at `/whoami`; shared records are under `/items`.
+- The complete server-side state (notes, tags, agent names/scopes, and token hashes) is encrypted at rest with AES-256-GCM, a fresh random 96-bit IV per write, and an authentication tag. File writes are atomic and use restrictive permissions.
+- Site-admin writes still require the logged-in cookie and same-origin checks. Agent tokens are per-agent and have separate permissions. API keys and provider secrets must not be saved in the shared vault.
+
+### Required deployment configuration
+
+- `SITE_PASSWORD`: at least 12 characters for the private human web login.
+- `SESSION_SECRET`: at least 32 random characters for signed sessions.
+- `VAULT_ENCRYPTION_KEY`: at least 32 random characters, stored only in the deployment environment. **Losing or changing this key makes existing encrypted vault data unreadable**; keep a protected backup of the key separate from the encrypted file.
+- `VAULT_DATA_DIR`: directory for the encrypted `vault.enc` file. Default is `./data`. For Render, set `/var/data` and attach a persistent disk to `/var/data` if long-term persistence is needed. Render's free web services do not support persistent disks; without durable storage, records may be lost after restarts/redeploys. Never assume a live test deployment is permanent until storage is configured.
+
+### Security boundaries
+
+This is **encrypted-at-rest shared storage, not end-to-end encryption**: the authorized server decrypts a record while serving API responses, because authorized agents must be able to read it. Use HTTPS in production; keep tokens private; issue read-only tokens when writing isn't needed; rotate/revoke compromised tokens. Do not use it for secrets such as provider API keys or unnecessary personal data. The Android APK has no shared-vault server by itself; the browser panel appears when running on the authenticated private website.

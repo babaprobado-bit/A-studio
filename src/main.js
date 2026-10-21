@@ -43,6 +43,8 @@ let activeProjectId = '';
 let userPlugins = [];
 let reusableSnippets = [];
 let agentActivity = [];
+let sharedVaultItems = [];
+let sharedVaultAgents = [];
 let codeFiles = [];
 let activeCodeFileId = '';
 let codeFileSaveTimer = null;
@@ -376,6 +378,101 @@ function applyLocalCoderDraft(){const draft=$('localCoderOutput').value.trim();i
 function downloadLocalCoderDraft(){const draft=$('localCoderOutput').value.trim();if(!draft){showToast('İndirilecek bir taslak yok.');return;}const ext=({javascript:'js',html:'html',css:'css',python:'py',json:'json',markdown:'md',text:'txt'})[$('codeLanguage').value]||'txt';downloadText('local-coder-draft.'+ext,draft);}
 async function saveLocalCoderDraft(){const code=$('localCoderOutput').value.trim();if(!code){showToast('Kasaya kaydedilecek bir taslak yok.');return;}try{await persistSnippetRecord({name:'LocalCoder - '+($('localCoderTask').value.trim()||'taslak').slice(0,70),language:$('codeLanguage').value,sourceUrl:'',license:'AI tarafından oluşturulmuş taslak; kullanmadan önce incele ve test et',code});}catch(error){showToast('Taslak kasaya kaydedilemedi: '+(error.message||'Hata'));}}
 
+
+async function vaultRequest(url, options = {}) {
+  const response = await fetch(url, {
+    credentials: 'same-origin',
+    ...options,
+    headers: {
+      'Accept': 'application/json',
+      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+      ...(options.headers || {})
+    }
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || ('HTTP ' + response.status));
+  return data;
+}
+function renderSharedVaultItems() {
+  const out = $('sharedVaultItems'); if (!out) return;
+  if (!sharedVaultItems.length) { out.innerHTML='<div class="panel"><p class="muted">Kasa boş veya arama eşleşmedi. İlk notunu yukarıdan kaydedebilirsin.</p></div>'; return; }
+  out.innerHTML=sharedVaultItems.map(item=>'<article class="project-card"><div class="project-head"><h3>'+esc(item.title)+'</h3><time>'+esc(new Date(item.updatedAt||Date.now()).toLocaleString('tr-TR'))+'</time></div><p class="fineprint">Kaydeden: '+esc(item.updatedBy||item.createdBy||'agent')+' · '+(item.tags||[]).map(tag=>'<span class="pill">'+esc(tag)+'</span>').join(' ')+'</p><p>'+esc(String(item.content||'').slice(0,650))+(String(item.content||'').length>650?'…':'')+'</p><div class="row-actions"><button class="btn secondary small" type="button" data-vault-to-chat="'+esc(item.id)+'">Sohbete aktar</button><span class="grow"></span><button class="btn danger small" type="button" data-vault-delete="'+esc(item.id)+'">Sil</button></div></article>').join('');
+}
+function renderSharedVaultAgents() {
+  const out=$('sharedVaultAgents'); if (!out) return;
+  if (!sharedVaultAgents.length) { out.innerHTML='<div class="panel"><p class="muted">Henüz AI agent yetkisi verilmedi.</p></div>'; return; }
+  out.innerHTML=sharedVaultAgents.map(agent=>'<article class="project-card"><div class="project-head"><h3>'+esc(agent.name)+'</h3><span class="pill">'+(agent.scope==='readwrite'?'OKU + YAZ':'SALT OKU')+'</span></div><p class="fineprint">Oluşturulma: '+esc(new Date(agent.createdAt||Date.now()).toLocaleString('tr-TR'))+' · Token yeniden gösterilmez.</p><div class="row-actions"><span class="grow"></span><button type="button" class="btn danger small" data-agent-revoke="'+esc(agent.id)+'">Erişimi iptal et</button></div></article>').join('');
+}
+async function loadSharedVault({quiet=false}={}) {
+  if (nativeApp || !$('sharedVaultPanel')) return;
+  const status=$('sharedVaultStatus');
+  if (!quiet && status) status.textContent='Şifreli kasadan kayıtlar okunuyor…';
+  try {
+    const q=$('sharedVaultSearch')?.value.trim()||'';
+    const [itemsResult, agentsResult] = await Promise.all([
+      vaultRequest('/api/vault/items?limit=30&q='+encodeURIComponent(q)),
+      vaultRequest('/api/vault/agents')
+    ]);
+    sharedVaultItems=Array.isArray(itemsResult.items)?itemsResult.items:[];
+    sharedVaultAgents=Array.isArray(agentsResult.agents)?agentsResult.agents:[];
+    renderSharedVaultItems();renderSharedVaultAgents();
+    if (status) status.textContent=sharedVaultItems.length+' kayıt yüklendi. Web kasası sunucuda AES-256-GCM ile şifreli saklanır.';
+  } catch (error) {
+    if (status) status.textContent='Site kasasına ulaşılamadı: '+(error.message||'Özel site sunucusu ve oturumunu kontrol et.');
+    const items=$('sharedVaultItems');if(items)items.innerHTML='<div class="panel"><p class="muted">Web kasası API’si henüz erişilebilir değil. Bu bölüm sunucu destekli özel site üzerinde çalışır; yerel/Android APK yalnız başına ortak kasaya bağlanmaz.</p></div>';
+  }
+}
+async function saveSharedVaultItem(event) {
+  event.preventDefault();
+  const title=$('sharedVaultTitle').value.trim(),content=$('sharedVaultContent').value.trim();
+  if (!title||!content) return;
+  const tags=$('sharedVaultTags').value.split(',').map(tag=>tag.trim()).filter(Boolean).slice(0,12);
+  try {
+    await vaultRequest('/api/vault/items',{method:'POST',body:JSON.stringify({title,content,tags})});
+    $('sharedVaultForm').reset();await loadSharedVault({quiet:true});showToast('Kayıt ortak şifreli kasaya kaydedildi.');
+  } catch(error) { showToast('Kasa kaydı başarısız: '+(error.message||'Sunucu bağlantısını kontrol et.')); }
+}
+async function createSharedVaultAgent(event) {
+  event.preventDefault();
+  const name=$('agentTokenName').value.trim(),scope=$('agentTokenScope').value;
+  if(!name)return;
+  try {
+    const data=await vaultRequest('/api/vault/agents',{method:'POST',body:JSON.stringify({name,scope})});
+    const token=String(data.token||'');
+    if(!token)throw new Error('Sunucu token döndürmedi; agent kaydı kontrol edilmeli.');
+    $('agentTokenValue').value=token;
+    const base=location.origin+'/api/agent/v1';
+    $('agentTokenInstructions').value=[
+      'AI STUDIO SHARED VAULT — Agent API',
+      'Base URL: '+base,
+      'Authentication: Authorization: Bearer '+token,
+      'API spec (token gerektirir): GET '+base+'/openapi.json',
+      'Kimlik kontrolü: GET '+base+'/whoami',
+      'Kayıtları ara: GET '+base+'/items?q='+encodeURIComponent('[aranan kelime]'),
+      'Tek kaydı oku: GET '+base+'/items/{id}',
+      scope==='readwrite'?'Kayıt ekle: POST '+base+'/items — JSON: {"title":"Başlık","content":"Not","tags":["etiket"]}':'Yetki salt okunur: bu tokenla kayıt ekleme/düzenleme/silme yapılamaz.',
+      scope==='readwrite'?'Kayıt güncelle: PUT '+base+'/items/{id} — JSON: {"title":"Başlık","content":"Yeni not","tags":["etiket"]}':'',
+      scope==='readwrite'?'Kayıt sil: DELETE '+base+'/items/{id}':'',
+      'Kullanıcı talimatı: Görevle ilgili bilgiyi önce ara; yararlı kararları kısa, kaynak ve tarih bilgili başlıklarla kaydet. Aynı kayıt varsa yenisini açmak yerine güncelle. Gizli API anahtarlarını/kişisel verileri kasaya yazma.',
+      'Not: Her istek HTTPS ve bu Bearer token ile yapılmalı. Tokenı herkese açık bir sohbet veya koda koyma.'
+    ].filter(Boolean).join('\n');
+    $('agentTokenResult').classList.remove('hidden');
+    $('agentTokenName').value='';
+    await loadSharedVault({quiet:true});
+    showToast('Agent token üretildi. Ham tokenı güvenli şekilde kopyala; sonra yeniden gösterilemez.');
+  } catch(error) { showToast('Agent oluşturulamadı: '+(error.message||'Site API’sini kontrol et.')); }
+}
+async function deleteSharedVaultItem(id) {
+  if(!confirm('Bu kasa kaydı kalıcı olarak silinsin mi?'))return;
+  try{await vaultRequest('/api/vault/items/'+encodeURIComponent(id),{method:'DELETE'});await loadSharedVault({quiet:true});showToast('Kasa kaydı silindi.');}
+  catch(error){showToast('Kayıt silinemedi: '+(error.message||'Hata'));}
+}
+async function revokeSharedVaultAgent(id) {
+  if(!confirm('Bu agentın tokenı iptal edilsin mi? Bu işlem geri alınamaz; agent artık API’ye bağlanamaz.'))return;
+  try{await vaultRequest('/api/vault/agents/'+encodeURIComponent(id),{method:'DELETE'});await loadSharedVault({quiet:true});showToast('Agent erişimi iptal edildi.');}
+  catch(error){showToast('Agent iptal edilemedi: '+(error.message||'Hata'));}
+}
+
 function renderBuiltinTools(){ $('builtinTools').innerHTML=builtinTools.map(t=>'<button class="tool-card" data-tool="'+t.id+'"><span class="tool-symbol">'+esc(t.icon)+'</span><strong>'+esc(t.name)+'</strong><small>'+esc(t.desc)+'</small></button>').join('');}
 function renderPlugins(){ const out=$('pluginList'); if(!userPlugins.length){out.innerHTML='<div class="panel"><p class="muted">Henüz özel eklenti yok. Eklentiler yalnızca metin talimatlarıdır; keyfi kod çalıştırmaz.</p></div>';return;}
   out.innerHTML=userPlugins.map((p,i)=>'<article class="plugin-card"><div class="plugin-head"><h3>'+esc(p.name)+'</h3><span class="pill">'+(p.kind==='builtin'?'HAZIR':'ÖZEL')+'</span></div><p>'+esc(p.prompt)+'</p><div class="row-actions"><button class="btn secondary small" data-plugin-run="'+i+'">Sohbette kullan</button><span class="grow"></span>'+(p.kind==='builtin'?'':'<button class="btn danger small" data-plugin-delete="'+i+'">Sil</button>')+'</div></article>').join('');
@@ -466,6 +563,9 @@ function copyText(text){if(navigator.clipboard?.writeText){navigator.clipboard.w
 function fallbackCopy(text){const t=document.createElement('textarea');t.value=text;t.style.position='fixed';t.style.opacity='0';document.body.append(t);t.select();try{document.execCommand('copy');showToast('Kopyalandı.');}catch(_){showToast('Kopyalanamadı; dosya olarak dışa aktarabilirsin.');}t.remove();}
 document.addEventListener('click',async e=>{
   const nav=e.target.closest('[data-go],[data-tab]');if(nav){go(nav.dataset.go||nav.dataset.tab);return;}
+  const vaultToChat=e.target.closest('[data-vault-to-chat]');if(vaultToChat){const item=sharedVaultItems.find(x=>x.id===vaultToChat.dataset.vaultToChat);if(item){go('chat');$('chatInput').value=('Ortak kasadan alınan proje kaydı: '+item.title+'\n\n'+String(item.content||'')).slice(0,12000);$('chatInput').focus();}return;}
+  const vaultDelete=e.target.closest('[data-vault-delete]');if(vaultDelete){await deleteSharedVaultItem(vaultDelete.dataset.vaultDelete);return;}
+  const agentRevoke=e.target.closest('[data-agent-revoke]');if(agentRevoke){await revokeSharedVaultAgent(agentRevoke.dataset.agentRevoke);return;}
   const catalogUse=e.target.closest('[data-catalog-use]');if(catalogUse){const item=reuseCatalog.find(x=>x.id===catalogUse.dataset.catalogUse);if(item){$('localCoderTask').value='Bu kaynağı mevcut projeme uygun şekilde değerlendir: '+item.name+'.\nKaynak: '+item.url+'\nLisans notu: '+item.license+'\nYeniden kullanılabilir kısmı öner; gerekli lisans/atıf şartlarını ayrıca kontrol et.';showToast(item.name+' görev bağlamına eklendi.');}return;}
   const snippetLoad=e.target.closest('[data-snippet-load]');if(snippetLoad){const item=reusableSnippets[Number(snippetLoad.dataset.snippetLoad)];if(item){$('codePad').value=item.code;if([...$('codeLanguage').options].some(o=>o.value===item.language))$('codeLanguage').value=item.language;showToast('Kod parçası Kod Alanı’na yüklendi.');}return;}
   const snippetUse=e.target.closest('[data-snippet-use]');if(snippetUse){const item=reusableSnippets[Number(snippetUse.dataset.snippetUse)];if(item){$('localCoderTask').value='Bu kod parçasını incele, projeye entegrasyon ve test önerilerini ver. Kaynak: '+(item.sourceUrl||'belirtilmedi')+'. Lisans: '+(item.license||'belirtilmedi')+'.\n\nKod:\n'+item.code.slice(0,10000);showToast('Kod parçası Local Coder görevine eklendi.');}return;}
@@ -494,6 +594,13 @@ $('demoToggle').addEventListener('change',async e=>{settings.demoMode=e.target.c
 $('settingsDemoToggle').addEventListener('change',async e=>{settings.demoMode=e.target.checked;await setPref(DB.settings,settings);syncModeUI();});
 $('chatProvider').addEventListener('change',syncModeUI);
 $('projectForm').addEventListener('submit',saveProject);
+$('sharedVaultForm').addEventListener('submit',saveSharedVaultItem);
+$('sharedVaultRefresh').addEventListener('click',()=>loadSharedVault());
+$('sharedVaultSearch').addEventListener('input',()=>loadSharedVault({quiet:true}));
+$('agentTokenForm').addEventListener('submit',createSharedVaultAgent);
+$('copyAgentToken').addEventListener('click',()=>copyText($('agentTokenValue').value));
+$('copyAgentInstructions').addEventListener('click',()=>copyText($('agentTokenInstructions').value));
+$('hideAgentToken').addEventListener('click',()=>{$('agentTokenValue').value='';$('agentTokenInstructions').value='';$('agentTokenResult').classList.add('hidden');});
 $('shareReusableContext').addEventListener('change',async e=>{settings.shareReusableContext=e.target.checked;await setPref(DB.settings,settings);renderProjectContextStatus();showToast(settings.shareReusableContext?'Kod dosyaları ve kasa parçaları gerçek model çağrılarına bağlam olarak eklenebilir.':'Yalnızca seçili projenin notları paylaşılır.');});
 $('exportProjects').addEventListener('click',exportProjects);
 $('importProjectsBtn').addEventListener('click',()=>$('importProjectsFile').click());
@@ -584,5 +691,6 @@ async function init(){
   await initKeys(); projectList=await getPref(DB.projects,[]);activeProjectId=await getPref(DB.activeProject,'');chatHistory=await getPref(DB.chat,[]);userPlugins=await getPref(DB.plugins,[]);reusableSnippets=await getPref(DB.snippets,[]);agentActivity=await getPref(DB.activity,[]);codeFiles=normalizeCodeFileList(await getPref(DB.codeFiles,[]),true);if(!codeFiles.length)codeFiles=[makeCodeFile()];activeCodeFileId=codeFiles[0].id;await setPref(DB.codeFiles,codeFiles);
   if(!Array.isArray(projectList))projectList=[];if(!projectList.some(p=>p&&p.id===activeProjectId))activeProjectId=projectList[0]?.id||'';await setPref(DB.activeProject,activeProjectId);if(!Array.isArray(chatHistory))chatHistory=[];if(!Array.isArray(userPlugins))userPlugins=[];if(!Array.isArray(reusableSnippets))reusableSnippets=[];if(!Array.isArray(agentActivity))agentActivity=[];
   renderProviderCards();renderProjects();renderChat();renderBuiltinTools();renderPlugins();renderReuseCatalog();renderSnippetVault();renderAgentActivity();loadActiveCodeFile();syncModeUI();updateDashboard();$('compareSelectionCount').textContent=settings.team.length+' ajan seçili';
+  if(!nativeApp)await loadSharedVault({quiet:true});else $('sharedVaultPanel')?.classList.add('hidden');
 }
 prepareBrowserFeatures().then(init).catch(()=>showToast('Başlangıç ayarları okunamadı; sayfayı yenileyebilirsin.'));

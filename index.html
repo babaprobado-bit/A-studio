@@ -117,6 +117,33 @@
           <label class="field-label" for="localCoderReview">İnceleme ve test önerileri</label>
           <textarea id="localCoderReview" class="input" rows="5" readonly placeholder="Son aşamada inceleme ve test listesi gelecek."></textarea>
         </div>
+        <div class="section-head"><div><div class="eyebrow">SHARED AI VAULT</div><h2>Şifreli ortak AI kasası</h2></div><span class="pill">AES-256-GCM</span></div>
+        <div class="panel" id="sharedVaultPanel" data-web-only>
+          <p class="muted">AI Studio web sitesi ve yetki verdiğin agentlar aynı kayıtları okuyup yeni notlar/kod açıklamaları kaydedebilir. Kayıtlar sunucuda AES-256-GCM ile şifreli tutulur; API anahtarı gibi sırları notlara koyma. Bu, uçtan uca şifreleme değildir: yetkili sunucu API isteği işlerken içeriği açar.</p>
+          <form id="sharedVaultForm">
+            <label class="field-label" for="sharedVaultTitle">Kayıt başlığı</label><input id="sharedVaultTitle" class="input" required maxlength="120" placeholder="Örn. Behind the Door — AI kararları">
+            <label class="field-label" for="sharedVaultTags">Etiketler (virgülle ayır)</label><input id="sharedVaultTags" class="input" maxlength="500" placeholder="oyun, plan, kod">
+            <label class="field-label" for="sharedVaultContent">Kaydedilecek not / içerik</label><textarea id="sharedVaultContent" class="input" required maxlength="20000" rows="5" placeholder="Ajanların daha sonra okuyacağı karar, görev, dosya özeti veya kod parçası..."></textarea>
+            <div class="row-actions"><span class="fineprint">Her kayıt en fazla 20.000 karakter.</span><span class="grow"></span><button class="btn primary" type="submit">Şifreli kasaya kaydet</button></div>
+          </form>
+          <div class="section-head"><h3>Kasa kayıtları</h3><div class="row-actions"><input id="sharedVaultSearch" class="input" type="search" maxlength="120" placeholder="Kayıt ara..." style="max-width:220px"><button id="sharedVaultRefresh" class="btn secondary small" type="button">Yenile</button></div></div>
+          <p id="sharedVaultStatus" class="fineprint" role="status">Site kasasına bağlanılıyor…</p><div id="sharedVaultItems" class="stack"></div>
+          <div class="section-head"><div><div class="eyebrow">AGENT ACCESS</div><h3>AI agent erişimleri</h3></div></div>
+          <p class="muted">Her agent için ayrı token oluştur. Token yalnızca bir kez gösterilir; agent ayarına güvenli biçimde ekle. Salt okunur token yalnızca kayıtları görebilir.</p>
+          <form id="agentTokenForm" class="panel">
+            <label class="field-label" for="agentTokenName">Agent adı</label><input id="agentTokenName" class="input" required maxlength="80" placeholder="Örn. GPT Planner, Local Coder">
+            <label class="field-label" for="agentTokenScope">Yetki</label><select id="agentTokenScope" class="input"><option value="readwrite">Oku + kaydet + düzenle + sil</option><option value="readonly">Yalnızca oku</option></select>
+            <div class="row-actions"><span class="grow"></span><button class="btn secondary" type="submit">Agent token oluştur</button></div>
+          </form>
+          <div id="agentTokenResult" class="notice compact hidden">
+            <strong>Token oluşturuldu — yalnızca bu ekranda gösteriliyor.</strong><p class="fineprint">Bu değeri kaybetme ve kimseye açık bir sohbette gönderme. Token gizli anahtar gibidir; bu panelde veya sunucuda ham hâliyle kalıcı kaydedilmez.</p>
+            <label class="field-label" for="agentTokenValue">Bearer token</label><textarea id="agentTokenValue" class="input" rows="2" readonly spellcheck="false"></textarea>
+            <div class="row-actions"><button id="copyAgentToken" class="btn secondary small" type="button">Tokenı kopyala</button><button id="copyAgentInstructions" class="btn ghost small" type="button">Bağlantı yönergesini kopyala</button><span class="grow"></span><button id="hideAgentToken" class="btn ghost small" type="button">Gizle</button></div>
+            <label class="field-label" for="agentTokenInstructions">AI aracına verilecek API yönergesi</label><textarea id="agentTokenInstructions" class="input" rows="8" readonly spellcheck="false"></textarea>
+          </div>
+          <div id="sharedVaultAgents" class="stack"></div>
+          <div class="notice compact"><strong>Kalıcı saklama notu:</strong> Paylaşımlı kayıtların yeniden başlatma ve yeniden dağıtımlardan sonra kalması için barındırma ortamında kalıcı disk veya kalıcı bir veritabanı gerekir. Render ücretsiz web servisleri kalıcı diski desteklemez.</div>
+        </div>
         <div class="section-head"><div><div class="eyebrow">REUSE INSTEAD OF REBUILD</div><h2>Açık kaynak / varlık kataloğu</h2></div></div>
         <div class="panel"><p class="muted">Motor, kütüphane ve varlık kaynaklarına hızlı erişim. Otomatik indirme/kopyalama yok; her varlığın lisansını ayrıca kontrol et.</p><label class="field-label" for="reuseCatalogSearch">Kaynakları filtrele</label><input id="reuseCatalogSearch" class="input" type="search" placeholder="Örn. 3D, GLB, ses, CC0"><div id="reuseCatalogGrid" class="reuse-grid"></div></div>
         <div class="section-head"><div><div class="eyebrow">PERSONAL REUSE VAULT</div><h2>Kod parçası kasası</h2></div><div class="row-actions"><button id="snippetImportBtn" class="btn ghost small" type="button">JSON içe aktar</button><input id="snippetImportFile" type="file" accept=".json,application/json" hidden><button id="snippetExportAll" class="btn secondary small" type="button">Kasayı yedekle</button></div></div>

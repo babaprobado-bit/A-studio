@@ -12,3 +12,9 @@ services:
         sync: false
       - key: SESSION_SECRET
         generateValue: true
+      - key: VAULT_ENCRYPTION_KEY
+        generateValue: true
+      - key: VAULT_DATA_DIR
+        value: /var/data
+      # For durable records on Render, attach a paid persistent disk at /var/data.
+      # Free web services cannot use persistent disks, so configure persistent storage before relying on long-term saves.
