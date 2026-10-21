@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { webcrypto } from 'node:crypto';
+import { encryptWorkspaceBackup, decryptWorkspaceBackup } from '../src/encrypted-backup.js';
 import { readFileSync } from 'node:fs';
 import { reuseCatalog, buildLocalCoderStages, extractCodeArtifact, normalizeSnippet } from '../src/workshop-data.js';
 const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
@@ -11,4 +13,13 @@ assert.equal(extractCodeArtifact('```js\nconst ok = true;\n```'),'const ok = tru
 assert.equal(normalizeSnippet({name:'x',code:'y',sourceUrl:'http://example.com'}).sourceUrl,'');
 assert.equal(normalizeSnippet({name:'x',code:'y',sourceUrl:'https://example.com'}).sourceUrl,'https://example.com');
 assert.equal(normalizeSnippet({name:'',code:'y'}),null);
-console.log('Workshop smoke test passed: Local Coder stages, reuse catalog, snippet validation, and UI bindings.');
+assert.match(html,/encryptedBackupPassword/);
+assert.match(html,/exportEncryptedWorkspace/);
+const workspace={format:'ai-studio-workspace-v1',settings:{demoMode:true},projects:[{name:'Behind the Door',notes:'MVP'}]};
+const backupPassword='test-backup-passphrase-42';
+const sealed=await encryptWorkspaceBackup(workspace,backupPassword,webcrypto);
+assert.equal(sealed.cipher,'AES-256-GCM');
+assert.deepEqual(await decryptWorkspaceBackup(sealed,backupPassword,webcrypto),workspace);
+await assert.rejects(decryptWorkspaceBackup(sealed,'wrong-backup-password-43',webcrypto),/Parola yanl[iı]ş veya yedek dosyas[ıi] de[gğ]i[sş]tirilmi[sş]/);
+await assert.rejects(encryptWorkspaceBackup(workspace,'short',webcrypto),/en az 12 karakter/);
+console.log('Workshop smoke test passed: Local Coder, snippet validation, encrypted backup round-trip and wrong-password rejection.');

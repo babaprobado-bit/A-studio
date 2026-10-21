@@ -1,4 +1,4 @@
-# AI Studio Alpha 1 — Mobile + Private Web Workspace 0.4
+# AI Studio Alpha 1 — Mobile + Private Web Workspace 0.6
 
 This mobile Android build includes:
 - Real API calls for OpenAI-compatible chat providers, Anthropic Messages, Google Gemini generateContent, and Ollama chat.
@@ -62,3 +62,12 @@ The same responsive workspace can be served as a PWA from a password-gated Node.
 Present: provider API adapters; selectable multi-agent parallel runs and a sequential text pipeline; prompt-only plugins; local project/chat records; workspace export/import; Local Coder drafting and review via configured Ollama; reuse catalog; local snippet vault; recent activity log; password-gated web gateway code; Android APK workflow.
 
 Still not implemented: unattended agents continuously inventing tasks; unrestricted access to the PC filesystem or shell; automatic code execution/build/test on your computer; a model bundled inside the APK/site; encrypted cloud sync, individual accounts, or a public deployment URL. These need separate implementations and/or hosting setup.
+
+
+## Workspace 0.6: encrypted full-workspace backup
+
+- Export an optional encrypted backup using AES-256-GCM. A random salt and nonce are generated for each export; PBKDF2-SHA-256 derives the encryption key from a passphrase (250,000 iterations).
+- Import validates the encrypted envelope and authenticates the ciphertext. A wrong passphrase or modified file is rejected before workspace data is restored.
+- The passphrase is not saved or sent to the server. There is no password recovery, so keep the passphrase in a safe place separate from the backup.
+- This protects the downloaded encrypted backup only. Working browser records still use the browser's local storage and are not encrypted at rest by this feature; the site's shared password is not local-data encryption. API keys remain excluded from both backup formats.
+- The ordinary JSON backup remains available for convenience and is **not encrypted**. Use the encrypted backup when storing a copy in cloud drives or sharing it with your future devices.

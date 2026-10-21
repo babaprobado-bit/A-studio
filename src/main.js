@@ -3,6 +3,7 @@ import { Preferences } from '@capacitor/preferences';
 import { SecureStoragePlugin } from 'capacitor-secure-storage-plugin';
 import './style.css';
 import { reuseCatalog, buildLocalCoderStages, extractCodeArtifact, normalizeSnippet } from './workshop-data.js';
+import { encryptWorkspaceBackup, decryptWorkspaceBackup } from './encrypted-backup.js';
 
 const $ = (id) => document.getElementById(id);
 const DB = {
@@ -270,9 +271,40 @@ function updateDashboard(){const connected=Object.keys(providers).filter(id=>id=
   $('dashboard').innerHTML='<article class="panel"><div class="row-actions"><strong>API sağlayıcıları</strong><span class="grow"></span><span class="pill">'+connected.length+' ayar</span></div><p class="muted">'+esc(connected.map(id=>providers[id].name).join(', ')||'Henüz anahtar ayarlanmadı.')+'</p><button class="btn ghost small" data-go="models">Bağlantıları yönet</button></article><article class="panel"><div class="row-actions"><strong>Sohbet geçmişi</strong><span class="grow"></span><span class="pill">'+chatHistory.length+' mesaj</span></div><p class="muted">Bu cihazdaki yerel geçmiş. Gerçek model sohbetleri de dışa aktarılabilir.</p></article>';
 }
 async function exportProjects(){downloadText('ai-studio-projects.json',JSON.stringify({format:'ai-studio-projects-v2',exportedAt:new Date().toISOString(),projects:projectList},null,2),'application/json;charset=utf-8');}
+function buildWorkspaceSnapshot(){
+  return {format:'ai-studio-workspace-v1',exportedAt:new Date().toISOString(),settings:{demoMode:settings.demoMode,models:settings.models,team:settings.team,ollamaUrl:settings.ollamaUrl,ollamaModel:settings.ollamaModel,systemPrompt:settings.systemPrompt},projects:projectList,chat:chatHistory,plugins:userPlugins.filter(p=>p.kind!=='builtin').map(p=>({name:p.name,prompt:p.prompt})),snippets:reusableSnippets,activity:agentActivity};
+}
 function exportWorkspace(){
-  const snapshot={format:'ai-studio-workspace-v1',exportedAt:new Date().toISOString(),settings:{demoMode:settings.demoMode,models:settings.models,team:settings.team,ollamaUrl:settings.ollamaUrl,ollamaModel:settings.ollamaModel,systemPrompt:settings.systemPrompt},projects:projectList,chat:chatHistory,plugins:userPlugins.filter(p=>p.kind!=='builtin').map(p=>({name:p.name,prompt:p.prompt})),snippets:reusableSnippets,activity:agentActivity};
+  const snapshot=buildWorkspaceSnapshot();
   downloadText('ai-studio-workspace-backup.json',JSON.stringify(snapshot,null,2),'application/json;charset=utf-8');
+}
+async function exportEncryptedWorkspace(){
+  const password=$('encryptedBackupPassword').value;
+  const confirmation=$('encryptedBackupConfirm').value;
+  if(password!==confirmation){showToast('Parolalar eşleşmiyor.');return;}
+  try{
+    const envelope=await encryptWorkspaceBackup(buildWorkspaceSnapshot(),password);
+    downloadText('ai-studio-workspace-backup.encrypted.json',JSON.stringify(envelope,null,2),'application/json;charset=utf-8');
+    $('encryptedBackupPassword').value='';$('encryptedBackupConfirm').value='';
+    showToast('Şifreli yedek indirildi. Parolayı güvenli yerde sakla.');
+  }catch(error){showToast('Şifreli yedek oluşturulamadı: '+(error.message||'Parolayı ve tarayıcı desteğini kontrol et.'));}
+}
+async function importEncryptedWorkspace(file){
+  const password=$('encryptedBackupPassword').value;
+  if(!password){showToast('Şifreli yedeği açmak için yedek parolasını gir.');return;}
+  try{
+    if(!file||file.size>8_000_000)throw new Error('Dosya eksik veya 8 MB sınırını aşıyor.');
+    const envelope=JSON.parse(await file.text());
+    const snapshot=await decryptWorkspaceBackup(envelope,password);
+    const serialized=JSON.stringify(snapshot);
+    const size=new TextEncoder().encode(serialized).byteLength;
+    if(size>5*1024*1024)throw new Error('Açılan yedek 5 MB sınırını aşıyor.');
+    await importWorkspace({size,text:async()=>serialized});
+    $('encryptedBackupPassword').value='';$('encryptedBackupConfirm').value='';
+  }catch(error){
+    $('encryptedBackupPassword').value='';$('encryptedBackupConfirm').value='';
+    showToast('Şifreli yedek açılamadı: '+(error.message||'Dosyayı ve parolayı kontrol et.'));
+  }
 }
 async function importWorkspace(file){
   try{
@@ -356,6 +388,9 @@ $('exportCode').addEventListener('click',()=>downloadText('ai-studio-code.'+({ja
 $('importCode').addEventListener('click',()=>$('codeFile').click());
 $('codeFile').addEventListener('change',async e=>{const f=e.target.files?.[0];if(f){if(f.size>1_000_000){showToast('Dosya 1 MB limitini aşıyor.');return;}$('codePad').value=await f.text();const ext=f.name.split('.').pop();const mapping={js:'javascript',ts:'javascript',py:'python',md:'markdown',txt:'text',json:'json',html:'html',css:'css'};$('codeLanguage').value=mapping[ext]||'text';showToast('Dosya içe aktarıldı.');}e.target.value='';});
 $('exportWorkspace').addEventListener('click',exportWorkspace);
+$('exportEncryptedWorkspace').addEventListener('click',exportEncryptedWorkspace);
+$('importEncryptedWorkspaceBtn').addEventListener('click',()=>$('importEncryptedWorkspaceFile').click());
+$('importEncryptedWorkspaceFile').addEventListener('change',async e=>{if(e.target.files?.[0])await importEncryptedWorkspace(e.target.files[0]);e.target.value='';});
 $('importWorkspaceBtn').addEventListener('click',()=> $('importWorkspaceFile').click());
 $('importWorkspaceFile').addEventListener('change',async e=>{if(e.target.files?.[0])await importWorkspace(e.target.files[0]);e.target.value='';});
 $('resetLocal').addEventListener('click',clearAllLocal);
