@@ -4,6 +4,7 @@ import { encryptWorkspaceBackup, decryptWorkspaceBackup } from '../src/encrypted
 import { readFileSync } from 'node:fs';
 import { reuseCatalog, buildLocalCoderStages, extractCodeArtifact, normalizeSnippet } from '../src/workshop-data.js';
 import { buildSharedProjectContext } from '../src/project-context.js';
+import { buildSharedVaultContext } from '../src/shared-vault-context.js';
 const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
 const main=readFileSync(new URL('../src/main.js',import.meta.url),'utf8');
 for(const id of ['localCoderTask','localCoderRun','localCoderOutput','localCoderReview','reuseCatalogGrid','snippetForm','snippetList','agentActivityList','savedCodeFileSelect','savedCodeFileName','newCodeFile','saveCodeFile','deleteCodeFile','exportCodeFiles','importCodeFilesBtn','importCodeFilesFile','projectContextStatus','shareReusableContext']) assert.match(html,new RegExp('id="'+id+'"'),'Missing UI: '+id);
@@ -19,6 +20,11 @@ const notesOnly=buildSharedProjectContext({project:contextProject,files:contextF
 assert.match(notesOnly,/Behind the Door/);assert.match(notesOnly,/modular player/);assert.doesNotMatch(notesOnly,/movePlayer/);assert.doesNotMatch(notesOnly,/stunEnemy/);
 const fullContext=buildSharedProjectContext({project:contextProject,files:contextFiles,activeFileId:'player',includeReusable:true,snippets:contextSnippets});
 assert.ok(fullContext.includes('player.js'));assert.ok(fullContext.includes('movePlayer'));assert.ok(fullContext.includes('Flashlight stun'));assert.ok(fullContext.includes('stunEnemy'));assert.ok(fullContext.length<=14000,'Shared context must stay bounded');
+assert.match(html,/shareVaultContext/);assert.match(main,/buildSharedVaultContext/);assert.match(main,/settings\.shareVaultContext/);
+const sharedItems=[{id:'a',title:'Flashlight stun mechanic',content:'The flashlight burst stuns the enemy briefly.',tags:['gameplay'],updatedAt:'2026-10-20T10:00:00Z'},{id:'b',title:'Unrelated school plan',content:'Prepare a science quiz.',tags:['school'],updatedAt:'2026-10-20T11:00:00Z'}];
+assert.equal(buildSharedVaultContext({items:sharedItems,task:'flashlight enemy stun',enabled:false}),'','Shared vault stays private to models unless opted in');
+const matchedVault=buildSharedVaultContext({items:sharedItems,task:'flashlight enemy stun',enabled:true});assert.match(matchedVault,/Flashlight stun mechanic/);assert.doesNotMatch(matchedVault,/Unrelated school plan/);assert.ok(matchedVault.length<=6400);
+const recentVault=buildSharedVaultContext({items:sharedItems,task:'a novel unrelated request',enabled:true});assert.ok(recentVault.length>0,'When enabled but unmatched, provide one latest saved memory');
 for(const event of ['Tekli sohbet','Paralel takım','Sıralı ajan zinciri','Model karşılaştırma']) assert.ok(main.includes(event),'Missing activity instrumentation: '+event);
 assert.ok(reuseCatalog.some(x=>x.id==='babylonjs'));assert.ok(reuseCatalog.some(x=>x.id==='kenney'));
 assert.equal(buildLocalCoderStages({task:'test',language:'javascript'}).length,3);

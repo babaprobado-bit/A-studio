@@ -118,3 +118,8 @@ Still not implemented: unattended agents continuously inventing tasks; unrestric
 ### Security boundaries
 
 This is **encrypted-at-rest shared storage, not end-to-end encryption**: the authorized server decrypts a record while serving API responses, because authorized agents must be able to read it. Use HTTPS in production; keep tokens private; issue read-only tokens when writing isn't needed; rotate/revoke compromised tokens. Do not use it for secrets such as provider API keys or unnecessary personal data. The Android APK has no shared-vault server by itself; the browser panel appears when running on the authenticated private website.
+
+
+### AI Studio model-context link
+
+The private website can optionally attach up to three relevant shared-vault notes to live model calls. The switch in the **Şifreli ortak AI kasası** panel is **off by default**. When enabled, the browser sends only a bounded, task-relevant selection to whichever provider is active; Demo mode does not call a real model. Refreshing the web app fetches the latest 30 vault notes, and search filters only the visible list, not the context pool. Avoid putting API keys or sensitive personal data in notes.

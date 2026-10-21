@@ -48,6 +48,7 @@ jobs:
           node --check server/login.js
           node --check public/sw.js
           node --check src/workshop-data.js
+          node --check src/shared-vault-context.js
           node --check server/workshop-smoke-test.js
           node -e "JSON.parse(require('node:fs').readFileSync('public/manifest.webmanifest','utf8'))"
       - name: Build web assets

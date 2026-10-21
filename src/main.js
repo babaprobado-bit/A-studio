@@ -4,6 +4,7 @@ import { SecureStoragePlugin } from 'capacitor-secure-storage-plugin';
 import './style.css';
 import { reuseCatalog, buildLocalCoderStages, extractCodeArtifact, normalizeSnippet } from './workshop-data.js';
 import { buildSharedProjectContext } from './project-context.js';
+import { buildSharedVaultContext } from './shared-vault-context.js';
 import { encryptWorkspaceBackup, decryptWorkspaceBackup } from './encrypted-backup.js';
 
 const $ = (id) => document.getElementById(id);
@@ -34,6 +35,7 @@ const defaultSettings = {
   ollamaUrl: '',
   ollamaModel: 'qwen2.5-coder:1.5b',
   shareReusableContext: false,
+  shareVaultContext: false,
   systemPrompt: 'Yanıtlarını açık ve uygulanabilir yaz. Bilmediğin şeyi uydurma. Kod istenince küçük, test edilebilir adımlar öner.'
 };
 let settings = structuredClone(defaultSettings);
@@ -233,7 +235,7 @@ function renderProjectContextStatus(){
   const snippetCount=settings.shareReusableContext===true?Math.min(2,reusableSnippets.length):0;
   status.textContent='Aktif bağlam: '+project.name+' · '+(settings.shareReusableContext===true?fileCount+' kod dosyası ve en fazla '+snippetCount+' kasa parçası paylaşılabilir.':'yalnızca proje notları paylaşılır.');
 }
-function systemFor(id){const context=getSharedProjectContext();return settings.systemPrompt+'\nSağlayıcı rolü: '+providers[id].name+'. Yanıtları Türkçe ve uygulanabilir yaz; var olmayan test sonuçlarını iddia etme.'+(context?'\n\n'+context:'');}
+function systemFor(id,task=''){const context=getSharedProjectContext();const vaultContext=buildSharedVaultContext({items:sharedVaultItems,task,enabled:settings.shareVaultContext===true});return settings.systemPrompt+'\nSağlayıcı rolü: '+providers[id].name+'. Yanıtları Türkçe ve uygulanabilir yaz; var olmayan test sonuçlarını iddia etme.'+(context?'\n\n'+context:'')+(vaultContext?'\n\n'+vaultContext:'');}
 async function fetchJson(url,options,timeoutMs=50000){
   const controller=new AbortController(); const timer=setTimeout(()=>controller.abort(),timeoutMs);
   try{const response=await fetch(url,{...options,signal:controller.signal}); const text=await response.text(); let data={}; try{data=text?JSON.parse(text):{};}catch(_){data={message:text.slice(0,1000)};}
@@ -247,23 +249,23 @@ async function callProvider(id,prompt,history){
     const url=(settings.ollamaUrl||'').trim().replace(/\/+$/,''); const model=(settings.ollamaModel||providerModel(id)).trim();
     if(!url||!model)throw new Error('Ollama adresi ve model adı eksik.'); let parsed; try{parsed=new URL(url);}catch(_){throw new Error('Ollama adresi geçerli bir URL olmalı.');}
     if(!['http:','https:'].includes(parsed.protocol))throw new Error('Ollama adresi http:// veya https:// ile başlamalı.');
-    const messages=[{role:'system',content:systemFor(id)}].concat(history.slice(-8).map(m=>({role:m.role,content:m.content}))).concat([{role:'user',content:prompt}]);
+    const messages=[{role:'system',content:systemFor(id,prompt)}].concat(history.slice(-8).map(m=>({role:m.role,content:m.content}))).concat([{role:'user',content:prompt}]);
     const d=await fetchJson(url+'/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model,messages,stream:false,options:{temperature:0.4}})});
     const answer=d?.message?.content;if(!answer)throw new Error('Ollama yanıtında mesaj yok. Model adını ve sunucuyu kontrol et.');return answer;
   }
   const p=providers[id]; const key=await getSecret(id); if(!key)throw new Error(p.name+' için API anahtarı ayarlanmamış. Modeller ekranından ekle.');
   const msgs=history.slice(-8).filter(m=>m.role==='user'||m.role==='assistant').map(m=>({role:m.role,content:m.content})); msgs.push({role:'user',content:prompt});
   if(p.kind==='anthropic'){
-    const d=await fetchJson(p.endpoint,{method:'POST',headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:providerModel(id),max_tokens:2048,system:systemFor(id),messages:msgs.filter(m=>m.role==='user'||m.role==='assistant')})});
+    const d=await fetchJson(p.endpoint,{method:'POST',headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:providerModel(id),max_tokens:2048,system:systemFor(id,prompt),messages:msgs.filter(m=>m.role==='user'||m.role==='assistant')})});
     const text=(d.content||[]).filter(x=>x.type==='text').map(x=>x.text).join('\n');if(!text)throw new Error('Claude yanıtında metin bulunamadı.');return text;
   }
   if(p.kind==='gemini'){
     const contents=msgs.map(m=>({role:m.role==='assistant'?'model':'user',parts:[{text:m.content}]}));
     const url=p.endpoint+encodeURIComponent(providerModel(id))+':generateContent?key='+encodeURIComponent(key);
-    const d=await fetchJson(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({systemInstruction:{parts:[{text:systemFor(id)}]},contents,generationConfig:{temperature:0.4,maxOutputTokens:2048}})});
+    const d=await fetchJson(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({systemInstruction:{parts:[{text:systemFor(id,prompt)}]},contents,generationConfig:{temperature:0.4,maxOutputTokens:2048}})});
     const text=(d.candidates?.[0]?.content?.parts||[]).map(x=>x.text||'').join('\n');if(!text)throw new Error(d.promptFeedback?.blockReason||'Gemini yanıtında metin bulunamadı.');return text;
   }
-  const openAiBody={model:providerModel(id),messages:[{role:'system',content:systemFor(id)},...msgs]};
+  const openAiBody={model:providerModel(id),messages:[{role:'system',content:systemFor(id,prompt)},...msgs]};
   if(id==='openai'){openAiBody.max_completion_tokens=2048;}
   else {openAiBody.temperature=0.4;openAiBody.max_tokens=2048;}
   const d=await fetchJson(p.endpoint,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify(openAiBody)});
@@ -395,8 +397,10 @@ async function vaultRequest(url, options = {}) {
 }
 function renderSharedVaultItems() {
   const out = $('sharedVaultItems'); if (!out) return;
-  if (!sharedVaultItems.length) { out.innerHTML='<div class="panel"><p class="muted">Kasa boş veya arama eşleşmedi. İlk notunu yukarıdan kaydedebilirsin.</p></div>'; return; }
-  out.innerHTML=sharedVaultItems.map(item=>'<article class="project-card"><div class="project-head"><h3>'+esc(item.title)+'</h3><time>'+esc(new Date(item.updatedAt||Date.now()).toLocaleString('tr-TR'))+'</time></div><p class="fineprint">Kaydeden: '+esc(item.updatedBy||item.createdBy||'agent')+' · '+(item.tags||[]).map(tag=>'<span class="pill">'+esc(tag)+'</span>').join(' ')+'</p><p>'+esc(String(item.content||'').slice(0,650))+(String(item.content||'').length>650?'…':'')+'</p><div class="row-actions"><button class="btn secondary small" type="button" data-vault-to-chat="'+esc(item.id)+'">Sohbete aktar</button><span class="grow"></span><button class="btn danger small" type="button" data-vault-delete="'+esc(item.id)+'">Sil</button></div></article>').join('');
+  const query=($('sharedVaultSearch')?.value||'').trim().toLocaleLowerCase('tr-TR');
+  const visible=sharedVaultItems.filter(item=>!query||[item.title,item.content,...(item.tags||[])].join(' ').toLocaleLowerCase('tr-TR').includes(query));
+  if (!visible.length) { out.innerHTML='<div class="panel"><p class="muted">Kasa boş veya arama eşleşmedi. İlk notunu yukarıdan kaydedebilirsin.</p></div>'; return; }
+  out.innerHTML=visible.map(item=>'<article class="project-card"><div class="project-head"><h3>'+esc(item.title)+'</h3><time>'+esc(new Date(item.updatedAt||Date.now()).toLocaleString('tr-TR'))+'</time></div><p class="fineprint">Kaydeden: '+esc(item.updatedBy||item.createdBy||'agent')+' · '+(item.tags||[]).map(tag=>'<span class="pill">'+esc(tag)+'</span>').join(' ')+'</p><p>'+esc(String(item.content||'').slice(0,650))+(String(item.content||'').length>650?'…':'')+'</p><div class="row-actions"><button class="btn secondary small" type="button" data-vault-to-chat="'+esc(item.id)+'">Sohbete aktar</button><span class="grow"></span><button class="btn danger small" type="button" data-vault-delete="'+esc(item.id)+'">Sil</button></div></article>').join('');
 }
 function renderSharedVaultAgents() {
   const out=$('sharedVaultAgents'); if (!out) return;
@@ -408,13 +412,13 @@ async function loadSharedVault({quiet=false}={}) {
   const status=$('sharedVaultStatus');
   if (!quiet && status) status.textContent='Şifreli kasadan kayıtlar okunuyor…';
   try {
-    const q=$('sharedVaultSearch')?.value.trim()||'';
     const [itemsResult, agentsResult] = await Promise.all([
-      vaultRequest('/api/vault/items?limit=30&q='+encodeURIComponent(q)),
+      vaultRequest('/api/vault/items?limit=30'),
       vaultRequest('/api/vault/agents')
     ]);
     sharedVaultItems=Array.isArray(itemsResult.items)?itemsResult.items:[];
     sharedVaultAgents=Array.isArray(agentsResult.agents)?agentsResult.agents:[];
+    const contextToggle=$('shareVaultContext');if(contextToggle)contextToggle.checked=settings.shareVaultContext===true;
     renderSharedVaultItems();renderSharedVaultAgents();
     if (status) status.textContent=sharedVaultItems.length+' kayıt yüklendi. Web kasası sunucuda AES-256-GCM ile şifreli saklanır.';
   } catch (error) {
@@ -484,7 +488,7 @@ function updateDashboard(){const connected=Object.keys(providers).filter(id=>id=
 }
 async function exportProjects(){downloadText('ai-studio-projects.json',JSON.stringify({format:'ai-studio-projects-v2',exportedAt:new Date().toISOString(),projects:projectList},null,2),'application/json;charset=utf-8');}
 function buildWorkspaceSnapshot(){
-  return {format:'ai-studio-workspace-v1',exportedAt:new Date().toISOString(),settings:{demoMode:settings.demoMode,models:settings.models,team:settings.team,ollamaUrl:settings.ollamaUrl,ollamaModel:settings.ollamaModel,systemPrompt:settings.systemPrompt,shareReusableContext:settings.shareReusableContext===true},projects:projectList,activeProjectId,chat:chatHistory,plugins:userPlugins.filter(p=>p.kind!=='builtin').map(p=>({name:p.name,prompt:p.prompt})),snippets:reusableSnippets,activity:agentActivity,codeFiles,activeCodeFileId};
+  return {format:'ai-studio-workspace-v1',exportedAt:new Date().toISOString(),settings:{demoMode:settings.demoMode,models:settings.models,team:settings.team,ollamaUrl:settings.ollamaUrl,ollamaModel:settings.ollamaModel,systemPrompt:settings.systemPrompt,shareReusableContext:settings.shareReusableContext===true,shareVaultContext:settings.shareVaultContext===true},projects:projectList,activeProjectId,chat:chatHistory,plugins:userPlugins.filter(p=>p.kind!=='builtin').map(p=>({name:p.name,prompt:p.prompt})),snippets:reusableSnippets,activity:agentActivity,codeFiles,activeCodeFileId};
 }
 async function exportWorkspace(){
   await saveCurrentCodeFile(false);
@@ -595,6 +599,7 @@ $('settingsDemoToggle').addEventListener('change',async e=>{settings.demoMode=e.
 $('chatProvider').addEventListener('change',syncModeUI);
 $('projectForm').addEventListener('submit',saveProject);
 $('sharedVaultForm').addEventListener('submit',saveSharedVaultItem);
+$('shareVaultContext').addEventListener('change',async e=>{settings.shareVaultContext=e.target.checked;await setPref(DB.settings,settings);showToast(settings.shareVaultContext?'Eşleşen kasa notları gerçek model isteklerine eklenecek.':'Kasa notları modele otomatik gönderilmeyecek.');});
 $('sharedVaultRefresh').addEventListener('click',()=>loadSharedVault());
 $('sharedVaultSearch').addEventListener('input',()=>loadSharedVault({quiet:true}));
 $('agentTokenForm').addEventListener('submit',createSharedVaultAgent);
