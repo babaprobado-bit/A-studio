@@ -69,6 +69,8 @@ try {
   assert.equal(session.status, 200, 'Valid session should be recognized');
   assert.equal((await session.json()).privateSite, true);
 
+  const unauthenticatedAgent = await request('/api/agent/v1/whoami');
+  assert.equal(unauthenticatedAgent.status, 401, 'Agent API must reject missing tokens');
   const emptyVault = await request('/api/vault/items', { headers: { Cookie: cookie } });
   assert.equal(emptyVault.status, 200, 'Authenticated site can read the encrypted vault');
   assert.deepEqual((await emptyVault.json()).items, []);
@@ -97,6 +99,9 @@ try {
   const agentData = await newAgent.json();
   assert.match(agentData.token, /^aiav_[A-Za-z0-9_-]{32,}$/);
   assert.equal(agentData.agent.scope, 'readwrite');
+  const afterTokenCreate = readFileSync(vaultFile, 'utf8');
+  assert.doesNotMatch(afterTokenCreate, new RegExp(agentData.token));
+  assert.doesNotMatch(afterTokenCreate, /Test coding agent/,'Agent names are encrypted at rest too');
   const bearer = { Authorization: 'Bearer ' + agentData.token };
   const whoami = await request('/api/agent/v1/whoami', { headers: bearer });
   assert.equal(whoami.status, 200);
@@ -143,7 +148,7 @@ try {
   const afterLogout = await request('/');
   assert.equal(afterLogout.status, 303, 'New browser request without the cleared cookie must be locked');
   assert.ok(logout.headers.get('set-cookie')?.toLowerCase().includes('expires=thu, 01 jan 1970'), 'Logout should expire the session cookie');
-  console.log('Private website smoke test passed: guest lock, bad password, login, session, and logout.');
+  console.log('Private website + encrypted shared vault tests passed: login gate, AES-256-GCM at-rest storage, agent auth/scopes, API schema, token revocation, and logout.');
 } catch (error) {
   console.error(error);
   console.error(serverOutput);
