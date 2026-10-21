@@ -47,3 +47,18 @@ The same responsive workspace can be served as a PWA from a password-gated Node.
 - The PWA service worker caches static app assets only, never AI API responses or project data. Real offline AI inference is not included.
 - Before using real provider keys, confirm provider pricing/quotas. The server never receives provider API keys through the current app.
 - For multiple users, cross-device project sync, or encrypted cloud storage, add a proper database and per-user authentication rather than sharing one site password.
+
+
+## Workspace 0.5: Local Coder, reuse catalog and snippet vault
+
+- Local Coder runs a user-started three-stage plan → code draft → review/test-plan workflow against a model already running in Ollama. After the model is downloaded once, Ollama can run it without internet; hardware limits affect speed and output quality.
+- The generated draft is not executed and is not written directly to arbitrary files. Review it first, then explicitly apply it to the scratchpad or download it. The review stage suggests tests; it does not claim to have run them.
+- Reuse Catalog links to upstream engines and asset repositories. It does not scrape or automatically copy third-party code/assets. Check the exact file, version, license, attribution and bundled notices before shipping.
+- Snippet Vault stores code/text with source URL and license notes in this device's storage. Export/import JSON to move the vault between devices. Full workspace backup includes snippets and recent Local Coder activity.
+- HTTPS-hosted browser apps may be prevented by browser security rules from calling a local HTTP Ollama endpoint. Do not expose Ollama's unauthenticated port to the public internet.
+
+## Implementation status — no pretend features
+
+Present: provider API adapters; selectable multi-agent parallel runs and a sequential text pipeline; prompt-only plugins; local project/chat records; workspace export/import; Local Coder drafting and review via configured Ollama; reuse catalog; local snippet vault; recent activity log; password-gated web gateway code; Android APK workflow.
+
+Still not implemented: unattended agents continuously inventing tasks; unrestricted access to the PC filesystem or shell; automatic code execution/build/test on your computer; a model bundled inside the APK/site; encrypted cloud sync, individual accounts, or a public deployment URL. These need separate implementations and/or hosting setup.

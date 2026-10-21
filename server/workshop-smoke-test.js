@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { reuseCatalog, buildLocalCoderStages, extractCodeArtifact, normalizeSnippet } from '../src/workshop-data.js';
+const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+const main=readFileSync(new URL('../src/main.js',import.meta.url),'utf8');
+for(const id of ['localCoderTask','localCoderRun','localCoderOutput','localCoderReview','reuseCatalogGrid','snippetForm','snippetList','agentActivityList']) assert.match(html,new RegExp('id="'+id+'"'),'Missing UI: '+id);
+assert.match(main,/buildLocalCoderStages/);assert.match(main,/callProvider\('ollama'/);assert.match(main,/DB\.snippets/);assert.match(main,/DB\.activity/);
+assert.ok(reuseCatalog.some(x=>x.id==='babylonjs'));assert.ok(reuseCatalog.some(x=>x.id==='kenney'));
+assert.equal(buildLocalCoderStages({task:'test',language:'javascript'}).length,3);
+assert.equal(extractCodeArtifact('```js\nconst ok = true;\n```'),'const ok = true;');
+assert.equal(normalizeSnippet({name:'x',code:'y',sourceUrl:'http://example.com'}).sourceUrl,'');
+assert.equal(normalizeSnippet({name:'x',code:'y',sourceUrl:'https://example.com'}).sourceUrl,'https://example.com');
+assert.equal(normalizeSnippet({name:'',code:'y'}),null);
+console.log('Workshop smoke test passed: Local Coder stages, reuse catalog, snippet validation, and UI bindings.');
