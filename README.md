@@ -1,4 +1,4 @@
-# AI Studio Alpha 1 — Mobile + Private Web Workspace 0.6
+# AI Studio Alpha 1 — Mobile + Private Web Workspace 0.9
 
 This mobile Android build includes:
 - Real API calls for OpenAI-compatible chat providers, Anthropic Messages, Google Gemini generateContent, and Ollama chat.
@@ -87,3 +87,12 @@ Still not implemented: unattended agents continuously inventing tasks; unrestric
 - Create, select, rename, delete, import and download individual files. Export/import the file collection as JSON to move the modular workspace between devices.
 - Full workspace backup and encrypted backup now include saved code files and the active selection. Older backups without the `codeFiles` field preserve the existing file collection instead of deleting it.
 - Individual file content is limited to 100 KB, with up to 100 files stored locally. This is a local editor/backup manager, not a PC filesystem bridge; it does not execute code or write to arbitrary folders.
+
+
+## Workspace 0.9: shared project context and opt-in file reuse
+
+- Choose one saved project as the active context. Its notes are included in the system context for real single-chat, parallel-team, sequential-pipeline, comparison, and Local Coder provider calls.
+- Project notes are sent to the selected provider when a real model request is made. Demo mode produces templates and does not run inference.
+- A separate opt-in switch can attach short excerpts from up to three saved code files and two saved snippets. It is off by default to avoid sending code unexpectedly. Context size is bounded; it is a reference for the model, not proof the model has read or executed files.
+- The selected project is persisted locally and included in standard/encrypted workspace backups. Older backups remain compatible; when no active ID exists, the first imported project becomes active.
+- Local file reuse still does not copy third-party code automatically. Check licenses and source notes before adding third-party snippets to a shipped project.

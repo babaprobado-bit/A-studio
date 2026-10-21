@@ -97,6 +97,7 @@
           <label class="field-label" for="projectNotes">Notlar / görev planı</label><textarea class="input" id="projectNotes" required maxlength="20000" rows="5" placeholder="Amaç, modüller, yapılacaklar, kararlar..."></textarea>
           <div class="row-actions"><button class="btn primary" type="submit">Projeyi kaydet +</button><button class="btn ghost" type="button" id="importProjectsBtn">JSON içe aktar</button><input id="importProjectsFile" type="file" accept=".json,application/json" hidden><span class="grow"></span><button class="btn secondary" type="button" id="exportProjects">Yedekle ↓</button></div>
         </form>
+        <div class="panel"><div class="eyebrow">SHARED PROJECT CONTEXT</div><h2>Ajanların ortak proje hafızası</h2><p class="muted">Burada seçtiğin proje; tekli sohbet, takım, sıralı zincir, karşılaştırma ve Local Coder'ın gerçek model çağrılarına otomatik bağlam olur. Demo modu yalnızca örnek şablon üretir.</p><p id="projectContextStatus" class="fineprint">Aktif proje seçilmedi.</p><label class="team-check"><input type="checkbox" id="shareReusableContext"> En fazla 3 kod dosyasını ve 2 kod kasası parçasını da bağlama ekle</label><p class="fineprint">Bu seçenek kapalıyken dosya/kod içeriği otomatik gönderilmez. Açılırsa seçili sağlayıcıya (ör. OpenAI veya Ollama) kısa dosya parçaları gönderilebilir. Her istekte yalnızca sınırlı miktar paylaşılır.</p></div>
         <div id="projectList" class="stack"></div>
       </section>
 
