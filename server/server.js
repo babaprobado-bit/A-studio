@@ -18,6 +18,7 @@ const SESSION_SECRET = process.env.SESSION_SECRET || '';
 const NODE_ENV = process.env.NODE_ENV || 'development';
 const PORT = Number(process.env.PORT || 10000);
 const VAULT_ENCRYPTION_KEY = process.env.VAULT_ENCRYPTION_KEY || '';
+const VAULT_DATABASE_URL = process.env.VAULT_DATABASE_URL || '';
 const VAULT_DATA_DIR = process.env.VAULT_DATA_DIR || path.join(rootDir, 'data');
 const SESSION_MS = 8 * 60 * 60 * 1000;
 const COOKIE_NAME = 'ai_studio_session';
@@ -38,7 +39,11 @@ if (VAULT_ENCRYPTION_KEY.length < 32) {
   console.error('Configuration error: VAULT_ENCRYPTION_KEY must contain at least 32 random characters.');
   process.exit(1);
 }
-const vault = createVaultStore({ filePath: path.join(VAULT_DATA_DIR, 'vault.enc'), encryptionSecret: VAULT_ENCRYPTION_KEY });
+const vault = createVaultStore({
+  filePath: VAULT_DATABASE_URL ? null : path.join(VAULT_DATA_DIR, 'vault.enc'),
+  databaseUrl: VAULT_DATABASE_URL,
+  encryptionSecret: VAULT_ENCRYPTION_KEY
+});
 
 const app = express();
 app.disable('x-powered-by');

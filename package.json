@@ -1,9 +1,9 @@
 {
   "name": "ai-studio-alpha-1-mobile",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "private": true,
   "type": "module",
-  "description": "AI Studio Alpha 1 with multi-provider workspace, Local Coder, encrypted shared AI vault, and agent REST API",
+  "description": "AI Studio Alpha 1 with multi-provider workspace, Local Coder, encrypted shared AI vault, PostgreSQL persistence, and agent REST API",
   "engines": {
     "node": ">=20"
   },
@@ -19,7 +19,8 @@
     "@capacitor/android": "7.4.0",
     "@capacitor/core": "7.4.0",
     "@capacitor/preferences": "^7.0.0",
-    "capacitor-secure-storage-plugin": "0.12.0"
+    "capacitor-secure-storage-plugin": "0.12.0",
+    "pg": "^8.23.1"
   },
   "devDependencies": {
     "@capacitor/cli": "7.4.0",

@@ -14,7 +14,10 @@ services:
         generateValue: true
       - key: VAULT_ENCRYPTION_KEY
         generateValue: true
+      - key: VAULT_DATABASE_URL
+        sync: false
       - key: VAULT_DATA_DIR
         value: /var/data
-      # For durable records on Render, attach a paid persistent disk at /var/data.
-      # Free web services cannot use persistent disks, so configure persistent storage before relying on long-term saves.
+      # Preferred: set VAULT_DATABASE_URL to a managed PostgreSQL connection string with SSL enabled.
+      # Database payloads remain AES-256-GCM encrypted before they leave the application.
+      # File fallback needs a persistent disk mounted at /var/data; local/ephemeral disk is not durable.

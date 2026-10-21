@@ -128,3 +128,12 @@ The private website can optionally attach up to three relevant shared-vault note
 ### Android ↔ shared vault
 
 The Android app has a mobile connection panel in Tools. Create an agent token in the private website (a `readwrite` token can save notes; `readonly` can only read), then enter the site's HTTPS origin and paste the token into the Android panel. The token is stored through Android secure storage, not in Preferences or workspace backups. Agent API CORS is limited to the Capacitor localhost origins used by the app. The device can read/search/save notes, optionally inject up to three relevant notes into real model requests, and revoke the device token from the web admin. `VAULT_ENCRYPTION_KEY` and durable storage must be configured on the web server first.
+
+
+## v1.0.3: durable PostgreSQL-backed encrypted shared vault
+
+- Set `VAULT_DATABASE_URL` to a PostgreSQL connection string to store the encrypted vault envelope in a database. When configured, this backend takes priority over `VAULT_DATA_DIR` and automatically creates the small `ai_studio_vault` table.
+- Notes, agent names/scopes and token hashes are serialized and encrypted with AES-256-GCM **before** being written to PostgreSQL; the database stores the ciphertext envelope, not the plaintext records. The database provider still receives connection metadata, timestamps and encrypted payload sizes.
+- If `VAULT_DATABASE_URL` is unset, the existing encrypted-file backend remains available. On a cloud host, use a persistent disk for that fallback; an ephemeral filesystem may be reset during deploys/restarts.
+- For an external PostgreSQL provider, use its private connection string where supported and follow the provider's TLS requirement (many provide a URL with `sslmode=require`). Set the connection string in the hosting dashboard, never in source code or chat.
+- This enables durable storage but does **not** publish the website by itself or make the vault end-to-end encrypted. After configuring secrets and the database, deploy and test save → restart/redeploy → read-back before relying on it.

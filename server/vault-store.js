@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
+import { Pool } from 'pg';
 
 function httpError(message, status = 400) {
   const error = new Error(message);
@@ -23,21 +24,52 @@ function cleanCopy(item) {
   return { ...item, tags: [...item.tags] };
 }
 
-export function createVaultStore({ filePath, encryptionSecret }) {
-  if (typeof filePath !== 'string' || !filePath) throw new Error('Vault filePath is required.');
+export function createVaultStore({ filePath, databaseUrl = '', encryptionSecret }) {
+  if (!databaseUrl && (typeof filePath !== 'string' || !filePath)) throw new Error('Vault filePath or databaseUrl is required.');
+  if (databaseUrl && typeof databaseUrl !== 'string') throw new Error('Vault databaseUrl must be a string.');
   if (typeof encryptionSecret !== 'string' || encryptionSecret.length < 32) throw new Error('Vault encryption secret must be at least 32 characters.');
   const key = crypto.createHash('sha256').update('AI-Studio-Shared-Vault-v1:' + encryptionSecret).digest();
+  const pool = databaseUrl ? new Pool({ connectionString: databaseUrl, max: 5, idleTimeoutMillis: 30000, connectionTimeoutMillis: 10000 }) : null;
+  let databaseSchema = null;
   let state = null;
   let loading = null;
   let saveQueue = Promise.resolve();
+
+  async function ensureDatabaseSchema() {
+    if (!pool) return;
+    if (!databaseSchema) {
+      databaseSchema = pool.query(`
+        CREATE TABLE IF NOT EXISTS ai_studio_vault (
+          singleton_id SMALLINT PRIMARY KEY CHECK (singleton_id = 1),
+          payload JSONB NOT NULL,
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `).catch(error => {
+        databaseSchema = null;
+        throw error;
+      });
+    }
+    await databaseSchema;
+  }
 
   async function load() {
     if (state) return state;
     if (loading) return loading;
     loading = (async () => {
       try {
-        const text = await fs.readFile(filePath, 'utf8');
-        const envelope = JSON.parse(text);
+        let envelope;
+        if (pool) {
+          await ensureDatabaseSchema();
+          const result = await pool.query('SELECT payload FROM ai_studio_vault WHERE singleton_id = 1');
+          if (!result.rowCount) {
+            state = { version: 1, items: [], agents: [] };
+            return state;
+          }
+          envelope = result.rows[0].payload;
+        } else {
+          const text = await fs.readFile(filePath, 'utf8');
+          envelope = JSON.parse(text);
+        }
         if (envelope?.format !== 'ai-studio-vault-encrypted-v1' || envelope?.cipher !== 'AES-256-GCM') {
           throw httpError('Kasa dosyasının biçimi tanınmıyor; veri korunmak için açılmadı.', 500);
         }
@@ -72,11 +104,19 @@ export function createVaultStore({ filePath, encryptionSecret }) {
         tag: cipher.getAuthTag().toString('base64url'),
         data: encrypted.toString('base64url')
       });
-      await fs.mkdir(path.dirname(filePath), { recursive: true });
-      const tempPath = filePath + '.tmp-' + crypto.randomBytes(6).toString('hex');
-      await fs.writeFile(tempPath, envelope, { encoding: 'utf8', mode: 0o600 });
-      await fs.chmod(tempPath, 0o600);
-      await fs.rename(tempPath, filePath);
+      if (pool) {
+        await ensureDatabaseSchema();
+        await pool.query(
+          'INSERT INTO ai_studio_vault (singleton_id, payload, updated_at) VALUES (1, $1::jsonb, NOW()) ON CONFLICT (singleton_id) DO UPDATE SET payload = EXCLUDED.payload, updated_at = NOW()',
+          [envelope]
+        );
+      } else {
+        await fs.mkdir(path.dirname(filePath), { recursive: true });
+        const tempPath = filePath + '.tmp-' + crypto.randomBytes(6).toString('hex');
+        await fs.writeFile(tempPath, envelope, { encoding: 'utf8', mode: 0o600 });
+        await fs.chmod(tempPath, 0o600);
+        await fs.rename(tempPath, filePath);
+      }
     };
     const task = saveQueue.then(write, write);
     saveQueue = task.catch(() => {});
