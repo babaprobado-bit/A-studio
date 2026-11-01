@@ -60,14 +60,14 @@ jobs:
           bash libs/llama.kt/scripts/build-opencl.sh
       - name: Install AI Studio dependencies
         run: npm install --no-audit --no-fund
+      - name: Build web assets
+        run: npm run build
       - name: Run existing and new regression checks
         run: |
           npm run test:workshop
           npm run test:site
           npm run test:skills
           npm run test:device-local-coder
-      - name: Build web assets
-        run: npm run build
       - name: Generate Capacitor Android project
         run: npx cap add android
       - name: Preserve trusted-LAN Ollama HTTP and set native bridge
