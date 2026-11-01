@@ -40,6 +40,7 @@ const defaultSettings = {
   ollamaUrl: '',
   ollamaModel: 'qwen2.5-coder:1.5b',
   localCoderEngine: 'ollama',
+  localCoderApiProvider: 'openai',
   shareReusableContext: false,
   shareVaultContext: false,
   vaultBaseUrl: '',
@@ -385,7 +386,18 @@ function syncLocalCoderEngineUI(){
   const option=[...select.options].find(item=>item.value==='device');
   const supported=Boolean(nativeApp&&deviceLocalState?.device?.supported);
   if(option)option.disabled=!supported;
-  select.value=(settings.localCoderEngine==='device'&&supported)?'device':'ollama';
+  const engine=settings.localCoderEngine==='api'?'api':(settings.localCoderEngine==='device'&&supported?'device':'ollama');
+  if(settings.localCoderEngine==='device'&&!supported)settings.localCoderEngine='ollama';
+  select.value=engine;
+  const providerSelect=$('localCoderApiProvider');
+  if(providerSelect){
+    const available=Object.entries(providers).filter(([id])=>id!=='ollama');
+    const current=settings.localCoderApiProvider||'openai';
+    providerSelect.innerHTML=available.map(([id,p])=>'<option value="'+esc(id)+'">'+esc(p.name)+'</option>').join('');
+    providerSelect.value=available.some(([id])=>id===current)?current:'openai';
+    settings.localCoderApiProvider=providerSelect.value;
+  }
+  $('localCoderApiSettings')?.classList.toggle('hidden',engine!=='api');
 }
 function renderDeviceModelDescription(){
   const select=$('onDeviceModelCatalog'), description=$('onDeviceModelDescription');
@@ -537,7 +549,50 @@ async function runDeviceLocalCoderWorkshop(){
     showToast('Telefon içi Local Coder başarısız.');
   }finally{busy=false;$('localCoderRun').disabled=false;$('localCoderRun').textContent='Yerel ajan zincirini çalıştır';}
 }
+async function runApiLocalCoderWorkshop(){
+  if(busy){showToast('Başka bir ajan zinciri çalışıyor.');return;}
+  const task=$('localCoderTask').value.trim();if(!task){showToast('Önce Local Coder görevini yaz.');return;}
+  const providerId=$('localCoderApiProvider')?.value||settings.localCoderApiProvider||'openai';
+  if(!providers[providerId]||providerId==='ollama'){showToast('API sağlayıcısı seçilmedi.');return;}
+  const key=await getSecret(providerId);
+  if(!key){showToast(providers[providerId].name+' API anahtarı yok. Modeller ekranından ekle.');go('models');return;}
+  if(settings.demoMode){
+    if(!confirm('Local Coder '+providers[providerId].name+' üzerinden 3 gerçek API isteği gönderecek. Sağlayıcının ücretsiz kotası veya ücretleri uygulanabilir. Devam edilsin mi?'))return;
+    settings.demoMode=false;await setPref(DB.settings,settings);syncModeUI();
+  }else if(!confirm('Local Coder '+providers[providerId].name+' üzerinden Plan, Kod ve İnceleme için 3 API isteği gönderecek. Kota/ücret oluşabilir. Devam edilsin mi?'))return;
+  settings.localCoderApiProvider=providerId;await setPref(DB.settings,settings);
+  const sourceCode=$('localCoderUseCode').checked?$('codePad').value.slice(0,10000):'';
+  const stages=buildLocalCoderStages({task,language:$('codeLanguage').value,sourceCode});
+  let previous='';busy=true;$('localCoderRun').disabled=true;$('localCoderRun').textContent='API ajanı çalışıyor…';$('localCoderReview').value='';$('localCoderOutput').value='';
+  try{
+    await logAgentActivity('Local Coder · '+providers[providerId].name,'Başladı',task);
+    for(const stage of stages){
+      $('localCoderStatus').textContent=stage.title+' · '+providers[providerId].name+' çalışıyor…';
+      await logAgentActivity('API '+stage.title,'Çalışıyor',providers[providerId].name);
+      const basePrompt=stage.makePrompt?stage.makePrompt(previous):stage.prompt;
+      const skillContext=currentSkillContext(stage.id,MAX_STAGE_SKILL_CHARS);
+      const prompt=basePrompt+(skillContext.promptText?'\n\n'+skillContext.promptText:'');
+      const answer=await callProvider(providerId,prompt,[]);
+      if(!answer)throw new Error('API sağlayıcısı boş yanıt verdi.');
+      if(stage.id==='code')$('localCoderOutput').value=extractCodeArtifact(answer);
+      if(stage.id==='review')$('localCoderReview').value=answer;
+      previous=answer;
+      await logAgentActivity('API '+stage.title,'Tamamlandı',answer.slice(0,220));
+    }
+    $('localCoderStatus').textContent=providers[providerId].name+' ile 3 aşamalı Local Coder zinciri tamamlandı. Kod çalıştırılmadı.';
+    await logAgentActivity('Local Coder · API','Tamamlandı','Kod taslağı ve inceleme notu hazır; kod otomatik çalıştırılmadı.');
+    showToast('API tabanlı Local Coder tamamlandı. Taslağı incele.');
+  }catch(error){
+    $('localCoderStatus').textContent='API tabanlı Local Coder durdu: '+(error.message||'Sağlayıcıyı ve anahtarı kontrol et.');
+    await logAgentActivity('Local Coder · API','Hata',error.message||'API isteği başarısız');
+    showToast('API Local Coder çalışamadı.');
+  }finally{
+    busy=false;$('localCoderRun').disabled=false;$('localCoderRun').textContent='Yerel ajan zincirini çalıştır';
+  }
+}
+
 async function runLocalCoderWorkshop(){
+  if(settings.localCoderEngine==='api')return runApiLocalCoderWorkshop();
   if(settings.localCoderEngine==='device')return runDeviceLocalCoderWorkshop();
   return runLocalCoderWorkshopOllama();
 }
@@ -810,7 +865,7 @@ function updateDashboard(){const connected=Object.keys(providers).filter(id=>id=
 }
 async function exportProjects(){downloadText('ai-studio-projects.json',JSON.stringify({format:'ai-studio-projects-v2',exportedAt:new Date().toISOString(),projects:projectList},null,2),'application/json;charset=utf-8');}
 function buildWorkspaceSnapshot(){
-  return {format:'ai-studio-workspace-v1',exportedAt:new Date().toISOString(),settings:{demoMode:settings.demoMode,models:settings.models,team:settings.team,ollamaUrl:settings.ollamaUrl,ollamaModel:settings.ollamaModel,localCoderEngine:settings.localCoderEngine==='device'?'device':'ollama',systemPrompt:settings.systemPrompt,shareReusableContext:settings.shareReusableContext===true,shareVaultContext:settings.shareVaultContext===true,vaultBaseUrl:settings.vaultBaseUrl||''},projects:projectList,activeProjectId,chat:chatHistory,plugins:userPlugins.filter(p=>p.kind!=='builtin').map(p=>({name:p.name,prompt:p.prompt})),skills:{customSkills,selectedSkillIds,profileId:skillProfileId},snippets:reusableSnippets,activity:agentActivity,codeFiles,activeCodeFileId};
+  return {format:'ai-studio-workspace-v1',exportedAt:new Date().toISOString(),settings:{demoMode:settings.demoMode,models:settings.models,team:settings.team,ollamaUrl:settings.ollamaUrl,ollamaModel:settings.ollamaModel,localCoderEngine:['device','api'].includes(settings.localCoderEngine)?settings.localCoderEngine:'ollama',localCoderApiProvider:settings.localCoderApiProvider||'openai',systemPrompt:settings.systemPrompt,shareReusableContext:settings.shareReusableContext===true,shareVaultContext:settings.shareVaultContext===true,vaultBaseUrl:settings.vaultBaseUrl||''},projects:projectList,activeProjectId,chat:chatHistory,plugins:userPlugins.filter(p=>p.kind!=='builtin').map(p=>({name:p.name,prompt:p.prompt})),skills:{customSkills,selectedSkillIds,profileId:skillProfileId},snippets:reusableSnippets,activity:agentActivity,codeFiles,activeCodeFileId};
 }
 async function exportWorkspace(){
   await saveCurrentCodeFile(false);
@@ -856,7 +911,8 @@ async function importWorkspace(file){
     nextSettings.team=(Array.isArray(nextSettings.team)?nextSettings.team:defaultSettings.team).filter(id=>providers[id]).slice(0,4);
     nextSettings.ollamaUrl=typeof nextSettings.ollamaUrl==='string'?nextSettings.ollamaUrl.slice(0,500):'';
     nextSettings.ollamaModel=typeof nextSettings.ollamaModel==='string'?nextSettings.ollamaModel.slice(0,140):providers.ollama.model;
-    nextSettings.localCoderEngine=nextSettings.localCoderEngine==='device'?'device':'ollama';
+    nextSettings.localCoderEngine=['device','api'].includes(nextSettings.localCoderEngine)?nextSettings.localCoderEngine:'ollama';
+    nextSettings.localCoderApiProvider=providers[nextSettings.localCoderApiProvider]&&nextSettings.localCoderApiProvider!=='ollama'?nextSettings.localCoderApiProvider:'openai';
     nextSettings.vaultBaseUrl=typeof nextSettings.vaultBaseUrl==='string'?nextSettings.vaultBaseUrl.slice(0,500):'';
     nextSettings.shareVaultContext=nextSettings.shareVaultContext===true;
     nextSettings.systemPrompt=typeof nextSettings.systemPrompt==='string'?nextSettings.systemPrompt.slice(0,6000):defaultSettings.systemPrompt;
@@ -972,7 +1028,8 @@ $('importWorkspaceBtn').addEventListener('click',()=> $('importWorkspaceFile').c
 $('importWorkspaceFile').addEventListener('change',async e=>{if(e.target.files?.[0])await importWorkspace(e.target.files[0]);e.target.value='';});
 $('resetLocal').addEventListener('click',clearAllLocal);
 $('localCoderRun').addEventListener('click',runLocalCoderWorkshop);
-$('localCoderEngine').addEventListener('change',async e=>{settings.localCoderEngine=e.target.value==='device'?'device':'ollama';await setPref(DB.settings,settings);syncLocalCoderEngineUI();$('localCoderStatus').textContent=settings.localCoderEngine==='device'?'Telefon içi GGUF motoru seçildi.':'Mevcut PC / Ollama motoru seçildi.';});
+$('localCoderEngine').addEventListener('change',async e=>{settings.localCoderEngine=['device','api'].includes(e.target.value)?e.target.value:'ollama';await setPref(DB.settings,settings);syncLocalCoderEngineUI();$('localCoderStatus').textContent=settings.localCoderEngine==='device'?'Telefon içi GGUF motoru seçildi.':(settings.localCoderEngine==='api'?'API sağlayıcılı Local Coder seçildi.':'Mevcut PC / Ollama motoru seçildi.');});
+$('localCoderApiProvider').addEventListener('change',async e=>{settings.localCoderApiProvider=e.target.value;await setPref(DB.settings,settings);});
 $('onDeviceModelCatalog').addEventListener('change',renderDeviceModelDescription);
 $('downloadOnDeviceModel').addEventListener('click',downloadSelectedDeviceModel);
 $('refreshDeviceLocalModels').addEventListener('click',()=>refreshDeviceLocalModels());
@@ -1040,7 +1097,7 @@ async function prepareBrowserFeatures(){
   }catch(_){}
 }
 async function init(){
-  try{settings={...clone(defaultSettings),...(await getPref(DB.settings,{}))};settings.models={...clone(defaultSettings.models),...(settings.models||{})};settings.team=(settings.team||defaultSettings.team).filter(id=>providers[id]).slice(0,4);settings.vaultBaseUrl=typeof settings.vaultBaseUrl==='string'?settings.vaultBaseUrl.slice(0,500):'';settings.localCoderEngine=settings.localCoderEngine==='device'?'device':'ollama';if(settings.ollamaUrl==='http://192.168.1.100:11434')settings.ollamaUrl='';}catch(_){}
+  try{settings={...clone(defaultSettings),...(await getPref(DB.settings,{}))};settings.models={...clone(defaultSettings.models),...(settings.models||{})};settings.team=(settings.team||defaultSettings.team).filter(id=>providers[id]).slice(0,4);settings.vaultBaseUrl=typeof settings.vaultBaseUrl==='string'?settings.vaultBaseUrl.slice(0,500):'';settings.localCoderEngine=['device','api'].includes(settings.localCoderEngine)?settings.localCoderEngine:'ollama';settings.localCoderApiProvider=providers[settings.localCoderApiProvider]&&settings.localCoderApiProvider!=='ollama'?settings.localCoderApiProvider:'openai';if(settings.ollamaUrl==='http://192.168.1.100:11434')settings.ollamaUrl='';}catch(_){}
   if(!nativeApp){showToast('Tarayıcıda API anahtarları yalnızca açık oturumda tutulur.');}
   await initKeys(); projectList=await getPref(DB.projects,[]);activeProjectId=await getPref(DB.activeProject,'');chatHistory=await getPref(DB.chat,[]);userPlugins=await getPref(DB.plugins,[]);const storedSkills=await getPref(DB.skills,{});customSkills=(Array.isArray(storedSkills?.customSkills)?storedSkills.customSkills:[]).map(skill=>normalizeSkill(skill)).filter(Boolean).slice(-100);skillLibrary=[...SKILL_CATALOG,...customSkills];skillProfileId=storedSkills?.profileId==='custom'?'custom':(SKILL_PROFILES[storedSkills?.profileId]?storedSkills.profileId:'karpathy');const validSkillIds=new Set(skillLibrary.map(skill=>skill.id));selectedSkillIds=(Array.isArray(storedSkills?.selectedSkillIds)?storedSkills.selectedSkillIds:[]).filter(id=>validSkillIds.has(id)).slice(0,MAX_SELECTED_SKILLS);if(!selectedSkillIds.length)selectedSkillIds=getProfileSkillIds(skillProfileId);reusableSnippets=await getPref(DB.snippets,[]);agentActivity=await getPref(DB.activity,[]);codeFiles=normalizeCodeFileList(await getPref(DB.codeFiles,[]),true);if(!codeFiles.length)codeFiles=[makeCodeFile()];activeCodeFileId=codeFiles[0].id;await setPref(DB.codeFiles,codeFiles);
   if(!Array.isArray(projectList))projectList=[];if(!projectList.some(p=>p&&p.id===activeProjectId))activeProjectId=projectList[0]?.id||'';await setPref(DB.activeProject,activeProjectId);if(!Array.isArray(chatHistory))chatHistory=[];if(!Array.isArray(userPlugins))userPlugins=[];if(!Array.isArray(reusableSnippets))reusableSnippets=[];if(!Array.isArray(agentActivity))agentActivity=[];

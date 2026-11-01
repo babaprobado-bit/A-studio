@@ -158,3 +158,10 @@ The Android app has a mobile connection panel in Tools. Create an agent token in
 - The original PC/Ollama flow stays available and remains the default. OpenAI, Claude, Gemini, DeepSeek, Groq and OpenRouter API-key providers remain available in the existing chat and comparison flows.
 - On-device Local Coder still runs a user-started Plan → Code → Review flow; code is shown for review and is not automatically executed or written to arbitrary files. Existing Skill context is injected per stage, but on-device prompts are trimmed to fit the chosen model context window.
 - This runtime has not been declared supported for 32-bit Android, iOS, or browser-only PWA. The separate workflow builds a debug APK; successful CI build and real-device testing are still required before treating the native inference bridge as release-ready.
+
+
+### Local Coder online API mode
+
+- Local Coder can choose one of the existing OpenAI, Claude, Gemini, DeepSeek, Groq or OpenRouter API adapters. The matching provider key must be saved on the device.
+- Each online run sends three requests (Plan, Code, Review). The app asks for explicit confirmation before the run; Demo mode remains on by default until the user approves a real API run. Provider quotas or charges may apply.
+- PC/Ollama remains the default engine. Device GGUF mode runs locally after a one-time model download and does not call cloud APIs. These three engines are separate choices.

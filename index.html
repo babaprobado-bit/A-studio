@@ -105,8 +105,9 @@
         <div class="page-title"><div class="eyebrow">TOOLBOX / PROMPT PLUGINS</div><h1>Araçlar ve eklentiler</h1><p>Hazır görev şablonları kullan, kendi prompt eklentilerini oluştur veya kod parçalarını dışa aktar.</p></div>
         <div class="section-head"><div><div class="eyebrow">LOCAL CODER / OFFLINE WORKFLOW</div><h2>Local Coder atölyesi</h2></div><span class="pill">PC + Telefon</span></div>
         <label class="field-label" for="localCoderEngine">Çalışma motoru</label>
-        <select class="input" id="localCoderEngine"><option value="ollama">PC / Ollama · Mevcut bağlantı</option><option value="device">Telefon içi GGUF · Çevrimdışı</option></select>
-        <p class="fineprint">API anahtarlı sağlayıcılar Takım Sohbeti ve Karşılaştırma bölümünde korunur. Telefon içi model, ilk indirmeden sonra internet kullanmadan çıkarım yapar.</p>
+        <select class="input" id="localCoderEngine"><option value="ollama">PC / Ollama · Mevcut bağlantı</option><option value="device">Telefon içi GGUF · Çevrimdışı</option><option value="api">API anahtarlı model · Çevrimiçi</option></select>
+        <div class="panel hidden" id="localCoderApiSettings"><label class="field-label" for="localCoderApiProvider">API sağlayıcısı</label><select class="input" id="localCoderApiProvider"></select><p class="fineprint">Seçtiğin sağlayıcının API anahtarı Modeller ekranında kayıtlı olmalı. Her Local Coder çalıştırması Plan, Kod ve İnceleme için 3 istek gönderir.</p></div>
+        <p class="fineprint">API anahtarlı sağlayıcılar Local Coder, Takım Sohbeti ve Karşılaştırma bölümlerinde kullanılabilir. Telefon içi model, ilk indirmeden sonra internet kullanmadan çıkarım yapar.</p>
         <div class="panel device-local-model-panel hidden" id="deviceLocalModelsPanel">
   <div class="section-head"><div><div class="eyebrow">ON-DEVICE GGUF</div><h3>Telefon içi model yöneticisi</h3></div><span class="pill">İnternetsiz çıkarım</span></div>
   <p class="muted">Modeli ilk kez indirmek için internet gerekir. İndirme tamamlandıktan sonra model telefonda saklanır ve çıkarım sırasında API anahtarı veya internet kullanmaz.</p>
