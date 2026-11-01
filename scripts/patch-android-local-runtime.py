@@ -148,30 +148,76 @@ if len(activities) != 1:
 activity = activities[0]
 content = activity.read_text(encoding="utf-8")
 if "LocalLlmPlugin" not in content:
+    package_match = re.search(r"^package\s+[^;\n]+;?", content, re.M)
+    if not package_match:
+        raise SystemExit("MainActivity package declaration missing.")
+    imports = []
     if activity.suffix == ".java":
-        match = re.search(r"^package\s+[^;]+;", content, re.M)
-        if not match:
-            raise SystemExit("MainActivity Java package declaration missing.")
-        content = content[:match.end()] + "\n\nimport com.aistudio.alpha1.LocalLlmPlugin;" + content[match.end():]
-        if "super.onCreate(savedInstanceState);" not in content:
-            raise SystemExit("BridgeActivity onCreate call missing.")
-        content = content.replace(
-            "super.onCreate(savedInstanceState);",
-            "registerPlugin(LocalLlmPlugin.class);\n        super.onCreate(savedInstanceState);",
-            1
-        )
+        if "import android.os.Bundle;" not in content:
+            imports.append("import android.os.Bundle;")
+        imports.append("import com.aistudio.alpha1.LocalLlmPlugin;")
+        content = content[:package_match.end()] + "\n\n" + "\n".join(imports) + content[package_match.end():]
+        if "onCreate(" in content:
+            # Existing onCreate: register the plugin before BridgeActivity builds its bridge.
+            if "super.onCreate(savedInstanceState);" in content:
+                content = content.replace(
+                    "super.onCreate(savedInstanceState);",
+                    "registerPlugin(LocalLlmPlugin.class);\n        super.onCreate(savedInstanceState);",
+                    1
+                )
+            elif "super.onCreate(" in content:
+                content = re.sub(
+                    r"super\.onCreate\(([^)]*)\);",
+                    r"registerPlugin(LocalLlmPlugin.class);\n        super.onCreate(\1);",
+                    content,
+                    count=1
+                )
+            else:
+                raise SystemExit("Existing MainActivity onCreate has no super.onCreate call.")
+        else:
+            class_match = re.search(r"(class\s+MainActivity[^{]*\{)", content)
+            if not class_match:
+                raise SystemExit("MainActivity Java class declaration missing.")
+            method = """
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        registerPlugin(LocalLlmPlugin.class);
+        super.onCreate(savedInstanceState);
+    }
+"""
+            content = content[:class_match.end()] + method + content[class_match.end():]
     else:
-        match = re.search(r"^package\s+[^\n]+", content, re.M)
-        if not match:
-            raise SystemExit("MainActivity Kotlin package declaration missing.")
-        content = content[:match.end()] + "\n\nimport com.aistudio.alpha1.LocalLlmPlugin" + content[match.end():]
-        if "super.onCreate(savedInstanceState)" not in content:
-            raise SystemExit("BridgeActivity onCreate call missing.")
-        content = content.replace(
-            "super.onCreate(savedInstanceState)",
-            "registerPlugin(LocalLlmPlugin::class.java)\n        super.onCreate(savedInstanceState)",
-            1
-        )
+        if "import android.os.Bundle" not in content:
+            imports.append("import android.os.Bundle")
+        imports.append("import com.aistudio.alpha1.LocalLlmPlugin")
+        content = content[:package_match.end()] + "\n\n" + "\n".join(imports) + content[package_match.end():]
+        if "onCreate(" in content:
+            if "super.onCreate(savedInstanceState)" in content:
+                content = content.replace(
+                    "super.onCreate(savedInstanceState)",
+                    "registerPlugin(LocalLlmPlugin::class.java)\n        super.onCreate(savedInstanceState)",
+                    1
+                )
+            elif "super.onCreate(" in content:
+                content = re.sub(
+                    r"super\.onCreate\(([^)]*)\)",
+                    r"registerPlugin(LocalLlmPlugin::class.java)\n        super.onCreate(\1)",
+                    content,
+                    count=1
+                )
+            else:
+                raise SystemExit("Existing MainActivity onCreate has no super.onCreate call.")
+        else:
+            class_match = re.search(r"(class\s+MainActivity[^{]*\{)", content)
+            if not class_match:
+                raise SystemExit("MainActivity Kotlin class declaration missing.")
+            method = """
+    override fun onCreate(savedInstanceState: Bundle?) {
+        registerPlugin(LocalLlmPlugin::class.java)
+        super.onCreate(savedInstanceState)
+    }
+"""
+            content = content[:class_match.end()] + method + content[class_match.end():]
     write(activity, content)
 
 # Include upstream license and notice files in the APK assets when present.
