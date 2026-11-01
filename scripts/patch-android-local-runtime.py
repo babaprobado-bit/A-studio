@@ -120,6 +120,12 @@ if "implementation project(':llama-kt')" not in app_text:
         "dependencies {",
         "\n    implementation project(':llama-kt')\n"
     )
+if "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0" not in app_text:
+    app_text = insert_before_matching_brace(
+        app_text,
+        "dependencies {",
+        '\n    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0"\n'
+    )
 app_text, code_count = re.subn(r"versionCode\s+\d+", "versionCode 2", app_text, count=1)
 app_text, name_count = re.subn(r'versionName\s+["\'][^"\']+["\']', 'versionName "1.1.0"', app_text, count=1)
 if code_count != 1 or name_count != 1:
