@@ -137,3 +137,13 @@ The Android app has a mobile connection panel in Tools. Create an agent token in
 - If `VAULT_DATABASE_URL` is unset, the existing encrypted-file backend remains available. On a cloud host, use a persistent disk for that fallback; an ephemeral filesystem may be reset during deploys/restarts.
 - For an external PostgreSQL provider, use its private connection string where supported and follow the provider's TLS requirement (many provide a URL with `sslmode=require`). Set the connection string in the hosting dashboard, never in source code or chat.
 - This enables durable storage but does **not** publish the website by itself or make the vault end-to-end encrypted. After configuring secrets and the database, deploy and test save → restart/redeploy → read-back before relying on it.
+
+
+## Workspace 1.1 — Skill Library (text-only)
+
+- Adds an offline Skill Library with 15 original Superpowers-inspired instructions, 22 original Caveman-style instructions, and one Karpathy-inspired coding-guidelines summary. These starter instructions are written for AI Studio and are **not official upstream Skill files or verbatim reproductions**.
+- Includes Karpathy Guidelines, Superpowers, Caveman, and Balanced profiles. A user can select at most eight Skills for Local Coder.
+- Imports custom `SKILL.md` files as text instructions. Simple YAML front matter supports `name`, `description`, and `stage` (`plan`, `code`, `review`, or `all`). Imported content is validated and never executed as code.
+- Each Local Coder stage receives no more than 36,000 characters of selected Skill context. Existing Ollama flow remains unchanged when no Skills are selected.
+- Skill selections and custom Skill text are included in standard/encrypted workspace backups. Existing backups without a `skills` field remain compatible. Provider API keys and vault tokens stay excluded.
+- This is an instruction catalog, not yet an executable plugin/MCP runtime. True on-device model inference remains a separate Android native-runtime milestone.

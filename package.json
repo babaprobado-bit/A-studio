@@ -1,6 +1,6 @@
 {
   "name": "ai-studio-alpha-1-mobile",
-  "version": "1.0.3",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
   "description": "AI Studio Alpha 1 with multi-provider workspace, Local Coder, encrypted shared AI vault, PostgreSQL persistence, and agent REST API",
@@ -11,7 +11,8 @@
     "build": "vite build",
     "start": "node server/server.js",
     "test:site": "node server/smoke-test.js",
-    "test:workshop": "node server/workshop-smoke-test.js"
+    "test:workshop": "node server/workshop-smoke-test.js",
+    "test:skills": "node scripts/test-skills.mjs"
   },
   "dependencies": {
     "express": "^5.1.0",

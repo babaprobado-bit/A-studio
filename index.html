@@ -117,6 +117,16 @@
           <label class="field-label" for="localCoderReview">İnceleme ve test önerileri</label>
           <textarea id="localCoderReview" class="input" rows="5" readonly placeholder="Son aşamada inceleme ve test listesi gelecek."></textarea>
         </div>
+        <section class="panel skill-library-panel" id="skillLibraryPanel">
+          <div class="section-head"><div><div class="eyebrow">SKILL ENGINE</div><h2>Skill Kütüphanesi</h2></div><span class="pill">Offline · Text-only</span></div>
+          <p class="muted">Skill’ler Local Coder’ın plan, kod ve inceleme aşamalarına bağlam olarak eklenir. İçerik cihazda saklanır; internet gerekmez. İçe aktarılan SKILL.md dosyaları talimattır, kod çalıştırmaz.</p>
+          <label class="field-label" for="skillProfileSelect">Hazır profil</label>
+          <select id="skillProfileSelect" class="input"><option value="karpathy">Karpathy Guidelines</option><option value="superpowers">Superpowers</option><option value="caveman">Caveman</option><option value="balanced">Dengeli Geliştirme</option><option value="custom">Özel seçim</option></select>
+          <div class="row-actions"><strong id="skillSelectedCount">1/8 Skill seçili</strong><span class="grow"></span><button class="btn ghost small" id="skillExportBtn" type="button">Skill ayarlarını dışa aktar</button></div>
+          <div id="skillLibraryList" class="skill-library-list"></div>
+          <div class="skill-import-row"><div><strong>Kendi Skill’ini ekle</strong><p class="fineprint">SKILL.md içe aktar · en fazla 12.000 karakter / Skill</p></div><span class="grow"></span><button class="btn secondary small" id="skillImportBtn" type="button">.md içe aktar</button><input id="skillImportFiles" type="file" accept=".md,text/markdown" multiple hidden></div>
+          <p id="skillLibraryStatus" class="fineprint" role="status"></p>
+        </section>
         <div class="panel hidden" id="nativeVaultPanel">
           <div class="section-head"><div><div class="eyebrow">MOBILE SHARED VAULT</div><h2>AI Studio’yu ortak kasaya bağla</h2></div><span class="pill">HTTPS + token</span></div>
           <p class="muted">Özel web sitesinde oluşturduğun agent tokenını buraya gir. Token Android’in güvenli anahtar deposunda saklanır; çalışma alanı yedeğine veya kaynak koduna eklenmez. Salt okunur token kayıtları okur; readwrite token kayıt ekleyip silebilir.</p>
