@@ -1,4 +1,5 @@
 import { Capacitor } from '@capacitor/core';
+import { DeviceLocalCoder, DEVICE_MODEL_CATALOG, chooseRecommendedDeviceModel, formatModelBytes } from './device-local-coder.js';
 import { Preferences } from '@capacitor/preferences';
 import { SecureStoragePlugin } from 'capacitor-secure-storage-plugin';
 import './style.css';
@@ -21,6 +22,8 @@ const DB = {
   skills: 'ai-studio-skills-v1'
 };
 const nativeApp = Capacitor.isNativePlatform();
+const deviceLocalCoder = new DeviceLocalCoder(nativeApp);
+let deviceLocalState = null;
 const providers = {
   openai: { name:'OpenAI', icon:'O', kind:'openai', endpoint:'https://api.openai.com/v1/chat/completions', model:'gpt-5-mini', keyUrl:'https://platform.openai.com/api-keys', desc:'GPT modelleri · Chat Completions API' },
   anthropic: { name:'Anthropic / Claude', icon:'A', kind:'anthropic', endpoint:'https://api.anthropic.com/v1/messages', model:'claude-sonnet-5', keyUrl:'https://console.anthropic.com/settings/keys', desc:'Claude modelleri · Messages API' },
@@ -36,6 +39,7 @@ const defaultSettings = {
   team: ['openai','gemini','ollama'],
   ollamaUrl: '',
   ollamaModel: 'qwen2.5-coder:1.5b',
+  localCoderEngine: 'ollama',
   shareReusableContext: false,
   shareVaultContext: false,
   vaultBaseUrl: '',
@@ -376,7 +380,169 @@ function exportSnippetsAll(){downloadText('ai-studio-snippet-vault.json',JSON.st
 async function importSnippetFile(file){
  try{if(!file||file.size>5000000)throw new Error('Dosya eksik veya 5 MB sınırını aşıyor.');const parsed=JSON.parse(await file.text());const incoming=Array.isArray(parsed)?parsed:parsed.snippets;if(!Array.isArray(incoming))throw new Error('JSON içinde snippets dizisi bulunamadı.');let count=0;for(const raw of incoming){const item=normalizeSnippet(raw);if(!item)continue;item.id=crypto.randomUUID?crypto.randomUUID():String(Date.now()+count);item.updated=new Date().toISOString();reusableSnippets.unshift(item);count++;}reusableSnippets=reusableSnippets.slice(0,100);await setPref(DB.snippets,reusableSnippets);renderSnippetVault();showToast(count+' kod parçası içe aktarıldı.');}catch(error){showToast('Kasa içe aktarılamadı: '+(error.message||'JSON dosyasını kontrol et.'));}
 }
+function syncLocalCoderEngineUI(){
+  const select=$('localCoderEngine'); if(!select)return;
+  const option=[...select.options].find(item=>item.value==='device');
+  const supported=Boolean(nativeApp&&deviceLocalState?.device?.supported);
+  if(option)option.disabled=!supported;
+  select.value=(settings.localCoderEngine==='device'&&supported)?'device':'ollama';
+}
+function renderDeviceModelDescription(){
+  const select=$('onDeviceModelCatalog'), description=$('onDeviceModelDescription');
+  if(!select||!description)return;
+  const model=DEVICE_MODEL_CATALOG.find(item=>item.id===select.value)||DEVICE_MODEL_CATALOG[0];
+  description.textContent=model.name+' · yaklaşık '+formatModelBytes(model.sizeBytes)+' indirme · '+model.minRamGb+' GB+ RAM önerisi. '+model.summary;
+}
+function renderDeviceLocalModelManager(){
+  const panel=$('deviceLocalModelsPanel'); if(!panel)return;
+  if(!nativeApp){panel.classList.add('hidden');syncLocalCoderEngineUI();return;}
+  panel.classList.remove('hidden');
+  const info=deviceLocalState?.device;
+  const summary=$('deviceLocalProfile');
+  if(summary){
+    if(!info)summary.textContent='Telefon bilgileri alınamadı.';
+    else summary.innerHTML='<strong>'+(info.supported?'Bu telefon yerel model motorunu destekliyor':'Bu telefon için yerel model motoru desteklenmiyor')+'</strong><span>Android '+esc(info.androidSdk)+' · '+esc(info.abi)+' · '+esc(info.processorCount)+' CPU çekirdeği</span><span>RAM: '+formatModelBytes(info.totalMemoryBytes)+' · Kullanılabilir: '+formatModelBytes(info.availableMemoryBytes)+'</span><span>Boş alan: '+formatModelBytes(info.freeStorageBytes)+'</span>';
+  }
+  const catalog=$('onDeviceModelCatalog');
+  if(catalog){
+    const previous=catalog.value;
+    catalog.innerHTML=DEVICE_MODEL_CATALOG.map(model=>'<option value="'+esc(model.id)+'">'+esc(model.name)+' · '+formatModelBytes(model.sizeBytes)+'</option>').join('');
+    if(DEVICE_MODEL_CATALOG.some(model=>model.id===previous))catalog.value=previous;
+    else if(deviceLocalState?.recommendation?.id)catalog.value=deviceLocalState.recommendation.id;
+  }
+  const installed=$('installedLocalModel');
+  if(installed){
+    const previous=installed.value||deviceLocalCoder.loadedFileName;
+    const models=deviceLocalState?.models||[];
+    installed.innerHTML=models.length?models.map(model=>'<option value="'+esc(model.fileName)+'">'+esc(model.fileName)+' · '+formatModelBytes(model.sizeBytes)+(model.loaded?' · Bellekte':'')+'</option>').join(''):'<option value="">Henüz model yok</option>';
+    if(models.some(model=>model.fileName===previous))installed.value=previous;
+    else if(models.length)installed.value=models[0].fileName;
+  }
+  if($('onDeviceModelCatalog'))$('onDeviceModelCatalog').disabled=!Boolean(info?.supported);
+  if($('downloadOnDeviceModel'))$('downloadOnDeviceModel').disabled=!Boolean(info?.supported);
+  if($('loadOnDeviceModel'))$('loadOnDeviceModel').disabled=!Boolean(info?.supported&&deviceLocalState?.models?.length);
+  if($('deleteOnDeviceModel'))$('deleteOnDeviceModel').disabled=!Boolean(deviceLocalState?.models?.length);
+  if($('unloadOnDeviceModel'))$('unloadOnDeviceModel').disabled=!Boolean(deviceLocalCoder.loadedFileName);
+  renderDeviceModelDescription();syncLocalCoderEngineUI();
+}
+async function refreshDeviceLocalModels(quiet=false){
+  if(!nativeApp){deviceLocalState=null;if(settings.localCoderEngine==='device'){settings.localCoderEngine='ollama';await setPref(DB.settings,settings);}renderDeviceLocalModelManager();return null;}
+  try{
+    deviceLocalState=await deviceLocalCoder.refresh();
+    if(!deviceLocalState.device?.supported&&settings.localCoderEngine==='device'){settings.localCoderEngine='ollama';await setPref(DB.settings,settings);}
+    renderDeviceLocalModelManager();
+    const recommendation=deviceLocalState.recommendation;
+    if($('onDeviceModelStatus'))$('onDeviceModelStatus').textContent=deviceLocalState.device?.supported
+      ?'Model önerisi: '+recommendation.name+'. '+(recommendation.lowAvailableMemory?'Şu anki boş RAM düşük; diğer uygulamaları kapatıp tekrar dene.':'Modeli indirdikten sonra internet olmadan çalıştırabilirsin.')
+      :'Bu Android sürümü veya işlemci mimarisi yerel modeli desteklemiyor. PC / Ollama ve API sağlayıcıları çalışmaya devam eder.';
+    return deviceLocalState;
+  }catch(error){
+    if($('onDeviceModelStatus'))$('onDeviceModelStatus').textContent='Telefon bilgileri okunamadı: '+(error.message||'Native LocalLlm köprüsünü kontrol et.');
+    if(!quiet)showToast('Yerel model yöneticisi açılamadı. Android APK sürümünü ve cihaz uyumluluğunu kontrol et.');
+    deviceLocalState=null;renderDeviceLocalModelManager();return null;
+  }
+}
+async function downloadSelectedDeviceModel(){
+  const model=DEVICE_MODEL_CATALOG.find(item=>item.id===$('onDeviceModelCatalog')?.value);
+  if(!model)return;
+  if(!confirm(model.name+' indirilsin mi? Yaklaşık '+formatModelBytes(model.sizeBytes)+' boş alan gerekir. İlk indirme internet ister; model indirildikten sonra çıkarım çevrimdışı yapılır. İndirme varsayılan olarak ücretli/mobil veri kullanmaz.'))return;
+  const button=$('downloadOnDeviceModel');button.disabled=true;
+  if($('onDeviceModelStatus'))$('onDeviceModelStatus').textContent='İndirme başlatılıyor…';
+  try{
+    await deviceLocalCoder.download(model,status=>{
+      const percent=Number(status.progress||0);
+      if($('onDeviceModelStatus'))$('onDeviceModelStatus').textContent='Model indiriliyor: %'+percent+' · '+formatModelBytes(status.downloadedBytes||0)+' / '+(Number(status.totalBytes)>0?formatModelBytes(status.totalBytes):'hesaplanıyor');
+    });
+    await refreshDeviceLocalModels(true);
+    const fileName=model.fileName;
+    if($('installedLocalModel'))$('installedLocalModel').value=fileName;
+    showToast('Model indirildi. Şimdi belleğe yükleyebilirsin.');
+  }catch(error){
+    if($('onDeviceModelStatus'))$('onDeviceModelStatus').textContent='İndirme tamamlanamadı: '+(error.message||'Wi-Fi bağlantısını ve depolama alanını kontrol et.');
+    showToast('Model indirilemedi.');
+  }finally{button.disabled=false;}
+}
+async function loadSelectedDeviceModel(){
+  const fileName=$('installedLocalModel')?.value;
+  if(!fileName){showToast('Önce bir GGUF modeli indir.');return;}
+  const button=$('loadOnDeviceModel');button.disabled=true;
+  if($('onDeviceModelStatus'))$('onDeviceModelStatus').textContent='Model belleğe yükleniyor… Büyük modelde birkaç dakika sürebilir.';
+  try{
+    const contextSize=Number($('onDeviceContextSize')?.value||2048);
+    await deviceLocalCoder.load(fileName,contextSize,event=>{
+      if($('onDeviceModelStatus'))$('onDeviceModelStatus').textContent='Model belleğe yükleniyor: %'+Number(event.progress||0);
+    });
+    settings.localCoderEngine='device';await setPref(DB.settings,settings);syncLocalCoderEngineUI();
+    await refreshDeviceLocalModels(true);
+    if($('onDeviceModelStatus'))$('onDeviceModelStatus').textContent=fileName+' belleğe yüklendi. Local Coder artık bu telefonda internet olmadan çalışabilir.';
+    showToast('Telefon içi model hazır.');
+  }catch(error){
+    if($('onDeviceModelStatus'))$('onDeviceModelStatus').textContent='Model yüklenemedi: '+(error.message||'Boş RAM ve model dosyasını kontrol et.');
+    showToast('Model belleğe yüklenemedi.');
+  }finally{button.disabled=false;await refreshDeviceLocalModels(true);}
+}
+async function unloadDeviceModel(){
+  try{await deviceLocalCoder.unload();await refreshDeviceLocalModels(true);if($('onDeviceModelStatus'))$('onDeviceModelStatus').textContent='Model bellekten kapatıldı. İndirilmiş dosya telefonda duruyor.';showToast('Model kapatıldı; indirme dosyası silinmedi.');}
+  catch(error){showToast('Model kapatılamadı: '+(error.message||'Hata'));}
+}
+async function deleteSelectedDeviceModel(){
+  const fileName=$('installedLocalModel')?.value;if(!fileName)return;
+  if(!confirm(fileName+' telefondan silinsin mi?'))return;
+  try{await deviceLocalCoder.delete(fileName);await refreshDeviceLocalModels(true);if($('onDeviceModelStatus'))$('onDeviceModelStatus').textContent='Model dosyası telefondan silindi.';showToast('Model silindi.');}
+  catch(error){showToast('Model silinemedi: '+(error.message||'Hata'));}
+}
+async function generateWithDeviceModel(basePrompt,maxTokens,stageId='all'){
+  const contextSize=Number($('onDeviceContextSize')?.value||2048);
+  const totalCharBudget=Math.max(1200,Math.floor((contextSize-maxTokens-128)*3.1));
+  const systemFull=systemFor('ollama',basePrompt).replace(providers.ollama.name,'Telefon içi GGUF Local Coder');
+  const systemBudget=Math.min(systemFull.length,Math.floor(totalCharBudget*0.25));
+  const systemText=systemFull.slice(0,systemBudget);
+  const userBudget=Math.max(500,totalCharBudget-systemText.length-80);
+  const skillBudget=Math.max(0,userBudget-basePrompt.length-100);
+  const skills=currentSkillContext(stageId,skillBudget);
+  let userText=basePrompt+(skills.promptText?'\n\n'+skills.promptText:'');
+  let wasTrimmed=false;
+  if(userText.length>userBudget){userText=userText.slice(0,userBudget);wasTrimmed=true;}
+  const result=await deviceLocalCoder.generate([{role:'system',content:systemText},{role:'user',content:userText}],{maxTokens,temperature:0.25});
+  return {text:result.text,wasTrimmed,skillCount:skills.includedIds.length};
+}
+async function runDeviceLocalCoderWorkshop(){
+  if(busy){showToast('Başka bir ajan zinciri çalışıyor.');return;}
+  const task=$('localCoderTask').value.trim();if(!task){showToast('Önce Local Coder görevini yaz.');return;}
+  if(!deviceLocalCoder.loadedFileName){showToast('Önce Telefon içi model yöneticisinden bir modeli belleğe yükle.');return;}
+  const sourceCode=$('localCoderUseCode').checked?$('codePad').value.slice(0,10000):'';
+  const stages=buildLocalCoderStages({task,language:$('codeLanguage').value,sourceCode});
+  let previous='';let contextTrimmed=false;busy=true;$('localCoderRun').disabled=true;$('localCoderRun').textContent='Telefon içi ajan çalışıyor…';$('localCoderReview').value='';$('localCoderOutput').value='';
+  try{
+    await logAgentActivity('Local Coder · Telefon','Başladı',task);
+    for(const stage of stages){
+      $('localCoderStatus').textContent=stage.title+' · '+deviceLocalCoder.loadedFileName+' çalışıyor…';
+      await logAgentActivity('Telefon içi '+stage.title,'Çalışıyor',task);
+      const basePrompt=stage.makePrompt?stage.makePrompt(previous):stage.prompt;
+      const outputLimit=stage.id==='code'?1000:420;
+      const generated=await generateWithDeviceModel(basePrompt,outputLimit,stage.id);
+      const answer=generated.text;if(!answer)throw new Error('Yerel model boş yanıt verdi. Modeli yeniden yüklemeyi dene.');
+      if(stage.id==='code')$('localCoderOutput').value=extractCodeArtifact(answer);
+      if(stage.id==='review')$('localCoderReview').value=answer;
+      previous=answer;
+      await logAgentActivity('Telefon içi '+stage.title,'Tamamlandı',answer.slice(0,220));
+      if(generated.wasTrimmed){contextTrimmed=true;$('localCoderStatus').textContent='Bağlam model penceresine sığmadı; bazı kaynak/Skill metinleri sınırlandı.';}
+    }
+    $('localCoderStatus').textContent='Telefon içi zincir tamamlandı. '+(contextTrimmed?'Model penceresine sığmayan bazı kaynak/Skill metinleri kısaltıldı. ':'')+'Taslağı kontrol et; kod çalıştırılmadı ve dosyalar otomatik değiştirilmedi.';
+    await logAgentActivity('Local Coder · Telefon','Tamamlandı','Offline GGUF taslağı ve inceleme notu hazır; kod çalıştırılmadı.');
+    showToast('Telefon içi Local Coder tamamlandı.');
+  }catch(error){
+    $('localCoderStatus').textContent='Telefon içi model çalışamadı: '+(error.message||'Boş RAM ve model yüklemesini kontrol et.');
+    await logAgentActivity('Local Coder · Telefon','Hata',error.message||'Yerel model hatası');
+    showToast('Telefon içi Local Coder başarısız.');
+  }finally{busy=false;$('localCoderRun').disabled=false;$('localCoderRun').textContent='Yerel ajan zincirini çalıştır';}
+}
 async function runLocalCoderWorkshop(){
+  if(settings.localCoderEngine==='device')return runDeviceLocalCoderWorkshop();
+  return runLocalCoderWorkshopOllama();
+}
+
+async function runLocalCoderWorkshopOllama(){
  if(busy){showToast('Başka bir ajan zinciri çalışıyor.');return;}const task=$('localCoderTask').value.trim();if(!task){showToast('Önce Local Coder görevini yaz.');return;}if(!settings.ollamaUrl){showToast('Önce Modeller ekranından Ollama adresini ayarla.');go('models');return;}
  const sourceCode=$('localCoderUseCode').checked?$('codePad').value.slice(0,10000):'';const stages=buildLocalCoderStages({task,language:$('codeLanguage').value,sourceCode});let previous='';busy=true;$('localCoderRun').disabled=true;$('localCoderRun').textContent='Yerel ajan çalışıyor…';$('localCoderStatus').textContent='Ollama modeline bağlanılıyor; küçük bilgisayarda yanıt yavaş gelebilir.';$('localCoderReview').value='';$('localCoderOutput').value='';
  try{await logAgentActivity('Local Coder','Başladı',task);for(const stage of stages){$('localCoderStatus').textContent=stage.title+' çalışıyor…';await logAgentActivity(stage.title,'Çalışıyor',task);const basePrompt=stage.makePrompt?stage.makePrompt(previous):stage.prompt;const skillContext=currentSkillContext(stage.id);const prompt=basePrompt+(skillContext.promptText?'\n\n'+skillContext.promptText:'');const answer=await callProvider('ollama',prompt,[]);if(stage.id==='code')$('localCoderOutput').value=extractCodeArtifact(answer);if(stage.id==='review')$('localCoderReview').value=answer;previous=answer;await logAgentActivity(stage.title,'Tamamlandı',answer.slice(0,220));} $('localCoderStatus').textContent='Zincir bitti. Taslağı gözden geçir; otomatik test çalıştırılmadı.';await logAgentActivity('Local Coder','Tamamlandı','Kod taslağı ve inceleme notları hazır; dosyalar otomatik değiştirilmedi.');showToast('Local Coder tamamlandı. Taslağı inceleyip gerekirse Kod Alanı’na aktar.');}
@@ -592,8 +758,8 @@ async function revokeSharedVaultAgent(id) {
 function getSelectedSkills(){
   return skillLibrary.filter(skill=>selectedSkillIds.includes(skill.id)).slice(0,MAX_SELECTED_SKILLS);
 }
-function currentSkillContext(stageId){
-  return buildStageSkillContext(getSelectedSkills(),stageId,{maxSkills:MAX_SELECTED_SKILLS,maxChars:MAX_STAGE_SKILL_CHARS});
+function currentSkillContext(stageId,maxChars=MAX_STAGE_SKILL_CHARS){
+  return buildStageSkillContext(getSelectedSkills(),stageId,{maxSkills:MAX_SELECTED_SKILLS,maxChars:Math.min(MAX_STAGE_SKILL_CHARS,Math.max(0,Number(maxChars)||0))});
 }
 async function persistSkillState(){
   await setPref(DB.skills,{customSkills,selectedSkillIds:selectedSkillIds.slice(0,MAX_SELECTED_SKILLS),profileId:skillProfileId});
@@ -644,7 +810,7 @@ function updateDashboard(){const connected=Object.keys(providers).filter(id=>id=
 }
 async function exportProjects(){downloadText('ai-studio-projects.json',JSON.stringify({format:'ai-studio-projects-v2',exportedAt:new Date().toISOString(),projects:projectList},null,2),'application/json;charset=utf-8');}
 function buildWorkspaceSnapshot(){
-  return {format:'ai-studio-workspace-v1',exportedAt:new Date().toISOString(),settings:{demoMode:settings.demoMode,models:settings.models,team:settings.team,ollamaUrl:settings.ollamaUrl,ollamaModel:settings.ollamaModel,systemPrompt:settings.systemPrompt,shareReusableContext:settings.shareReusableContext===true,shareVaultContext:settings.shareVaultContext===true,vaultBaseUrl:settings.vaultBaseUrl||''},projects:projectList,activeProjectId,chat:chatHistory,plugins:userPlugins.filter(p=>p.kind!=='builtin').map(p=>({name:p.name,prompt:p.prompt})),skills:{customSkills,selectedSkillIds,profileId:skillProfileId},snippets:reusableSnippets,activity:agentActivity,codeFiles,activeCodeFileId};
+  return {format:'ai-studio-workspace-v1',exportedAt:new Date().toISOString(),settings:{demoMode:settings.demoMode,models:settings.models,team:settings.team,ollamaUrl:settings.ollamaUrl,ollamaModel:settings.ollamaModel,localCoderEngine:settings.localCoderEngine==='device'?'device':'ollama',systemPrompt:settings.systemPrompt,shareReusableContext:settings.shareReusableContext===true,shareVaultContext:settings.shareVaultContext===true,vaultBaseUrl:settings.vaultBaseUrl||''},projects:projectList,activeProjectId,chat:chatHistory,plugins:userPlugins.filter(p=>p.kind!=='builtin').map(p=>({name:p.name,prompt:p.prompt})),skills:{customSkills,selectedSkillIds,profileId:skillProfileId},snippets:reusableSnippets,activity:agentActivity,codeFiles,activeCodeFileId};
 }
 async function exportWorkspace(){
   await saveCurrentCodeFile(false);
@@ -690,6 +856,7 @@ async function importWorkspace(file){
     nextSettings.team=(Array.isArray(nextSettings.team)?nextSettings.team:defaultSettings.team).filter(id=>providers[id]).slice(0,4);
     nextSettings.ollamaUrl=typeof nextSettings.ollamaUrl==='string'?nextSettings.ollamaUrl.slice(0,500):'';
     nextSettings.ollamaModel=typeof nextSettings.ollamaModel==='string'?nextSettings.ollamaModel.slice(0,140):providers.ollama.model;
+    nextSettings.localCoderEngine=nextSettings.localCoderEngine==='device'?'device':'ollama';
     nextSettings.vaultBaseUrl=typeof nextSettings.vaultBaseUrl==='string'?nextSettings.vaultBaseUrl.slice(0,500):'';
     nextSettings.shareVaultContext=nextSettings.shareVaultContext===true;
     nextSettings.systemPrompt=typeof nextSettings.systemPrompt==='string'?nextSettings.systemPrompt.slice(0,6000):defaultSettings.systemPrompt;
@@ -805,6 +972,13 @@ $('importWorkspaceBtn').addEventListener('click',()=> $('importWorkspaceFile').c
 $('importWorkspaceFile').addEventListener('change',async e=>{if(e.target.files?.[0])await importWorkspace(e.target.files[0]);e.target.value='';});
 $('resetLocal').addEventListener('click',clearAllLocal);
 $('localCoderRun').addEventListener('click',runLocalCoderWorkshop);
+$('localCoderEngine').addEventListener('change',async e=>{settings.localCoderEngine=e.target.value==='device'?'device':'ollama';await setPref(DB.settings,settings);syncLocalCoderEngineUI();$('localCoderStatus').textContent=settings.localCoderEngine==='device'?'Telefon içi GGUF motoru seçildi.':'Mevcut PC / Ollama motoru seçildi.';});
+$('onDeviceModelCatalog').addEventListener('change',renderDeviceModelDescription);
+$('downloadOnDeviceModel').addEventListener('click',downloadSelectedDeviceModel);
+$('refreshDeviceLocalModels').addEventListener('click',()=>refreshDeviceLocalModels());
+$('loadOnDeviceModel').addEventListener('click',loadSelectedDeviceModel);
+$('unloadOnDeviceModel').addEventListener('click',unloadDeviceModel);
+$('deleteOnDeviceModel').addEventListener('click',deleteSelectedDeviceModel);
 $('localCoderApply').addEventListener('click',applyLocalCoderDraft);
 $('localCoderDownload').addEventListener('click',downloadLocalCoderDraft);
 $('localCoderSaveSnippet').addEventListener('click',saveLocalCoderDraft);
@@ -866,11 +1040,12 @@ async function prepareBrowserFeatures(){
   }catch(_){}
 }
 async function init(){
-  try{settings={...clone(defaultSettings),...(await getPref(DB.settings,{}))};settings.models={...clone(defaultSettings.models),...(settings.models||{})};settings.team=(settings.team||defaultSettings.team).filter(id=>providers[id]).slice(0,4);settings.vaultBaseUrl=typeof settings.vaultBaseUrl==='string'?settings.vaultBaseUrl.slice(0,500):'';if(settings.ollamaUrl==='http://192.168.1.100:11434')settings.ollamaUrl='';}catch(_){}
+  try{settings={...clone(defaultSettings),...(await getPref(DB.settings,{}))};settings.models={...clone(defaultSettings.models),...(settings.models||{})};settings.team=(settings.team||defaultSettings.team).filter(id=>providers[id]).slice(0,4);settings.vaultBaseUrl=typeof settings.vaultBaseUrl==='string'?settings.vaultBaseUrl.slice(0,500):'';settings.localCoderEngine=settings.localCoderEngine==='device'?'device':'ollama';if(settings.ollamaUrl==='http://192.168.1.100:11434')settings.ollamaUrl='';}catch(_){}
   if(!nativeApp){showToast('Tarayıcıda API anahtarları yalnızca açık oturumda tutulur.');}
   await initKeys(); projectList=await getPref(DB.projects,[]);activeProjectId=await getPref(DB.activeProject,'');chatHistory=await getPref(DB.chat,[]);userPlugins=await getPref(DB.plugins,[]);const storedSkills=await getPref(DB.skills,{});customSkills=(Array.isArray(storedSkills?.customSkills)?storedSkills.customSkills:[]).map(skill=>normalizeSkill(skill)).filter(Boolean).slice(-100);skillLibrary=[...SKILL_CATALOG,...customSkills];skillProfileId=storedSkills?.profileId==='custom'?'custom':(SKILL_PROFILES[storedSkills?.profileId]?storedSkills.profileId:'karpathy');const validSkillIds=new Set(skillLibrary.map(skill=>skill.id));selectedSkillIds=(Array.isArray(storedSkills?.selectedSkillIds)?storedSkills.selectedSkillIds:[]).filter(id=>validSkillIds.has(id)).slice(0,MAX_SELECTED_SKILLS);if(!selectedSkillIds.length)selectedSkillIds=getProfileSkillIds(skillProfileId);reusableSnippets=await getPref(DB.snippets,[]);agentActivity=await getPref(DB.activity,[]);codeFiles=normalizeCodeFileList(await getPref(DB.codeFiles,[]),true);if(!codeFiles.length)codeFiles=[makeCodeFile()];activeCodeFileId=codeFiles[0].id;await setPref(DB.codeFiles,codeFiles);
   if(!Array.isArray(projectList))projectList=[];if(!projectList.some(p=>p&&p.id===activeProjectId))activeProjectId=projectList[0]?.id||'';await setPref(DB.activeProject,activeProjectId);if(!Array.isArray(chatHistory))chatHistory=[];if(!Array.isArray(userPlugins))userPlugins=[];if(!Array.isArray(reusableSnippets))reusableSnippets=[];if(!Array.isArray(agentActivity))agentActivity=[];
   renderProviderCards();renderProjects();renderChat();renderBuiltinTools();renderPlugins();renderSkillLibrary();renderReuseCatalog();renderSnippetVault();renderAgentActivity();loadActiveCodeFile();syncModeUI();updateDashboard();$('compareSelectionCount').textContent=settings.team.length+' ajan seçili';
+  syncLocalCoderEngineUI();await refreshDeviceLocalModels(true);
   if(!nativeApp){$('nativeVaultPanel')?.classList.add('hidden');await loadSharedVault({quiet:true});}else{$('sharedVaultPanel')?.classList.add('hidden');$('nativeVaultPanel')?.classList.remove('hidden');await loadNativeVault({quiet:true});}
 }
 prepareBrowserFeatures().then(init).catch(()=>showToast('Başlangıç ayarları okunamadı; sayfayı yenileyebilirsin.'));

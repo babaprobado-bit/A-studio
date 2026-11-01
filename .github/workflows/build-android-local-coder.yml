@@ -1,0 +1,89 @@
+name: Build Android APK with on-device Local Coder
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/device-local-coder.js'
+      - 'android-local-runtime/**'
+      - 'scripts/patch-android-local-runtime.py'
+      - '.github/workflows/build-android-local-coder.yml'
+      - 'src/main.js'
+      - 'index.html'
+      - 'src/skill-library.js'
+      - 'package.json'
+
+permissions:
+  contents: read
+
+jobs:
+  build-local-coder-apk:
+    name: Build AI Studio 1.1 Android APK (GGUF / llama.cpp)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 100
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Install native build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake ninja-build glslc patch python3
+          yes | sdkmanager --licenses
+          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0" "ndk;27.2.12479018" "cmake;3.22.1"
+      - name: Fetch pinned llama.kt engine
+        run: |
+          mkdir -p libs
+          git clone https://github.com/tensai-app/llama.kt libs/llama.kt
+          git -C libs/llama.kt checkout 1cbaffa1986b5a339482b33da4f7cd91db94e7e8
+          git -C libs/llama.kt submodule update --init --recursive
+      - name: Prepare llama.cpp Android sources
+        run: |
+          bash libs/llama.kt/scripts/bootstrap.sh
+          bash libs/llama.kt/scripts/build-opencl.sh
+      - name: Install AI Studio dependencies
+        run: npm install --no-audit --no-fund
+      - name: Run existing and new regression checks
+        run: |
+          npm run test:workshop
+          npm run test:site
+          npm run test:skills
+          npm run test:device-local-coder
+      - name: Build web assets
+        run: npm run build
+      - name: Generate Capacitor Android project
+        run: npx cap add android
+      - name: Preserve trusted-LAN Ollama HTTP and set native bridge
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("android/app/src/main/AndroidManifest.xml")
+          s = p.read_text()
+          if 'android:usesCleartextTraffic="true"' not in s:
+              s = s.replace('<application', '<application android:usesCleartextTraffic="true"', 1)
+          p.write_text(s)
+          PY
+          python3 scripts/patch-android-local-runtime.py "$PWD"
+      - name: Sync Capacitor Android project
+        run: npx cap sync android
+      - name: Build debug APK
+        working-directory: android
+        run: chmod +x gradlew && ./gradlew --no-daemon assembleDebug
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: AI-Studio-Alpha-1.1-OnDevice-LocalCoder-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14

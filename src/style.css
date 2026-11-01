@@ -4,3 +4,7 @@
 
 /* Skill Library: additive, responsive text-only instruction manager */
 .skill-library-panel{margin-top:18px}.skill-library-list{display:grid;gap:16px;margin-top:12px}.skill-group h3{display:flex;align-items:center;gap:8px;margin:0 0 8px;font-size:14px}.skill-group h3 small{color:var(--muted);font-weight:500}.skill-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px}.skill-item{display:flex;align-items:flex-start;gap:9px;padding:10px;border:1px solid var(--line);border-radius:12px;background:var(--panel);cursor:pointer;min-width:0}.skill-item input{margin-top:3px;accent-color:var(--violet)}.skill-item span{display:grid;gap:4px;min-width:0}.skill-item strong{font-size:13px;overflow-wrap:anywhere}.skill-item small,.skill-item em{font-size:11px;color:var(--muted);font-style:normal}.skill-import-row{display:flex;align-items:center;gap:12px;padding-top:14px;margin-top:14px;border-top:1px solid var(--line)}.skill-import-row p{margin:4px 0 0}@media(max-width:520px){.skill-grid{grid-template-columns:1fr}.skill-import-row{align-items:flex-start;flex-wrap:wrap}}
+
+
+/* AI Studio 1.1 on-device model manager */
+.device-local-model-panel{margin:14px 0}.device-profile{padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--panel);font-size:12px;color:var(--muted);display:grid;gap:5px}.device-profile strong{color:var(--text)}.device-local-model-panel .row-actions{flex-wrap:wrap}.device-local-model-panel .field-label{margin-top:10px}

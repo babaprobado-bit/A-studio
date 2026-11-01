@@ -147,3 +147,14 @@ The Android app has a mobile connection panel in Tools. Create an agent token in
 - Each Local Coder stage receives no more than 36,000 characters of selected Skill context. Existing Ollama flow remains unchanged when no Skills are selected.
 - Skill selections and custom Skill text are included in standard/encrypted workspace backups. Existing backups without a `skills` field remain compatible. Provider API keys and vault tokens stay excluded.
 - This is an instruction catalog, not yet an executable plugin/MCP runtime. True on-device model inference remains a separate Android native-runtime milestone.
+
+
+## Workspace 1.1 — on-device offline Local Coder
+
+- Android APK can include a CPU-first GGUF inference bridge based on the pinned `tensai-app/llama.kt` engine. The optional runtime targets Android 10+ (`minSdk 29`) and `arm64-v8a`; devices outside that target keep the existing PC/Ollama and API-key workflows.
+- The optional Android build workflow downloads and builds the native llama.cpp/llama.kt engine during CI. Model weights are **not bundled in the APK**. A user downloads one of the catalogued Qwen2.5-Coder GGUF files separately; after that download, local inference does not require internet or an API key.
+- The first model download does require internet. Downloads use Android DownloadManager and are Wi-Fi-only by default. Model files are stored in the app's private external-files directory and can be deleted from the model manager.
+- Model choice uses device RAM and free storage as rough guidance. Actual loadability, speed and usable context vary by phone. Start with the 0.5B quantized model; do not assume a larger model will fit merely because its file downloaded.
+- The original PC/Ollama flow stays available and remains the default. OpenAI, Claude, Gemini, DeepSeek, Groq and OpenRouter API-key providers remain available in the existing chat and comparison flows.
+- On-device Local Coder still runs a user-started Plan → Code → Review flow; code is shown for review and is not automatically executed or written to arbitrary files. Existing Skill context is injected per stage, but on-device prompts are trimmed to fit the chosen model context window.
+- This runtime has not been declared supported for 32-bit Android, iOS, or browser-only PWA. The separate workflow builds a debug APK; successful CI build and real-device testing are still required before treating the native inference bridge as release-ready.

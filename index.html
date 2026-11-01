@@ -103,7 +103,25 @@
 
       <section class="screen" id="tools">
         <div class="page-title"><div class="eyebrow">TOOLBOX / PROMPT PLUGINS</div><h1>Araçlar ve eklentiler</h1><p>Hazır görev şablonları kullan, kendi prompt eklentilerini oluştur veya kod parçalarını dışa aktar.</p></div>
-        <div class="section-head"><div><div class="eyebrow">LOCAL CODER / OFFLINE WORKFLOW</div><h2>Local Coder atölyesi</h2></div><span class="pill">Ollama</span></div>
+        <div class="section-head"><div><div class="eyebrow">LOCAL CODER / OFFLINE WORKFLOW</div><h2>Local Coder atölyesi</h2></div><span class="pill">PC + Telefon</span></div>
+        <label class="field-label" for="localCoderEngine">Çalışma motoru</label>
+        <select class="input" id="localCoderEngine"><option value="ollama">PC / Ollama · Mevcut bağlantı</option><option value="device">Telefon içi GGUF · Çevrimdışı</option></select>
+        <p class="fineprint">API anahtarlı sağlayıcılar Takım Sohbeti ve Karşılaştırma bölümünde korunur. Telefon içi model, ilk indirmeden sonra internet kullanmadan çıkarım yapar.</p>
+        <div class="panel device-local-model-panel hidden" id="deviceLocalModelsPanel">
+  <div class="section-head"><div><div class="eyebrow">ON-DEVICE GGUF</div><h3>Telefon içi model yöneticisi</h3></div><span class="pill">İnternetsiz çıkarım</span></div>
+  <p class="muted">Modeli ilk kez indirmek için internet gerekir. İndirme tamamlandıktan sonra model telefonda saklanır ve çıkarım sırasında API anahtarı veya internet kullanmaz.</p>
+  <div id="deviceLocalProfile" class="device-profile">Telefon bilgileri okunuyor…</div>
+  <label class="field-label" for="onDeviceModelCatalog">İndirilecek model</label>
+  <select id="onDeviceModelCatalog" class="input"></select>
+  <p id="onDeviceModelDescription" class="fineprint"></p>
+  <div class="row-actions"><button id="downloadOnDeviceModel" class="btn primary" type="button">Modeli indir</button><button id="refreshDeviceLocalModels" class="btn ghost small" type="button">Yenile</button></div>
+  <label class="field-label" for="installedLocalModel">Telefona indirilmiş modeller</label>
+  <select id="installedLocalModel" class="input"><option value="">Henüz model yok</option></select>
+  <label class="field-label" for="onDeviceContextSize">Bağlam boyutu</label>
+  <select id="onDeviceContextSize" class="input"><option value="1024">1024 · En az bellek</option><option value="2048" selected>2048 · Önerilen</option><option value="4096">4096 · Daha fazla bellek</option></select>
+  <div class="row-actions"><button id="loadOnDeviceModel" class="btn secondary" type="button">Belleğe yükle</button><button id="unloadOnDeviceModel" class="btn ghost small" type="button">Bellekten kapat</button><button id="deleteOnDeviceModel" class="btn ghost small danger-text" type="button">Modeli sil</button></div>
+  <p id="onDeviceModelStatus" class="fineprint" role="status">Cihaz bilgileri okunuyor…</p>
+</div>
         <div class="panel">
           <p class="muted">Planla → kod taslağı üret → incele. Modelin Ollama ile bu cihazda veya güvendiğin yerel ağdaki bilgisayarda çalışıyor olmalı.</p>
           <div class="notice compact"><strong>Gerçek durum:</strong> Model APK’ya veya siteye gömülü değil. Bu araç dosyaları otomatik yazmaz, kodu çalıştırmaz; taslağı gösterir ve sen onaylayınca Kod Alanı’na aktarır. HTTPS web sitesi yerel HTTP Ollama bağlantısını tarayıcı güvenlik kuralları nedeniyle engelleyebilir.</div>

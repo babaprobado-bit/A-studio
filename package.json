@@ -12,7 +12,8 @@
     "start": "node server/server.js",
     "test:site": "node server/smoke-test.js",
     "test:workshop": "node server/workshop-smoke-test.js",
-    "test:skills": "node scripts/test-skills.mjs"
+    "test:skills": "node scripts/test-skills.mjs",
+    "test:device-local-coder": "node scripts/test-device-local-coder.mjs"
   },
   "dependencies": {
     "express": "^5.1.0",
