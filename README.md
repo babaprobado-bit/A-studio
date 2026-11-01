@@ -1,36 +1,91 @@
-# AI Studio Alpha 1 — Mobile + Private Web Workspace 0.9
+# AI Studio Alpha 1.1 — Android + Private Web Workspace
 
-This mobile Android build includes:
-- Real API calls for OpenAI-compatible chat providers, Anthropic Messages, Google Gemini generateContent, and Ollama chat.
-- Encrypted Android API-key storage using Android Keystore-backed secure storage (web preview never persists API keys).
-- Demo mode enabled by default to avoid accidental API charges.
-- Multi-provider chat and comparison; parallel team runs and a sequential agent pipeline explicitly confirm when they may make multiple paid requests. Each sequential stage sees the prior stage's output.
-- Ollama endpoint settings for a model hosted on another computer in the same trusted network. No language model is bundled inside this APK.
-- Local project notes with JSON backup/import, chat export, custom prompt plugins with JSON import/export, workflow templates, and a code scratchpad.
+AI Studio Alpha 1 is an Android-first workspace for multi-provider AI coding workflows. The current development branch adds a Skill Library and three Local Coder engine choices while preserving existing project/chat/editor/backup/vault features.
+
+## Current Local Coder modes
+
+- **PC / Ollama (default):** connects to a model running on another computer in a trusted local network. It is not phone-local inference.
+- **Phone / GGUF (native Android build):** a native llama.kt/llama.cpp bridge is in the feature branch. It targets Android 10+ and arm64-v8a. Model weights are downloaded separately; the first download requires internet, while inference after download is intended to run locally without network/API keys. Do not call it supported until native APK build and real-device tests pass.
+- **Cloud API:** Local Coder can use existing OpenAI, Claude, Gemini, DeepSeek, Groq or OpenRouter adapter. One Plan → Code → Review run sends three provider requests and requires explicit confirmation; quotas/charges may apply.
+
+## Skill Library
+
+- 38 original AI Studio starter instructions: 15 Superpowers-inspired, 22 Caveman-style and one Karpathy-inspired coding guideline summary.
+- Profiles, up to eight selected Skills and up to 36,000 Skill-context characters per stage.
+- Custom SKILL.md import as plain text. Imported Markdown is not executed as code.
+- These are AI Studio-authored prompts, not official upstream Skill files or verbatim reproductions. See src/skill-library.js.
+
+## Existing workspace features
+
+- Real provider adapters for OpenAI, Anthropic, Google Gemini, DeepSeek, Groq, OpenRouter and Ollama.
+- Encrypted Android API-key storage through Android secure storage. Browser preview holds keys in memory only.
+- Demo mode enabled by default. Multi-provider/team runs that may make paid requests require confirmation.
+- Parallel team requests and sequential text pipelines.
+- Local project notes, chat history, shared project context and opt-in selected code/snippet context.
+- Multi-file code workspace; up to 100 files and 100 KB per file.
+- Snippet Vault, source/license notes, reusable code catalog, activity history.
+- Standard JSON workspace backup and encrypted backup (AES-256-GCM; PBKDF2-SHA-256, 250,000 iterations). Provider API keys and vault tokens are excluded.
+- Password-gated private web workspace and optional encrypted-at-rest shared vault. The shared vault is not end-to-end encrypted.
 
 ## Build Android APK
-GitHub Actions → **Build Android Demo APK** → **Run workflow** on `main`. Download the `AI-Studio-Alpha-1-Demo-APK` artifact and extract `app-debug.apk`.
 
-## Provider notes
-Provider endpoints and default model IDs can change. Model IDs are editable in Settings. Requests are sent directly from the app to the chosen provider; the provider receives the prompt/context you submit. Configure API keys only on your own device. Key storage is encrypted at rest on Android but cannot protect secrets on a compromised/rooted device. API calls may incur provider charges.
+Regular debug APK:
+1. GitHub Actions → Build Android Demo APK → Run workflow.
+2. Download artifact AI-Studio-Alpha-1-Demo-APK.
+3. Extract app-debug.apk.
 
-## Local models
-Ollama is a connection to a model running on another computer, not an on-device model. Use only a trusted local network when HTTP is enabled. This app does not install Ollama or download a model.
+Native GGUF debug APK:
+1. Use separate workflow Build Android APK with on-device Local Coder.
+2. Download artifact AI-Studio-Alpha-1.1-OnDevice-LocalCoder-APK only after workflow completes successfully.
+3. That artifact targets Android 10+ / arm64 devices. Model weights are not bundled; download a supported GGUF model through the in-app model manager.
 
-## Security boundaries
-API keys are never written to GitHub or included in the source. Browser preview stores keys only in memory, not localStorage. Project/chat backups do not contain provider keys. This standalone mobile workspace does not bundle the desktop LocalCoder/AirLLM runtime or video render engine.
+Repository does not commit generated android/ project. GitHub Actions creates it with npx cap add android, configures native bridge, syncs Capacitor and runs Gradle. Workflows produce debug builds, not signed store releases.
 
+## Tests
 
-## Mobile Workspace 0.3 notes
-- Updated provider request compatibility for OpenAI-style calls and Anthropic direct-client requests. Providers can change API behavior; always check their current docs and model IDs.
-- The default Ollama address is intentionally blank so a placeholder IP is not mistaken for a working connection. Enter the computer's actual trusted-LAN address.
-- The sequential agent chain is an orchestration feature, not an autonomous computer operator: it does not run shell commands, edit arbitrary files on the PC, or claim tests passed unless a connected model reports them. Demo mode returns templates rather than model inference.
-- Prompt plugin import accepts JSON instructions only and does not execute imported code. Backups never include provider API keys.
+Run from repository root:
 
+    npm install --no-audit --no-fund
+    npm run build
+    npm run test:workshop
+    npm run test:site
+    npm run test:skills
+    npm run test:device-local-coder
 
-## Full workspace backup
-The one-file workspace backup includes local settings, projects, conversation history, and custom prompt instructions. Provider API keys are excluded. Restoring a backup replaces those local records after an explicit confirmation; existing provider secrets remain separate in Android secure storage.
+JavaScript tests and mock plugins do not prove Kotlin/NDK compilation or real phone-local inference. Check native Android workflow and test on a physical supported phone.
 
+## Four-conversation continuation plan
+
+The durable project memory and exact next prompts live here:
+
+- docs/HANDOFF/README.md — read first; repository/branch status and all four sessions.
+- docs/HANDOFF/PROJECT_STATE.md — architecture, source map, existing features, limits and security notes.
+- docs/HANDOFF/SESSION_1_NATIVE_APK.md — finish native build and obtain GGUF APK.
+- docs/HANDOFF/SESSION_2_DEVICE_TESTING.md — physical-phone and airplane-mode proof.
+- docs/HANDOFF/SESSION_3_SKILLS_AND_API.md — finish Skill profiles/import and API/Local Coder regression.
+- docs/HANDOFF/SESSION_4_REA_MCP_AND_RELEASE.md — optional REA/MCP and release/merge checklist.
+
+For a new chat, read the handoff files before editing. Continue on feature/android-offline-skills-v1, preserve existing functionality, and do not push directly to main.
+
+## Provider, network and privacy notes
+
+Provider model IDs/endpoints can change. Check provider documentation and prices before real calls. Prompts, selected project context, selected code/snippets and Skill instructions are sent to chosen cloud provider when API mode is used. Local GGUF inference is intended to stay on-device; initial model download uses internet. Use only trusted networks for plain-HTTP LAN Ollama. Current native workflow enables Android cleartext traffic for that compatibility; review security boundary before production release.
+
+API keys are never written to GitHub or included in backups. Configure keys only on your own device. Android Keystore-backed storage encrypts keys at rest but cannot protect a compromised/rooted device. Never add keys, vault tokens, SITE_PASSWORD, SESSION_SECRET, VAULT_ENCRYPTION_KEY, database credentials or signing material to source/docs/chat.
+
+## Private website / shared vault
+
+The same workspace can be served by the password-gated Node.js server. Configure HTTPS, a persistent database/disk where needed, and never put deployment secrets in this repository.
+
+The shared vault encrypts data at rest on server, but authorized server processes decrypt records to serve them; it is not end-to-end encryption. Do not put API keys or unnecessary personal data in it.
+
+## Honest feature boundaries
+
+Local Coder produces a code draft and review/test plan. It does not execute code, run arbitrary shell commands, edit arbitrary PC folders or claim tests passed when they were not run. Reuse catalog links to third-party projects/assets; it does not download/copy them automatically. Skills are text instructions, not executable plugins. REA/MCP remains a future optional companion integration, not a feature already present in the APK.
+
+---
+
+## Historical workspace notes
 
 ## Private website / browser version (0.4)
 The same responsive workspace can be served as a PWA from a password-gated Node.js server. The server requires `SITE_PASSWORD` (at least 12 characters) and `SESSION_SECRET` (at least 32 characters) at startup; it refuses to start if either is missing. The site password is checked server-side, the signed session cookie is HttpOnly, Secure in production, SameSite=Strict, and expires after 8 hours. Login attempts are rate-limited in memory. HTTPS must be enabled by the host.
