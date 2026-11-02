@@ -510,7 +510,7 @@ export async function prepareSkillImportQueue(fileList, existingSkills = []) {
 
   for (const file of files) {
     const fileName = typeof file?.name === 'string' ? file.name : '';
-    if (!/\\.md$/i.test(fileName)) {
+    if (!/\.md$/i.test(fileName)) {
       errors.push((fileName || 'Bilinmeyen dosya') + ': yalnızca .md dosyaları destekleniyor');
       continue;
     }
