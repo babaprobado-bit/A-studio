@@ -1,4 +1,5 @@
 export const MAX_SELECTED_SKILLS = 8;
+export const MAX_CUSTOM_SKILLS = 100;
 export const MAX_STAGE_SKILL_CHARS = 36000;
 export const MAX_IMPORTED_SKILL_CHARS = 12000;
 export const SKILL_CATALOG = Object.freeze([
@@ -494,6 +495,45 @@ export function parseSkillMarkdown(markdown, fileName = 'SKILL.md') {
     version: header.version || '',
     metadata
   });
+}
+
+
+/**
+ * Parse a multi-file .md selection into a review queue without saving it.
+ * Duplicate names are retained as separate entries and explicitly flagged.
+ */
+export async function prepareSkillImportQueue(fileList, existingSkills = []) {
+  const files = Array.from(fileList || []);
+  const existing = Array.isArray(existingSkills) ? existingSkills.filter(Boolean) : [];
+  const queue = [];
+  const errors = [];
+
+  for (const file of files) {
+    const fileName = typeof file?.name === 'string' ? file.name : '';
+    if (!/\\.md$/i.test(fileName)) {
+      errors.push((fileName || 'Bilinmeyen dosya') + ': yalnızca .md dosyaları destekleniyor');
+      continue;
+    }
+    if (existing.length + queue.length >= MAX_CUSTOM_SKILLS) {
+      errors.push(fileName + ': en fazla ' + MAX_CUSTOM_SKILLS + ' özel Skill saklanabilir');
+      continue;
+    }
+    try {
+      if (typeof file.text !== 'function') throw new Error('Dosya metni okunamadı.');
+      const parsed = parseSkillMarkdown(await file.text(), fileName);
+      const duplicateName = [...existing, ...queue.map(entry => entry.skill)]
+        .some(item => String(item.name || '').trim().toLowerCase() === parsed.name.trim().toLowerCase());
+      queue.push({
+        fileName,
+        skill: { ...parsed, group: 'Custom', builtIn: false },
+        duplicateName,
+        unsupportedStage: Boolean(parsed.metadata?.unsupported_stage)
+      });
+    } catch (error) {
+      errors.push(fileName + ': ' + (error?.message || 'okunamadı'));
+    }
+  }
+  return { queue, errors };
 }
 
 export function buildStageSkillContext(skills, stageId, limits = {}) {

@@ -8,7 +8,7 @@ import { reuseCatalog, buildLocalCoderStages, extractCodeArtifact, normalizeSnip
 import { buildSharedProjectContext } from './project-context.js';
 import { buildSharedVaultContext } from './shared-vault-context.js';
 import { encryptWorkspaceBackup, decryptWorkspaceBackup } from './encrypted-backup.js';
-import { SKILL_CATALOG, SKILL_PROFILES, parseSkillMarkdown, normalizeSkill, buildStageSkillContext, getProfileSkillIds, createSkillBackupState, restoreSkillBackupState, MAX_SELECTED_SKILLS, MAX_STAGE_SKILL_CHARS } from './skill-library.js';
+import { SKILL_CATALOG, SKILL_PROFILES, parseSkillMarkdown, normalizeSkill, prepareSkillImportQueue, buildStageSkillContext, getProfileSkillIds, createSkillBackupState, restoreSkillBackupState, MAX_SELECTED_SKILLS, MAX_CUSTOM_SKILLS, MAX_STAGE_SKILL_CHARS } from './skill-library.js';
 
 const $ = (id) => document.getElementById(id);
 const DB = {
@@ -934,36 +934,11 @@ function renderSkillImportPreview() {
 }
 
 async function importSkillFiles(fileList) {
-  const files = Array.from(fileList || []);
-  const queue = [];
-  const errors = [];
-  for (const file of files) {
-    if (!/\.md$/i.test(file.name)) {
-      errors.push(file.name + ': yalnızca .md dosyaları destekleniyor');
-      continue;
-    }
-    if (customSkills.length + queue.length >= 100) {
-      errors.push(file.name + ': en fazla 100 özel Skill saklanabilir');
-      continue;
-    }
-    try {
-      const parsed = parseSkillMarkdown(await file.text(), file.name);
-      const duplicateName = [...customSkills, ...queue.map(entry => entry.skill)]
-        .some(existing => existing.name.trim().toLowerCase() === parsed.name.trim().toLowerCase());
-      queue.push({
-        fileName: file.name,
-        skill: { ...parsed, group: 'Custom', builtIn: false },
-        duplicateName,
-        unsupportedStage: Boolean(parsed.metadata?.unsupported_stage)
-      });
-    } catch (error) {
-      errors.push(file.name + ': ' + (error.message || 'okunamadı'));
-    }
-  }
-  pendingSkillImports = queue;
-  skillImportFailures = errors;
+  const result = await prepareSkillImportQueue(fileList, customSkills);
+  pendingSkillImports = result.queue;
+  skillImportFailures = result.errors;
   if (!pendingSkillImports.length) {
-    if (errors.length) showToast('Skill içe aktarılamadı: ' + errors.slice(0, 3).join(' · '));
+    if (skillImportFailures.length) showToast('Skill içe aktarılamadı: ' + skillImportFailures.slice(0, 3).join(' · '));
     return;
   }
   renderSkillImportPreview();
@@ -981,7 +956,7 @@ function nextSkillImportId(item) {
 async function acceptSkillImport() {
   const entry = pendingSkillImports.shift();
   if (!entry) return;
-  if (customSkills.length >= 100) {
+  if (customSkills.length >= MAX_CUSTOM_SKILLS) {
     skillImportFailures.push(entry.fileName + ': özel Skill sınırı dolu');
     renderSkillImportPreview();
     return;

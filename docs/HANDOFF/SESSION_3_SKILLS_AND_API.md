@@ -9,7 +9,7 @@ Finish the Skills system and add regression coverage for the three Local Coder r
 - 38 original AI Studio starter instructions: 15 Superpowers-inspired, 22 Caveman-style and one AI Studio-authored Karpathy-inspired guideline summary.
 - Legacy profile IDs are preserved: `karpathy`, `superpowers`, `caveman`, `balanced`. Added `superpowers-development`, `planning`, `review`, `caveman-short`. The `custom` selector is manual selection, not a preset.
 - Maximum eight selected Skills; strict 36,000-character stage context budget including wrappers and inter-Skill separators.
-- Markdown import accepts `.md`, shows a preview before save, supports simple bounded scalar front matter (`name`, `description`, `stage`, `source`, `source_url`, `license`, `author`, `version`), and retains unknown scalar metadata. Multiline YAML/list front matter is not supported.
+- Markdown import accepts `.md`, prepares multi-file import queues, shows a preview before saving each file, flags duplicate names, supports BOM/CRLF input and simple bounded scalar front matter (`name`, `description`, `stage`, `source`, `source_url`, `license`, `author`, `version`), and retains unknown scalar metadata. Multiline YAML/list front matter is not supported.
 - Duplicate names are allowed but warned about; each file is saved as a separate Skill with a generated ID. Multiple files are processed one at a time. Malformed front matter, empty content and oversized files are rejected.
 - Imported Markdown is untrusted text and is never executed.
 - Limits: 50 KB input file, 12,000 chars per Skill body, 100 custom Skills, eight selected Skills.
@@ -43,7 +43,7 @@ Finish the Skills system and add regression coverage for the three Local Coder r
 ## Remaining work
 
 - [ ] Manually verify the duplicate-name and multi-file import preview UI on a browser/phone.
-- [ ] Consider BOM and CRLF Markdown parser fixtures.
+- [x] Add automated BOM, CRLF, multi-file queue, duplicate-name warning, invalid-extension, malformed-file and 100-Skill limit tests.
 - [ ] Run the full three-engine regression on a real capable PC/phone when available; native phone testing is tracked in Session 2.
 - [ ] Re-check the native build on the latest branch head and update the handoff with its final artifact status.
 - [ ] Do not start REA/MCP here; Session 4 owns that work.

@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import {
   SKILL_CATALOG, SKILL_PROFILES, MAX_SELECTED_SKILLS, MAX_STAGE_SKILL_CHARS,
   parseSkillMarkdown, normalizeSkill, buildStageSkillContext, getProfileSkillIds,
-  createSkillBackupState, restoreSkillBackupState
+  createSkillBackupState, restoreSkillBackupState,
+  prepareSkillImportQueue
 } from '../src/skill-library.js';
 import { encryptWorkspaceBackup, decryptWorkspaceBackup } from '../src/encrypted-backup.js';
 import { webcrypto } from 'node:crypto';
@@ -31,6 +32,48 @@ assert.equal(parsed.sourceUrl, 'https://example.com/skill');
 assert.equal(parsed.author, 'Example Author');
 assert.equal(parsed.version, '1.2');
 assert.equal(parsed.metadata.category, 'testing');
+
+
+const bomSkill = parseSkillMarkdown(
+  '\uFEFF---\r\nname: BOM Skill\r\nstage: review\r\nlicense: MIT\r\n---\r\n# BOM Skill\r\nReview with care.',
+  'bom-skill.md'
+);
+assert.equal(bomSkill.name, 'BOM Skill');
+assert.equal(bomSkill.stage, 'review');
+assert.equal(bomSkill.license, 'MIT');
+assert.equal(bomSkill.content, 'Review with care.');
+
+const crlfSkill = parseSkillMarkdown(
+  '---\r\nname: CRLF Skill\r\ndescription: Windows line endings\r\nstage: plan\r\n---\r\n# CRLF Skill\r\nPlan in small steps.',
+  'crlf-skill.md'
+);
+assert.equal(crlfSkill.name, 'CRLF Skill');
+assert.equal(crlfSkill.description, 'Windows line endings');
+assert.equal(crlfSkill.content, 'Plan in small steps.');
+
+const fakeFile = (name, content) => ({ name, text: async () => content });
+const importQueue = await prepareSkillImportQueue([
+  fakeFile('first.md', '---\nname: Duplicate\n---\nFirst instructions.'),
+  fakeFile('second.MD', '---\nname: duplicate\n---\nSecond instructions.'),
+  fakeFile('not-a-skill.txt', 'ignored'),
+  fakeFile('broken.md', '---\nname: Broken\n# Missing delimiter'),
+  fakeFile('third.md', '# Third Skill\nThird instructions.')
+], [{ name: 'Duplicate' }]);
+assert.equal(importQueue.queue.length, 3);
+assert.equal(importQueue.queue[0].duplicateName, true, 'existing name collision must be flagged');
+assert.equal(importQueue.queue[1].duplicateName, true, 'queued file name collision must be flagged');
+assert.equal(importQueue.queue[2].skill.name, 'Third Skill');
+assert.equal(importQueue.errors.length, 2);
+assert.match(importQueue.errors[0], /yalnızca \.md/i);
+assert.match(importQueue.errors[1], /kapanmamış/i);
+
+const importLimit = await prepareSkillImportQueue([
+  fakeFile('one.md', '# One\nOne.'),
+  fakeFile('two.md', '# Two\nTwo.')
+], Array.from({ length: 99 }, (_, index) => ({ name: 'Existing ' + index })));
+assert.equal(importLimit.queue.length, 1, 'the import queue must respect the 100 custom Skill cap');
+assert.equal(importLimit.errors.length, 1);
+assert.match(importLimit.errors[0], /100/);
 
 const invalidStage = parseSkillMarkdown('---\nname: Fallback\nstage: unknown\ncustom_field: preserved\n---\nDo the work.', 'fallback.md');
 assert.equal(invalidStage.stage, 'all');
@@ -64,7 +107,7 @@ assert.ok(cap.charCount <= MAX_STAGE_SKILL_CHARS, 'separators and wrappers must 
 assert.ok(cap.includedIds.length <= MAX_SELECTED_SKILLS);
 assert.ok(cap.excludedIds.length > 0, 'overflow Skills must be reported as excluded');
 assert.equal(new Set(getProfileSkillIds('superpowers-development')).size, 8);
-console.log('Skill library tests passed.');
+console.log('Skill library tests passed, including BOM/CRLF and multi-file import queue checks.');
 
 const custom = normalizeSkill({
   id: 'custom-imported-skill', name: 'Imported Skill', description: 'Imported for backup coverage',
