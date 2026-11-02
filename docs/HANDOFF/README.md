@@ -1,8 +1,11 @@
-# AI Studio Alpha 1 — Four-session handoff
+# AI Studio — Four-session handoff
 
-Purpose: this is the durable project memory for continuing AI Studio Alpha 1 across four separate ChatGPT conversations. Read this file first, then PROJECT_STATE.md and the session brief for the current session.
+Purpose: this is the durable project memory for continuing AI Studio across four separate ChatGPT conversations. Read this file first, then PROJECT_STATE.md and the session brief for the current session.
 
 ## Current identity
+
+- Official product name: **AI Studio**. “Alpha 1” is an internal milestone label only, not part of the product name.
+- Android display name is AI Studio. The existing `com.aistudio.alpha1` application ID is a stable technical package identifier and is intentionally retained for update/data compatibility.
 
 - Repository: babaprobado-bit/A-studio
 - Default branch: main
@@ -30,7 +33,7 @@ Do not trust the status snapshot below without checking GitHub. CI can finish be
 
 | Chat | Scope | Must deliver before moving on |
 |---|---|---|
-| 1 | Finish the real Android native GGUF APK build. Fix Kotlin/Gradle/native bridge issues, run CI and inspect APK artifact. | Successful AI-Studio-Alpha-1.1-OnDevice-LocalCoder-APK artifact, or a precise documented blocker with logs and next fix. |
+| 1 | Finish the real Android native GGUF APK build. Fix Kotlin/Gradle/native bridge issues, run CI and inspect APK artifact. | Successful AI-Studio-1.1-OnDevice-LocalCoder-APK artifact, or a precise documented blocker with logs and next fix. |
 | 2 | Test the app on a real supported Android phone. Model download, load, inference, airplane-mode operation, memory/storage and error handling. | A device test report; confirm whether actual on-device offline inference works. |
 | 3 | Finish the Skill system and three Local Coder modes (Ollama, device GGUF, API). Fill profile/import/preview/license/compatibility gaps and add regression tests. | Complete, tested Skill and Local Coder behavior with docs updated. |
 | 4 | Design and implement optional REA/MCP companion integration, then full regression/security/release, PR review and merge decision. | REA integration plan or tested opt-in implementation, final test matrix, accurate release notes and explicit decision on PR #2. |

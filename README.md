@@ -1,6 +1,6 @@
-# AI Studio Alpha 1.1 — Android + Private Web Workspace
+# AI Studio — Android + Private Web Workspace
 
-AI Studio Alpha 1 is an Android-first workspace for multi-provider AI coding workflows. The current development branch adds a Skill Library and three Local Coder engine choices while preserving existing project/chat/editor/backup/vault features.
+AI Studio is an Android-first workspace for multi-provider AI coding workflows. The current development branch adds a Skill Library and three Local Coder engine choices while preserving existing project/chat/editor/backup/vault features. Alpha 1 is an internal development milestone label, not part of the product name.
 
 ## Current Local Coder modes
 
@@ -31,12 +31,12 @@ AI Studio Alpha 1 is an Android-first workspace for multi-provider AI coding wor
 
 Regular debug APK:
 1. GitHub Actions → Build Android Demo APK → Run workflow.
-2. Download artifact AI-Studio-Alpha-1-Demo-APK.
+2. Download artifact AI-Studio-Demo-APK.
 3. Extract app-debug.apk.
 
 Native GGUF debug APK:
 1. Use separate workflow Build Android APK with on-device Local Coder.
-2. Download artifact AI-Studio-Alpha-1.1-OnDevice-LocalCoder-APK only after workflow completes successfully.
+2. Download artifact AI-Studio-1.1-OnDevice-LocalCoder-APK only after workflow completes successfully.
 3. That artifact targets Android 10+ / arm64 devices. Model weights are not bundled; download a supported GGUF model through the in-app model manager.
 
 Repository does not commit generated android/ project. GitHub Actions creates it with npx cap add android, configures native bridge, syncs Capacitor and runs Gradle. Workflows produce debug builds, not signed store releases.

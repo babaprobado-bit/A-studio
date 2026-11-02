@@ -91,4 +91,4 @@ Do not use the regular demo APK for this test; it does not contain the native GG
 
 ## Copy-ready prompt for next conversation
 
-Continue AI Studio Alpha 1. Read docs/HANDOFF/README.md, PROJECT_STATE.md and SESSION_2_DEVICE_TESTING.md. First inspect latest native APK artifact and Session 1 build result. Test on a real Android 10+ arm64 device. Critical acceptance test: download Qwen2.5-Coder 0.5B once, switch to airplane mode, restart if possible, load it and run Local Coder entirely on-device. Distinguish JS mocks from real native-device results. Preserve API/Ollama/Skill/project functionality and write measurements/failures back to repo docs.
+Continue AI Studio. Read docs/HANDOFF/README.md, PROJECT_STATE.md and SESSION_2_DEVICE_TESTING.md. First inspect latest native APK artifact and Session 1 build result. Test on a real Android 10+ arm64 device. Critical acceptance test: download Qwen2.5-Coder 0.5B once, switch to airplane mode, restart if possible, load it and run Local Coder entirely on-device. Distinguish JS mocks from real native-device results. Preserve API/Ollama/Skill/project functionality and write measurements/failures back to repo docs.

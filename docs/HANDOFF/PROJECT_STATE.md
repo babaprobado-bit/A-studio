@@ -1,8 +1,10 @@
-# AI Studio Alpha 1 — Project state and technical handoff
+# AI Studio — Project state and technical handoff
 
 ## 1. Product goal
 
-AI Studio Alpha 1 is a lightweight Android-first workspace for coordinating AI coding assistants. It must support three Local Coder engines:
+**Product naming:** The product is named **AI Studio**. “Alpha 1” is a development-stage label only. The Android display name is AI Studio; the legacy application ID `com.aistudio.alpha1` remains unchanged to preserve package/update identity.
+
+AI Studio is a lightweight Android-first workspace for coordinating AI coding assistants. It must support three Local Coder engines:
 
 1. PC / Ollama — an Ollama endpoint on a separate computer in the trusted local network.
 2. Phone / GGUF — a real model loaded and executed inside Android through a native C++ inference runtime. It must work offline after model download.
@@ -93,7 +95,7 @@ The workflow currently:
 6. Generates Capacitor Android project.
 7. Adds trusted-LAN cleartext support and runs scripts/patch-android-local-runtime.py.
 8. Runs npx cap sync android, then Gradle assembleDebug.
-9. Uploads AI-Studio-Alpha-1.1-OnDevice-LocalCoder-APK for 14 days.
+9. Uploads AI-Studio-1.1-OnDevice-LocalCoder-APK for 14 days.
 
 Historical native run 41339891960 failed at `:app:compileDebugKotlin` with `LocalLlmPlugin.kt:40:53 — Unsupported escape sequence`. Root cause: the Kotlin source had one literal backslash before `.gguf`, creating invalid escape `\.`. Commit `ffc332eb9d21b616c3fcdb199b21dc6bf69dc1c8` fixed this using `[.]`.
 

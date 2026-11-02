@@ -1,8 +1,8 @@
-# New chat starter — AI Studio Alpha 1 / Session 2
+# New chat starter — AI Studio / Session 2
 
 ## Resume code
 
-`AI-STUDIO-ALPHA1-SESSION2-APK-READY`
+`AI-STUDIO-SESSION2-APK-READY`
 
 When opening a fresh ChatGPT conversation, paste the resume code and the prompt below. The code is a label for this exact handoff, not an API key or password.
 
@@ -26,9 +26,9 @@ In the ChatGPT Android app, tap **New chat** (the compose/plus icon or the New c
 ## Copy and paste this into the new chat
 
 ```text
-AI-STUDIO-ALPHA1-SESSION2-APK-READY
+AI-STUDIO-SESSION2-APK-READY
 
-Continue my existing AI Studio Alpha 1 project in GitHub repository babaprobado-bit/A-studio.
+Continue my existing AI Studio project in GitHub repository babaprobado-bit/A-studio.
 
 Before editing, read these repository files:
 1. docs/HANDOFF/README.md

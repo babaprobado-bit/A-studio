@@ -1,9 +1,9 @@
 {
-  "name": "ai-studio-alpha-1-mobile",
+  "name": "ai-studio-mobile",
   "version": "1.1.0",
   "private": true,
   "type": "module",
-  "description": "AI Studio Alpha 1 with multi-provider workspace, Local Coder, encrypted shared AI vault, PostgreSQL persistence, and agent REST API",
+  "description": "AI Studio with multi-provider workspace, Local Coder, encrypted shared AI vault, PostgreSQL persistence, and agent REST API",
   "engines": {
     "node": ">=20"
   },

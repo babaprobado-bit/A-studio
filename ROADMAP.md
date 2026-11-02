@@ -1,6 +1,6 @@
-# AI Studio Alpha 1 — Current feature status and next steps
+# AI Studio — Current feature status and next steps
 
-This document separates implemented source code from verified builds and physical-device tests. A button, prompt template, mocked test or source-only bridge is not proof of a working native feature.
+This document separates implemented source code from verified builds and physical-device tests. A button, prompt template, mocked test or source-only bridge is not proof of a working native feature. Product name: AI Studio. Alpha 1 is an internal milestone label only.
 
 ## Current development track
 
