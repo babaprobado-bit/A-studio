@@ -53,8 +53,12 @@ assert.equal(context.omittedByCount, true);
 
 const planOnly = buildStageSkillContext([{id: 'p', name: 'Plan', stage: 'plan', content: 'Plan carefully.'}], 'review');
 assert.equal(planOnly.includedIds.length, 0);
-const cap = buildStageSkillContext([{id: 'huge', name: 'Huge', stage: 'code', content: 'Z'.repeat(40000)}], 'code');
+const largeSkills = Array.from({length: 8}, (_, index) => ({
+  id: 'large-' + index, name: 'Large ' + index, stage: 'code', content: 'Z'.repeat(8000)
+}));
+const cap = buildStageSkillContext(largeSkills, 'code');
 assert.ok(cap.charCount <= MAX_STAGE_SKILL_CHARS);
-assert.ok(cap.excludedIds.includes('huge'));
+assert.ok(cap.includedIds.length <= MAX_SELECTED_SKILLS);
+assert.ok(cap.excludedIds.length > 0, 'overflow Skills must be reported as excluded');
 assert.equal(new Set(getProfileSkillIds('superpowers-development')).size, 8);
 console.log('Skill library tests passed.');
