@@ -57,12 +57,15 @@ Do not mix these scopes. If an earlier session finds a blocker, fix only what is
 
 ## Latest verified status — 2026-11-02
 
-- PR #2 is open and remains a draft; base is `main`, head is `feature/android-offline-skills-v1`. Do not merge yet.
-- Session 1 is complete: native GGUF workflow [41390410229](https://github.com/babaprobado-bit/A-studio/actions/runs/41390410229) succeeded on app-code commit `a30696ff29cdda2dfe43e27a77286e97be026914`.
-- Artifact `AI-Studio-Alpha-1.1-OnDevice-LocalCoder-APK` (ID `13117996643`) is downloadable from the workflow run page until `2026-11-16 05:04:48 UTC`. Artifact ZIP size: `18,129,889` bytes; SHA-256: `10c752445aa442a3e87e76041742cd469c3613f760985b40139a1d20e4070e94`.
-- The ZIP passed integrity inspection and contains `app-debug.apk` (54,453,328 bytes). This is a debug APK, not a signed production release.
-- No physical-phone installation or offline-inference test has been completed. Session 2 must test on a real Android 10+ / arm64-v8a phone. The separate GGUF model download requires internet once; offline inference must be proven after that download.
-- **Next session: Session 2 — physical-device install, model download/load, inference and airplane-mode verification.** Use `docs/HANDOFF/NEW_CHAT_STARTER.md` to open a fresh chat without losing context.
+- Official product name: **AI Studio**. “Alpha 1” is a milestone label, not the product name. Keep Android application ID `com.aistudio.alpha1` stable.
+- Current feature branch head: `c2417699cca0ec1381c6a41422f5b7d837c91f02`. `main` is unchanged.
+- PR #2 is open and remains a draft; base `main`, head `feature/android-offline-skills-v1`. Do not merge yet.
+- Hardware-aware GGUF model selection is implemented in source and tested by JS bridge tests. It inspects Android/ABI support, RAM, available RAM, low-memory state, CPU core count and storage; manual selection of 0.5B/1.5B/3B remains available. Thresholds are heuristics only.
+- Demo workflow [41472090928](https://github.com/babaprobado-bit/A-studio/actions/runs/41472090928) passed on `c2417699...` and produced `AI-Studio-Demo-APK` (artifact ID `13155362741`). This APK does not contain the native GGUF bridge and is not the Session 2 native test artifact.
+- Native GGUF workflow [41472242158](https://github.com/babaprobado-bit/A-studio/actions/runs/41472242158) is running for `c2417699...`. At last inspection it was still fetching the pinned llama.kt engine. Wait for a successful run and artifact upload before treating the current branch as having a fresh native APK.
+- Earlier native run [41459856700](https://github.com/babaprobado-bit/A-studio/actions/runs/41459856700) passed on `7341a83...` (the hardware-aware model-selection commit), but do not substitute that result for the current `c2417699...` run.
+- User reports a Redmi S12 and no current internet access. No physical-phone installation, separate GGUF download, on-device generation or airplane-mode test has been performed. Session 2 remains incomplete.
+- Use `docs/HANDOFF/SESSION_2_DEVICE_TESTING.md` and `docs/HANDOFF/NEW_CHAT_STARTER.md` to continue. Preserve all features; never modify `main`; never merge PR #2 without explicit instruction.
 
 ## Last verified snapshot (historical; re-check live)
 

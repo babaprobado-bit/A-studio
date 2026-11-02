@@ -13,6 +13,15 @@ Do not use the regular demo APK for this test; it does not contain the native GG
 - These heuristics do not replace real performance, thermal or memory-stability testing. No physical-phone install, GGUF inference or airplane-mode test has been completed.
 - Initial GGUF download still requires internet. After a complete model download, inference is intended to run locally without internet or an API key.
 
+## Latest project status — 2026-11-02
+
+- Official product name: AI Studio (Alpha 1 is only an internal milestone label).
+- User-reported test phone: Redmi S12. Exact device variant, Android version, ABI and available RAM are not yet verified from Android system information.
+- Internet is currently unavailable to the user. A GGUF download cannot be done until a connection is available; do not mark model download, inference or offline verification as passed.
+- Demo build [41472090928](https://github.com/babaprobado-bit/A-studio/actions/runs/41472090928) passed and created `AI-Studio-Demo-APK` (ID `13155362741`), but this is not the native GGUF APK.
+- Native build [41472242158](https://github.com/babaprobado-bit/A-studio/actions/runs/41472242158) is running for current branch commit `c2417699cca0ec1381c6a41422f5b7d837c91f02`; wait for its successful artifact upload before installation.
+- PR #2 remains draft and `main` remains untouched.
+
 ## Read first
 - docs/HANDOFF/README.md
 - docs/HANDOFF/PROJECT_STATE.md

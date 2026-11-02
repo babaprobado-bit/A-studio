@@ -1,5 +1,16 @@
 # AI Studio — Project state and technical handoff
 
+## Latest continuation status — 2026-11-02
+
+- Official product name is **AI Studio**. “Alpha 1” is a development milestone label only. Android display name is AI Studio; keep the compatibility-sensitive application ID `com.aistudio.alpha1` unchanged.
+- Active branch head: `c2417699cca0ec1381c6a41422f5b7d837c91f02` (`Update private site smoke test for AI Studio name`). All work remains on `feature/android-offline-skills-v1`; `main` has not been modified.
+- Hardware-aware GGUF model choice is implemented in source and covered by JavaScript device-bridge tests: RAM, available RAM, CPU core count, Android low-memory state, ABI/Android support and free storage are considered. The user can manually choose 0.5B / 1.5B / 3B; recommendations are conservative estimates, not real performance benchmarks.
+- Demo Android workflow [41472090928](https://github.com/babaprobado-bit/A-studio/actions/runs/41472090928) completed successfully on `c2417699...`. Artifact `AI-Studio-Demo-APK` (ID `13155362741`, ZIP 3,765,056 bytes) was uploaded. This is the regular demo APK and does **not** include the native GGUF bridge; do not use it for Session 2 native inference tests.
+- Native GGUF workflow [41472242158](https://github.com/babaprobado-bit/A-studio/actions/runs/41472242158) was manually dispatched for the same `c2417699...` commit. At the latest check it was still in progress at the pinned `llama.kt` checkout step. Do not call it successful until it completes and uploads `AI-Studio-1.1-OnDevice-LocalCoder-APK`.
+- The earlier native run [41459856700](https://github.com/babaprobado-bit/A-studio/actions/runs/41459856700) succeeded on commit `7341a83ebbe57d9f4ae917c1a632856d44df6965`, which contains the hardware-aware model-selection code. The latest `c2417699...` native run is a separate verification after the product-name/test expectation correction.
+- The user reports their phone as Redmi S12 and says internet is currently unavailable. Exact Android version, ABI and device memory have not been read from the physical phone. No phone install, model download, on-device inference or airplane-mode inference has been performed. Do not claim any of these as passed.
+- PR #2 remains open/draft, base `main`, head `feature/android-offline-skills-v1`; do not merge without explicit user instruction.
+
 ## 1. Product goal
 
 **Product naming:** The product is named **AI Studio**. “Alpha 1” is a development-stage label only. The Android display name is AI Studio; the legacy application ID `com.aistudio.alpha1` remains unchanged to preserve package/update identity.
