@@ -508,20 +508,22 @@ export function buildStageSkillContext(skills, stageId, limits = {}) {
   const header = '\n\n--- AI STUDIO SKILLS (' + stage.toUpperCase() + ') ---\n';
   const footer = '\n--- END SKILLS ---';
   const contentBudget = Math.max(0, maxChars - header.length - footer.length);
+  const separator = '\n\n';
   const blocks = [];
   let used = 0;
   const includedIds = [];
   const excludedIds = [];
   for (const item of candidates) {
     const block = '### ' + item.name + '\n' + item.content;
-    const remaining = contentBudget - used;
+    const separatorLength = blocks.length ? separator.length : 0;
+    const remaining = contentBudget - used - separatorLength;
     if (remaining < 100) {
       excludedIds.push(item.id);
       continue;
     }
     const clipped = block.length > remaining ? block.slice(0, remaining) : block;
     blocks.push(clipped);
-    used += clipped.length;
+    used += separatorLength + clipped.length;
     includedIds.push(item.id);
     if (clipped.length < block.length) {
       excludedIds.push(item.id);
@@ -529,7 +531,7 @@ export function buildStageSkillContext(skills, stageId, limits = {}) {
     }
   }
   const omittedByCount = eligible.length > maxSkills;
-  const promptText = blocks.length ? header + blocks.join('\n\n') + footer : '';
+  const promptText = blocks.length ? header + blocks.join(separator) + footer : '';
   return { promptText, includedIds, excludedIds, charCount: promptText.length, maxChars, stage, omittedByCount };
 }
 export function getProfileSkillIds(profileId) {

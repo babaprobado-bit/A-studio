@@ -57,7 +57,7 @@ const largeSkills = Array.from({length: 8}, (_, index) => ({
   id: 'large-' + index, name: 'Large ' + index, stage: 'code', content: 'Z'.repeat(8000)
 }));
 const cap = buildStageSkillContext(largeSkills, 'code');
-assert.ok(cap.charCount <= MAX_STAGE_SKILL_CHARS);
+assert.ok(cap.charCount <= MAX_STAGE_SKILL_CHARS, 'separators and wrappers must count toward the stage cap');
 assert.ok(cap.includedIds.length <= MAX_SELECTED_SKILLS);
 assert.ok(cap.excludedIds.length > 0, 'overflow Skills must be reported as excluded');
 assert.equal(new Set(getProfileSkillIds('superpowers-development')).size, 8);
