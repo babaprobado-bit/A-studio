@@ -2,6 +2,16 @@
 
 > **Session 1 complete — 2026-11-02:** The Kotlin failure was fixed in commit [`ffc332e`](https://github.com/babaprobado-bit/A-studio/commit/ffc332eb9d21b616c3fcdb199b21dc6bf69dc1c8) by using `[.]` in the GGUF filename regex. Native build run [41389970211](https://github.com/babaprobado-bit/A-studio/actions/runs/41389970211) succeeded, and the latest branch-tip native build [41390410229](https://github.com/babaprobado-bit/A-studio/actions/runs/41390410229) also completed successfully on app-code commit `a30696ff29cdda2dfe43e27a77286e97be026914`. All 16 build/upload steps passed. Artifact: `AI-Studio-Alpha-1.1-OnDevice-LocalCoder-APK`, ID `13117996643`, ZIP size `18,129,889` bytes, expires `2026-11-16 05:04:48 UTC`. The downloaded ZIP passed integrity inspection (`testzip() == None`) and contains `app-debug.apk` (54,453,328 bytes). **This verifies CI build and artifact contents only; no physical-phone install or offline inference test has been done.** Session 2 is next.
 
+
+## Later native build snapshot — 2026-11-02
+
+- Native run [41472242158](https://github.com/babaprobado-bit/A-studio/actions/runs/41472242158) succeeded on commit `c2417699cca0ec1381c6a41422f5b7d837c91f02`.
+- Artifact: `AI-Studio-1.1-OnDevice-LocalCoder-APK`, ID `13157875497`, archive size 18,131,646 bytes; expires `2026-11-16 15:47:19 UTC`.
+- This build includes the prior hardware-aware model chooser but predates the newest Skills/API implementation; do not treat it as the latest code.
+- Current native run [41477367956](https://github.com/babaprobado-bit/A-studio/actions/runs/41477367956) on branch head `b37ba5744f797d956aab63f08fa61a45a55b8924` is still building. At last inspection it was preparing llama.cpp Android sources and had not uploaded an APK.
+- The latest standard demo artifact is [run 41477367948](https://github.com/babaprobado-bit/A-studio/actions/runs/41477367948), artifact `13157453492`; it does not contain the native GGUF bridge.
+- All of these are CI artifact facts only. No physical-phone install or offline inference has been confirmed.
+
 ## Goal
 Make the optional native Android build actually compile and produce the GGUF-capable debug APK artifact. This session is about CI/build/plugin integration only; do not start broad Skill redesign or REA integration here.
 

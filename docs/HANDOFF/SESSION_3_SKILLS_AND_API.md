@@ -1,86 +1,77 @@
-# Session 3 of 4 — Finish Skills and the three Local Coder modes
+# Session 3 of 4 — Skills and Local Coder modes
 
 ## Goal
-Make Skill system match prior requirements and polish three Local Coder modes without breaking existing providers or backups. Do not implement REA/MCP here; that is Session 4.
+Finish the Skills system and add regression coverage for the three Local Coder routes without removing existing functionality. REA/MCP stays in Session 4.
 
-## Read first
-- docs/HANDOFF/README.md
-- docs/HANDOFF/PROJECT_STATE.md
-- Session 1 and 2 results, especially device memory/context findings
-- src/skill-library.js
-- src/main.js
-- scripts/test-skills.mjs
-- scripts/test-device-local-coder.mjs
-- README.md
+## Current implementation — 2026-11-02
 
-## Current Skill implementation — 2026-11-02
+### Skill Library
+- 38 original AI Studio starter instructions: 15 Superpowers-inspired, 22 Caveman-style and one AI Studio-authored Karpathy-inspired guideline summary.
+- Legacy profile IDs are preserved: `karpathy`, `superpowers`, `caveman`, `balanced`. Added `superpowers-development`, `planning`, `review`, `caveman-short`. The `custom` selector is manual selection, not a preset.
+- Maximum eight selected Skills; strict 36,000-character stage context budget including wrappers and inter-Skill separators.
+- Markdown import accepts `.md`, shows a preview before save, supports simple bounded scalar front matter (`name`, `description`, `stage`, `source`, `source_url`, `license`, `author`, `version`), and retains unknown scalar metadata. Multiline YAML/list front matter is not supported.
+- Duplicate names are allowed but warned about; each file is saved as a separate Skill with a generated ID. Multiple files are processed one at a time. Malformed front matter, empty content and oversized files are rejected.
+- Imported Markdown is untrusted text and is never executed.
+- Limits: 50 KB input file, 12,000 chars per Skill body, 100 custom Skills, eight selected Skills.
 
-- Original AI Studio starter set: 15 Superpowers-inspired instructions, 22 Caveman-style instructions and one AI Studio-authored Karpathy-inspired guideline summary (38 total).
-- Existing preset IDs retained for compatibility: `karpathy`, `superpowers`, `caveman`, `balanced`. New presets: `superpowers-development`, `planning`, `review`, `caveman-short`. The `custom` select entry is the manual-selection mode, not a preset. Karpathy remains default-enabled.
-- Max eight selected Skills. Each prompt stage has a strict 36,000-character budget including opening/closing wrappers and the newline separators between Skills.
-- Markdown import accepts `.md` files; each selected file is parsed and previewed before it is saved. Multiple files are handled one by one. User sees filename, title, description, stage, content and available source/license/author/version metadata.
-- Supported front matter is a bounded, simple scalar `key: value` format with `name`, `description`, `stage`, `source`, `source_url`, `license`, `author`, `version`. Unknown scalar keys are retained in metadata; malformed lines or unclosed front matter are rejected. Multiline YAML/list syntax is not supported.
-- Filename extension validation is fixed. Duplicate names are retained as separate custom Skills with unique IDs and a warning in the preview; duplicates do not overwrite existing Skills.
-- Imported content is text-only instructions and is never executed. The UI explicitly says this.
-- Limits: 50,000 chars per source file, 12,000 chars per Skill body, max 100 custom Skills, max eight selected at a time.
-- Stage context inserts actual line breaks rather than literal backslash-n text. Regression test covers malformed/empty/oversized files, front matter metadata, invalid stage fallback, eight-Skill cap and strict 36k cap.
-- Standard and encrypted export both use the same workspace snapshot, which includes custom Skills, selected IDs and profile ID. Workspace restore normalizes custom Skills and falls back to Karpathy if an older backup has no Skill data. Dedicated automated backup/restore round-trip tests still remain.
-- Skill backup tests and the new API fake-provider tests are now included in both Android CI workflows. Check live Actions before treating the new test commit or APK as passed.
+### Backup compatibility
+- `buildWorkspaceSnapshot()` includes the Skill state created by `createSkillBackupState()`. Standard JSON and encrypted exports use the same snapshot.
+- `restoreSkillBackupState()` normalizes and bounds custom Skills, remaps IDs, and remaps selected custom IDs with the new Skill IDs. This closes the earlier selection-loss bug on restore.
+- Legacy backups without a Skills section safely restore the Karpathy profile.
+- Regression tests cover standard JSON round-trip, encrypted round-trip, metadata, selected custom Skill remapping, wrong-password rejection, old backup fallback and size/count bounds.
 
-## Remaining Skill / API work
+### Three Local Coder routes
+1. **PC / Ollama**: existing LAN endpoint. Keep default and do not confuse it with on-device inference.
+2. **Phone / GGUF**: native llama.kt/llama.cpp bridge. Separate weights download; first download needs internet; inference should run inside Android after download.
+3. **Cloud API**: OpenAI, Claude, Gemini, DeepSeek, Groq and OpenRouter. API mode requires a stored key and explicit confirmation before real calls. The selected provider is used for exactly Plan, Code and Review; the flow stops on errors and does not retry or fall back silently.
 
-- [ ] Add automated tests for standard workspace backup and encrypted backup Skill round-trip, custom profile persistence, and old backups with no Skill section.
-- [ ] Add mocked tests for API Local Coder provider selection, missing-key handling, demo-mode consent, exactly three stage requests, no retry/fallback and no API secret in backup/log data. Do not send real billable calls in tests.
-- [ ] Verify duplicate-name preview interaction and multiple-file queue manually or with a DOM test harness.
-- [ ] Consider adding UTF-8 BOM and CRLF front matter fixtures.
-- [ ] Maintain source/author/license attribution when importing external Skill files; do not copy copyrighted skill collections wholesale.
-- [ ] Keep imported Skills as untrusted text instructions; do not execute Markdown, scripts or arbitrary commands.
+### API flow and key boundaries
+- API orchestration is in `src/local-coder-api.js`, with injected `confirmConsent`, `callProvider` and stage callbacks.
+- Only a boolean key-presence value enters this sequence helper; the secret itself remains in the existing secure-storage/provider call path.
+- Demo mode is disabled only after explicit consent. If the user cancels, no request is sent and Demo remains on.
+- Automated tests use fake provider calls; they do not contact providers or spend quota.
+- Static checks verify that workspace snapshots and Local Coder activity log arguments do not include provider secrets. No real paid API call has been made.
 
+## Verified CI
 
-## Three Local Coder modes
+- Latest branch head: `b37ba5744f797d956aab63f08fa61a45a55b8924`.
+- Demo run [41477367948](https://github.com/babaprobado-bit/A-studio/actions/runs/41477367948) completed successfully on this branch head. It passed Vite and regression tests and uploaded `AI-Studio-Demo-APK`, artifact ID `13157453492`. This is not the native GGUF APK.
+- Native run [41477367956](https://github.com/babaprobado-bit/A-studio/actions/runs/41477367956) is still running on this branch head; at last inspection it was preparing llama.cpp Android sources. No latest-branch native artifact yet.
+- Earlier native artifact [41472242158](https://github.com/babaprobado-bit/A-studio/actions/runs/41472242158), artifact ID `13157875497`, succeeded on older commit `c241769...`; it predates the latest Skills/API changes.
+- No real paid API request or physical-phone test was performed.
 
-### PC / Ollama
-- Existing PC endpoint connection; model runs on a different computer, not phone.
-- Keep default.
-- Include project/Skill context and preserve Plan → Code → Review draft workflow.
+## Remaining work
 
-### Phone / GGUF
-- Show as available only when native plugin/device support is confirmed.
-- Use physical-device findings from Session 2 to adjust RAM estimates/context.
-- Once model loaded, inference should not call network/API; first download needs internet.
-- Context trimming must be visible; never pretend all Skill/file context was sent.
-- If native unsupported/unavailable, allow Ollama/API mode without losing task text.
+- [ ] Manually verify the duplicate-name and multi-file import preview UI on a browser/phone.
+- [ ] Consider BOM and CRLF Markdown parser fixtures.
+- [ ] Run the full three-engine regression on a real capable PC/phone when available; native phone testing is tracked in Session 2.
+- [ ] Re-check the native build on the latest branch head and update the handoff with its final artifact status.
+- [ ] Do not start REA/MCP here; Session 4 owns that work.
 
-### Cloud API
-- Existing adapters: OpenAI, Anthropic/Claude, Gemini, DeepSeek, Groq, OpenRouter.
-- API key must already exist in secure storage.
-- One run makes three requests: Plan, Code, Review.
-- Explicitly tell user provider quotas/charges may apply before sending.
-- Demo stays default; user confirmation required before switching Demo off/making real calls.
-- No silent retries or automatic provider fallback; those can multiply costs or send project context to another company without consent.
-- Preserve selected provider ID in settings/backups only, never secret key.
+## Regression commands
 
-## Regression suite
-
-Run:
-  npm install --no-audit --no-fund
-  npm run build
-  npm run test:workshop
-  npm run test:site
-  npm run test:skills
-  npm run test:device-local-coder
-
-Add tests for API dispatcher routing/consent/provider selection without calling a real paid API where possible. Use mocks/fakes and label them. Do not claim real API test unless real authorized request sent with permission.
+```sh
+npm install --no-audit --no-fund
+npm run build
+npm run test:workshop
+npm run test:site
+npm run test:skills
+npm run test:api-local-coder
+npm run test:device-local-coder
+```
 
 ## Session exit criteria
-- [x] Five requested profile concepts implemented while retaining legacy profile IDs.
-- [x] SKILL.md import preview and bounded source/license metadata implemented.
-- [x] Max 8 and strict 36k stage context constraints covered by the passing Skill regression test.
-- [ ] Automated standard/encrypted backup round-trip and legacy backup tests.
-- [ ] Mocked API consent/provider-routing tests; no real paid API request made.
-- [ ] Device GGUF compared against real Session 2 measurements (still blocked on physical-device test).
-- [ ] README, project state and tests match actual behavior; CI/artifacts rechecked.
+
+- [x] Requested profiles implemented and legacy profile IDs retained.
+- [x] SKILL.md preview, source/license metadata and import limits implemented.
+- [x] Eight-Skill and strict 36k context limits covered by tests.
+- [x] Standard/encrypted Skill backup round-trip and legacy fallback tests.
+- [x] Custom selected Skill ID remapping on restore.
+- [x] API provider selection, missing key, consent, Demo transition, exactly three stages, no retry/fallback and error stop tested with fakes.
+- [x] Static checks for secret exclusion from backup and activity log.
+- [ ] Manual preview UI verification.
+- [ ] Latest native GGUF APK build and real-device testing; physical-device acceptance remains Session 2.
 
 ## Copy-ready prompt for next conversation
 
-Continue AI Studio. Read docs/HANDOFF/README.md, PROJECT_STATE.md and SESSION_3_SKILLS_AND_API.md; inspect current code on feature branch first. Finish requested Skill profiles (Karpathy, Superpowers development, Planning, Review, Caveman short mode), custom SKILL.md import preview and source/license metadata, and regression tests. Preserve existing 38 original AI Studio instructions, 8-Skill cap, 36,000-character stage cap, old backup compatibility and three Local Coder engines (Ollama, on-device GGUF, API). API mode makes three requests and must keep explicit consent. Do not start REA/MCP in this chat; leave it for Session 4. Update repo docs as work completes.
+Continue AI Studio Session 3 from the live branch `feature/android-offline-skills-v1`. Read README.md, PROJECT_STATE.md and this file first. Latest branch head is `b37ba5744f797d956aab63f08fa61a45a55b8924`; latest demo run [41477367948](https://github.com/babaprobado-bit/A-studio/actions/runs/41477367948) succeeded with artifact `13157453492`; latest native run [41477367956](https://github.com/babaprobado-bit/A-studio/actions/runs/41477367956) was still preparing llama.cpp Android sources at last check. Manually verify Skills import preview/multiple-file behavior and recheck the native workflow. Do not merge PR #2, do not change main, preserve all features. Real phone is reported as Redmi S12 and has no internet currently; do not claim offline device inference. Session 4 owns REA/MCP.
