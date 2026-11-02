@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import {
   SKILL_CATALOG, SKILL_PROFILES, MAX_SELECTED_SKILLS, MAX_STAGE_SKILL_CHARS,
   parseSkillMarkdown, normalizeSkill, buildStageSkillContext, getProfileSkillIds,
@@ -160,3 +161,34 @@ assert.equal(boundedBackup.customSkills.length, 100);
 assert.equal(boundedBackup.selectedSkillIds.length, MAX_SELECTED_SKILLS);
 assert.equal(boundedBackup.profileId, 'balanced');
 console.log('Skill backup compatibility tests passed.');
+
+const mainUiSource = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
+const previewStart = mainUiSource.indexOf('function renderSkillImportPreview()');
+const previewEnd = mainUiSource.indexOf('async function importSkillFiles(', previewStart);
+assert.ok(previewStart >= 0 && previewEnd > previewStart, 'Skill import preview renderer must exist');
+const previewSource = mainUiSource.slice(previewStart, previewEnd);
+for (const field of ['skillImportPreviewFile', 'skillImportPreviewName', 'skillImportPreviewDescription', 'skillImportPreviewStage', 'skillImportPreviewContent', 'skillImportPreviewMetadata']) {
+  assert.ok(previewSource.includes(field), 'Preview must display ' + field);
+}
+assert.ok(previewSource.includes('.textContent = item.content'), 'Imported instructions must be displayed as text');
+assert.ok(previewSource.includes('esc(label)') && previewSource.includes('esc(value)'), 'Metadata HTML must escape untrusted values');
+
+const importUiListeners = mainUiSource.slice(mainUiSource.indexOf("$('skillImportFiles').addEventListener"));
+assert.ok(importUiListeners.includes("$('skillImportAccept').addEventListener('click',acceptSkillImport)"));
+assert.ok(importUiListeners.includes("$('skillImportSkip').addEventListener('click',skipSkillImport)"));
+assert.ok(importUiListeners.includes("$('skillImportDialog').addEventListener('cancel'"), 'Escape/cancel must skip rather than save');
+assert.ok(importUiListeners.includes("e.target.value='';"), 'File picker must reset after selection to allow re-selecting the same file');
+
+const acceptStart = mainUiSource.indexOf('async function acceptSkillImport()');
+const acceptEnd = mainUiSource.indexOf('function skipSkillImport()', acceptStart);
+assert.ok(acceptStart >= 0 && acceptEnd > acceptStart);
+const acceptSource = mainUiSource.slice(acceptStart, acceptEnd);
+assert.ok(acceptSource.includes('pendingSkillImports.shift()'));
+assert.ok(acceptSource.includes('await persistSkillState()'));
+assert.ok(acceptSource.includes('renderSkillImportPreview()'), 'Accept must advance to the next preview');
+const skipStart = acceptEnd;
+const skipEnd = mainUiSource.indexOf('function exportSkillLibrary()', skipStart);
+const skipSource = mainUiSource.slice(skipStart, skipEnd);
+assert.ok(skipSource.includes('pendingSkillImports.shift()'));
+assert.ok(skipSource.includes('renderSkillImportPreview()'), 'Skip must advance to the next preview');
+console.log('Skill import preview UI wiring checks passed.');

@@ -42,7 +42,8 @@ Finish the Skills system and add regression coverage for the three Local Coder r
 
 ## Remaining work
 
-- [ ] Manually verify the duplicate-name and multi-file import preview UI on a browser/phone.
+- [x] Add static UI-wiring regression checks for preview content escaping, Save/Skip buttons, Escape-to-skip, repeated file selection and queue advancement.
+- [ ] Manually verify the visual duplicate-name and multi-file import preview UI on a browser/phone.
 - [x] Add automated BOM, CRLF, multi-file queue, duplicate-name warning, invalid-extension, malformed-file and 100-Skill limit tests.
 - [ ] Run the full three-engine regression on a real capable PC/phone when available; native phone testing is tracked in Session 2.
 - [ ] Re-check the native build on the latest branch head and update the handoff with its final artifact status.
