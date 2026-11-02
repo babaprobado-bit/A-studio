@@ -25,7 +25,7 @@ Make Skill system match prior requirements and polish three Local Coder modes wi
 - Limits: 50,000 chars per source file, 12,000 chars per Skill body, max 100 custom Skills, max eight selected at a time.
 - Stage context inserts actual line breaks rather than literal backslash-n text. Regression test covers malformed/empty/oversized files, front matter metadata, invalid stage fallback, eight-Skill cap and strict 36k cap.
 - Standard and encrypted export both use the same workspace snapshot, which includes custom Skills, selected IDs and profile ID. Workspace restore normalizes custom Skills and falls back to Karpathy if an older backup has no Skill data. Dedicated automated backup/restore round-trip tests still remain.
-- Latest Skill Library test passed on commit `a277892d712d903e985a05d98440afc55f5684f2`. Full demo build is still finishing Gradle; native GGUF build is still preparing llama.cpp sources. Check live Actions before continuing.
+- Skill backup tests and the new API fake-provider tests are now included in both Android CI workflows. Check live Actions before treating the new test commit or APK as passed.
 
 ## Remaining Skill / API work
 

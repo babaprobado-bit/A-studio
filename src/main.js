@@ -1,4 +1,5 @@
 import { Capacitor } from '@capacitor/core';
+import { runApiLocalCoderSequence } from './local-coder-api.js';
 import { DeviceLocalCoder, DEVICE_MODEL_CATALOG, assessDeviceModel, chooseRecommendedDeviceModel, formatModelBytes } from './device-local-coder.js';
 import { Preferences } from '@capacitor/preferences';
 import { SecureStoragePlugin } from 'capacitor-secure-storage-plugin';
@@ -7,7 +8,7 @@ import { reuseCatalog, buildLocalCoderStages, extractCodeArtifact, normalizeSnip
 import { buildSharedProjectContext } from './project-context.js';
 import { buildSharedVaultContext } from './shared-vault-context.js';
 import { encryptWorkspaceBackup, decryptWorkspaceBackup } from './encrypted-backup.js';
-import { SKILL_CATALOG, SKILL_PROFILES, parseSkillMarkdown, normalizeSkill, buildStageSkillContext, getProfileSkillIds, MAX_SELECTED_SKILLS, MAX_STAGE_SKILL_CHARS } from './skill-library.js';
+import { SKILL_CATALOG, SKILL_PROFILES, parseSkillMarkdown, normalizeSkill, buildStageSkillContext, getProfileSkillIds, createSkillBackupState, restoreSkillBackupState, MAX_SELECTED_SKILLS, MAX_STAGE_SKILL_CHARS } from './skill-library.js';
 
 const $ = (id) => document.getElementById(id);
 const DB = {
@@ -587,29 +588,51 @@ async function runApiLocalCoderWorkshop(){
   if(!providers[providerId]||providerId==='ollama'){showToast('API sağlayıcısı seçilmedi.');return;}
   const key=await getSecret(providerId);
   if(!key){showToast(providers[providerId].name+' API anahtarı yok. Modeller ekranından ekle.');go('models');return;}
-  if(settings.demoMode){
-    if(!confirm('Local Coder '+providers[providerId].name+' üzerinden 3 gerçek API isteği gönderecek. Sağlayıcının ücretsiz kotası veya ücretleri uygulanabilir. Devam edilsin mi?'))return;
-    settings.demoMode=false;await setPref(DB.settings,settings);syncModeUI();
-  }else if(!confirm('Local Coder '+providers[providerId].name+' üzerinden Plan, Kod ve İnceleme için 3 API isteği gönderecek. Kota/ücret oluşabilir. Devam edilsin mi?'))return;
-  settings.localCoderApiProvider=providerId;await setPref(DB.settings,settings);
   const sourceCode=$('localCoderUseCode').checked?$('codePad').value.slice(0,10000):'';
   const stages=buildLocalCoderStages({task,language:$('codeLanguage').value,sourceCode});
-  let previous='';busy=true;$('localCoderRun').disabled=true;$('localCoderRun').textContent='API ajanı çalışıyor…';$('localCoderReview').value='';$('localCoderOutput').value='';
+  let flowStarted=false;
   try{
-    await logAgentActivity('Local Coder · '+providers[providerId].name,'Başladı',task);
-    for(const stage of stages){
-      $('localCoderStatus').textContent=stage.title+' · '+providers[providerId].name+' çalışıyor…';
-      await logAgentActivity('API '+stage.title,'Çalışıyor',providers[providerId].name);
-      const basePrompt=stage.makePrompt?stage.makePrompt(previous):stage.prompt;
-      const skillContext=currentSkillContext(stage.id,MAX_STAGE_SKILL_CHARS);
-      const prompt=basePrompt+(skillContext.promptText?'\n\n'+skillContext.promptText:'');
-      const answer=await callProvider(providerId,prompt,[]);
-      if(!answer)throw new Error('API sağlayıcısı boş yanıt verdi.');
-      if(stage.id==='code')$('localCoderOutput').value=extractCodeArtifact(answer);
-      if(stage.id==='review')$('localCoderReview').value=answer;
-      previous=answer;
-      await logAgentActivity('API '+stage.title,'Tamamlandı',answer.slice(0,220));
-    }
+    const result=await runApiLocalCoderSequence({
+      providerId,
+      providers,
+      hasKey:Boolean(key),
+      demoMode:settings.demoMode,
+      stages,
+      confirmConsent:message=>confirm(message),
+      disableDemoMode:async()=>{
+        settings.demoMode=false;
+        await setPref(DB.settings,settings);
+        syncModeUI();
+      },
+      onApproved:async()=>{
+        settings.localCoderApiProvider=providerId;
+        await setPref(DB.settings,settings);
+        busy=true;flowStarted=true;
+        $('localCoderRun').disabled=true;
+        $('localCoderRun').textContent='API ajanı çalışıyor…';
+        $('localCoderReview').value='';
+        $('localCoderOutput').value='';
+        await logAgentActivity('Local Coder · '+providers[providerId].name,'Başladı',task);
+      },
+      makePrompt:(stage,previous)=>{
+        const basePrompt=stage.makePrompt?stage.makePrompt(previous):stage.prompt;
+        const skillContext=currentSkillContext(stage.id,MAX_STAGE_SKILL_CHARS);
+        return basePrompt+(skillContext.promptText?'\n\n'+skillContext.promptText:'');
+      },
+      callProvider,
+      onStageStart:async stage=>{
+        $('localCoderStatus').textContent=stage.title+' · '+providers[providerId].name+' çalışıyor…';
+        await logAgentActivity('API '+stage.title,'Çalışıyor',providers[providerId].name);
+      },
+      onStageComplete:async(stage,answer)=>{
+        if(stage.id==='code')$('localCoderOutput').value=extractCodeArtifact(answer);
+        if(stage.id==='review')$('localCoderReview').value=answer;
+        await logAgentActivity('API '+stage.title,'Tamamlandı',answer.slice(0,220));
+      }
+    });
+    if(result.status==='cancelled')return;
+    if(result.status==='invalid-provider'){showToast('API sağlayıcısı seçilmedi.');return;}
+    if(result.status==='missing-key'){showToast(providers[providerId].name+' API anahtarı yok. Modeller ekranından ekle.');go('models');return;}
     $('localCoderStatus').textContent=providers[providerId].name+' ile 3 aşamalı Local Coder zinciri tamamlandı. Kod çalıştırılmadı.';
     await logAgentActivity('Local Coder · API','Tamamlandı','Kod taslağı ve inceleme notu hazır; kod otomatik çalıştırılmadı.');
     showToast('API tabanlı Local Coder tamamlandı. Taslağı incele.');
@@ -618,7 +641,11 @@ async function runApiLocalCoderWorkshop(){
     await logAgentActivity('Local Coder · API','Hata',error.message||'API isteği başarısız');
     showToast('API Local Coder çalışamadı.');
   }finally{
-    busy=false;$('localCoderRun').disabled=false;$('localCoderRun').textContent='Yerel ajan zincirini çalıştır';
+    if(flowStarted){
+      busy=false;
+      $('localCoderRun').disabled=false;
+      $('localCoderRun').textContent='Yerel ajan zincirini çalıştır';
+    }
   }
 }
 
@@ -993,7 +1020,7 @@ function updateDashboard(){const connected=Object.keys(providers).filter(id=>id=
 }
 async function exportProjects(){downloadText('ai-studio-projects.json',JSON.stringify({format:'ai-studio-projects-v2',exportedAt:new Date().toISOString(),projects:projectList},null,2),'application/json;charset=utf-8');}
 function buildWorkspaceSnapshot(){
-  return {format:'ai-studio-workspace-v1',exportedAt:new Date().toISOString(),settings:{demoMode:settings.demoMode,models:settings.models,team:settings.team,ollamaUrl:settings.ollamaUrl,ollamaModel:settings.ollamaModel,localCoderEngine:['device','api'].includes(settings.localCoderEngine)?settings.localCoderEngine:'ollama',localCoderApiProvider:settings.localCoderApiProvider||'openai',systemPrompt:settings.systemPrompt,shareReusableContext:settings.shareReusableContext===true,shareVaultContext:settings.shareVaultContext===true,vaultBaseUrl:settings.vaultBaseUrl||''},projects:projectList,activeProjectId,chat:chatHistory,plugins:userPlugins.filter(p=>p.kind!=='builtin').map(p=>({name:p.name,prompt:p.prompt})),skills:{customSkills,selectedSkillIds,profileId:skillProfileId},snippets:reusableSnippets,activity:agentActivity,codeFiles,activeCodeFileId};
+  return {format:'ai-studio-workspace-v1',exportedAt:new Date().toISOString(),settings:{demoMode:settings.demoMode,models:settings.models,team:settings.team,ollamaUrl:settings.ollamaUrl,ollamaModel:settings.ollamaModel,localCoderEngine:['device','api'].includes(settings.localCoderEngine)?settings.localCoderEngine:'ollama',localCoderApiProvider:settings.localCoderApiProvider||'openai',systemPrompt:settings.systemPrompt,shareReusableContext:settings.shareReusableContext===true,shareVaultContext:settings.shareVaultContext===true,vaultBaseUrl:settings.vaultBaseUrl||''},projects:projectList,activeProjectId,chat:chatHistory,plugins:userPlugins.filter(p=>p.kind!=='builtin').map(p=>({name:p.name,prompt:p.prompt})),skills:createSkillBackupState({customSkills,selectedSkillIds,profileId:skillProfileId}),snippets:reusableSnippets,activity:agentActivity,codeFiles,activeCodeFileId};
 }
 async function exportWorkspace(){
   await saveCurrentCodeFile(false);
@@ -1049,11 +1076,10 @@ async function importWorkspace(file){
     const nextChat=(Array.isArray(data.chat)?data.chat:[]).filter(m=>(m?.role==='user'||m?.role==='assistant')&&typeof m.content==='string').slice(-80).map(m=>({role:m.role,content:m.content.slice(0,20000),provider:typeof m.provider==='string'?m.provider.slice(0,100):'',mode:['demo','live','error'].includes(m.mode)?m.mode:'demo',time:typeof m.time==='string'?m.time:new Date().toISOString()}));
     const nextPlugins=(Array.isArray(data.plugins)?data.plugins:[]).filter(p=>typeof p?.name==='string'&&typeof p?.prompt==='string'&&p.name.trim()&&p.prompt.trim()).slice(-100).map((p,i)=>({id:crypto.randomUUID?crypto.randomUUID():String(Date.now()+i),name:p.name.trim().slice(0,80),prompt:p.prompt.trim().slice(0,6000),kind:'custom'}));
     const nextSnippets=(Array.isArray(data.snippets)?data.snippets:[]).map(normalizeSnippet).filter(Boolean).slice(0,100).map((item,i)=>({...item,id:crypto.randomUUID?crypto.randomUUID():String(Date.now()+i)}));
-    const nextCustomSkills=(Array.isArray(data.skills?.customSkills)?data.skills.customSkills:[]).map(skill=>normalizeSkill(skill)).filter(Boolean).slice(-100).map((skill,i)=>({...skill,id:'custom-'+skill.id.replace(/^custom-/,'')+'-'+i,builtIn:false}));
-    const validSkillIds=new Set([...SKILL_CATALOG.map(skill=>skill.id),...nextCustomSkills.map(skill=>skill.id)]);
-    let nextSelectedSkillIds=(Array.isArray(data.skills?.selectedSkillIds)?data.skills.selectedSkillIds:[]).filter(id=>validSkillIds.has(id)).slice(0,MAX_SELECTED_SKILLS);
-    const nextSkillProfileId=data.skills?.profileId==='custom'?'custom':(SKILL_PROFILES[data.skills?.profileId]?data.skills.profileId:'karpathy');
-    if(!nextSelectedSkillIds.length)nextSelectedSkillIds=getProfileSkillIds(nextSkillProfileId);
+    const restoredSkillState=restoreSkillBackupState(data.skills);
+    const nextCustomSkills=restoredSkillState.customSkills;
+    const nextSelectedSkillIds=restoredSkillState.selectedSkillIds;
+    const nextSkillProfileId=restoredSkillState.profileId;
     const nextActivity=(Array.isArray(data.activity)?data.activity:[]).slice(0,80).filter(item=>item&&typeof item.event==='string').map((item,i)=>({id:crypto.randomUUID?crypto.randomUUID():String(Date.now()+i),event:item.event.slice(0,100),status:typeof item.status==='string'?item.status.slice(0,40):'',detail:typeof item.detail==='string'?item.detail.slice(0,260):'',time:typeof item.time==='string'?item.time:new Date().toISOString()}));
     const nextFiles=Array.isArray(data.codeFiles)?normalizeCodeFileList(data.codeFiles,true):codeFiles;
     if(!nextFiles.length)nextFiles.push(makeCodeFile());

@@ -537,3 +537,68 @@ export function buildStageSkillContext(skills, stageId, limits = {}) {
 export function getProfileSkillIds(profileId) {
   return [...(SKILL_PROFILES[profileId]?.skillIds || SKILL_PROFILES.karpathy.skillIds)].slice(0, MAX_SELECTED_SKILLS);
 }
+
+
+/** Return the bounded Skill-only portion of a workspace backup. */
+export function createSkillBackupState({ customSkills = [], selectedSkillIds = [], profileId = 'karpathy' } = {}) {
+  const normalizedCustom = (Array.isArray(customSkills) ? customSkills : [])
+    .map(item => normalizeSkill(item))
+    .filter(Boolean)
+    .slice(-100)
+    .map(item => ({ ...item, group: 'Custom', builtIn: false }));
+  const validIds = new Set([
+    ...SKILL_CATALOG.map(item => item.id),
+    ...normalizedCustom.map(item => item.id)
+  ]);
+  const selected = [...new Set((Array.isArray(selectedSkillIds) ? selectedSkillIds : [])
+    .filter(id => typeof id === 'string' && validIds.has(id)))]
+    .slice(0, MAX_SELECTED_SKILLS);
+  const requestedProfile = typeof profileId === 'string' ? profileId : 'karpathy';
+  const safeProfileId = requestedProfile === 'custom' || SKILL_PROFILES[requestedProfile]
+    ? requestedProfile
+    : 'karpathy';
+  return {
+    customSkills: normalizedCustom,
+    selectedSkillIds: selected.length ? selected : getProfileSkillIds(safeProfileId),
+    profileId: safeProfileId
+  };
+}
+
+/**
+ * Restore Skill state from standard/encrypted backups. Older backups without
+ * a skills field safely fall back to Karpathy. Selected custom IDs are remapped
+ * together with the custom Skill IDs, so imported selections remain selected.
+ */
+export function restoreSkillBackupState(raw) {
+  const source = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+  const idMap = new Map();
+  const customSkills = (Array.isArray(source.customSkills) ? source.customSkills : [])
+    .map(item => normalizeSkill(item))
+    .filter(Boolean)
+    .slice(-100)
+    .map((item, index) => {
+      const id = 'custom-' + item.id.replace(/^custom-/, '') + '-' + index;
+      idMap.set(item.id, id);
+      return { ...item, id, group: 'Custom', builtIn: false };
+    });
+  const validIds = new Set([
+    ...SKILL_CATALOG.map(item => item.id),
+    ...customSkills.map(item => item.id)
+  ]);
+  const requestedProfile = typeof source.profileId === 'string' ? source.profileId : '';
+  const profileId = requestedProfile === 'custom'
+    ? 'custom'
+    : (SKILL_PROFILES[requestedProfile] ? requestedProfile : 'karpathy');
+  const selectedSkillIds = [...new Set((Array.isArray(source.selectedSkillIds) ? source.selectedSkillIds : [])
+    .filter(id => typeof id === 'string')
+    .map(id => idMap.get(id) || id)
+    .filter(id => validIds.has(id)))]
+    .slice(0, MAX_SELECTED_SKILLS);
+  return {
+    customSkills,
+    selectedSkillIds: selectedSkillIds.length
+      ? selectedSkillIds
+      : getProfileSkillIds(profileId),
+    profileId
+  };
+}

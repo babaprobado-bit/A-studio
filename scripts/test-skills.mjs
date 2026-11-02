@@ -1,8 +1,11 @@
 import assert from 'node:assert/strict';
 import {
   SKILL_CATALOG, SKILL_PROFILES, MAX_SELECTED_SKILLS, MAX_STAGE_SKILL_CHARS,
-  parseSkillMarkdown, normalizeSkill, buildStageSkillContext, getProfileSkillIds
+  parseSkillMarkdown, normalizeSkill, buildStageSkillContext, getProfileSkillIds,
+  createSkillBackupState, restoreSkillBackupState
 } from '../src/skill-library.js';
+import { encryptWorkspaceBackup, decryptWorkspaceBackup } from '../src/encrypted-backup.js';
+import { webcrypto } from 'node:crypto';
 
 assert.equal(SKILL_CATALOG.length, 38, 'starter pack must contain 15 Superpowers, 22 Caveman and one guideline');
 assert.equal(SKILL_CATALOG.filter(skill => skill.group === 'Superpowers').length, 15);
@@ -62,3 +65,55 @@ assert.ok(cap.includedIds.length <= MAX_SELECTED_SKILLS);
 assert.ok(cap.excludedIds.length > 0, 'overflow Skills must be reported as excluded');
 assert.equal(new Set(getProfileSkillIds('superpowers-development')).size, 8);
 console.log('Skill library tests passed.');
+
+const custom = normalizeSkill({
+  id: 'custom-imported-skill', name: 'Imported Skill', description: 'Imported for backup coverage',
+  stage: 'code', content: 'Keep the source and license metadata.', source: 'Test source',
+  sourceUrl: 'https://example.test/skill', license: 'MIT', author: 'AI Studio test',
+  version: '1.0', metadata: { category: 'backup-test' }
+});
+const savedSkillState = createSkillBackupState({
+  customSkills: [custom], selectedSkillIds: ['karpathy-guidelines', custom.id], profileId: 'custom'
+});
+assert.equal(savedSkillState.profileId, 'custom');
+assert.equal(savedSkillState.customSkills.length, 1);
+assert.ok(savedSkillState.selectedSkillIds.includes(custom.id));
+
+const standardSnapshot = JSON.parse(JSON.stringify({ format: 'ai-studio-workspace-v1', skills: savedSkillState }));
+const standardRestore = restoreSkillBackupState(standardSnapshot.skills);
+assert.equal(standardRestore.customSkills[0].content, custom.content);
+assert.equal(standardRestore.customSkills[0].license, 'MIT');
+assert.equal(standardRestore.customSkills[0].sourceUrl, 'https://example.test/skill');
+assert.equal(standardRestore.customSkills[0].metadata.category, 'backup-test');
+assert.ok(standardRestore.selectedSkillIds.includes(standardRestore.customSkills[0].id),
+  'selected custom Skill ID must be remapped along with the restored Skill ID');
+assert.equal(standardRestore.profileId, 'custom');
+
+const encryptedSnapshot = { format: 'ai-studio-workspace-v1', settings: { demoMode: true }, skills: savedSkillState };
+const backupPassword = 'skill-backup-test-passphrase';
+const sealedSkillsBackup = await encryptWorkspaceBackup(encryptedSnapshot, backupPassword, webcrypto);
+const openedSkillsBackup = await decryptWorkspaceBackup(sealedSkillsBackup, backupPassword, webcrypto);
+const encryptedRestore = restoreSkillBackupState(openedSkillsBackup.skills);
+assert.equal(encryptedRestore.customSkills[0].name, 'Imported Skill');
+assert.ok(encryptedRestore.selectedSkillIds.includes(encryptedRestore.customSkills[0].id));
+assert.equal(encryptedRestore.profileId, 'custom');
+await assert.rejects(
+  decryptWorkspaceBackup(sealedSkillsBackup, 'wrong-skill-backup-passphrase', webcrypto),
+  /Parola yanl[iı]ş veya yedek dosyas[ıi] de[gğ]i[sş]tirilmi[sş]/
+);
+
+const legacySkillRestore = restoreSkillBackupState(undefined);
+assert.equal(legacySkillRestore.profileId, 'karpathy');
+assert.deepEqual(legacySkillRestore.selectedSkillIds, ['karpathy-guidelines']);
+const manyCustom = Array.from({ length: 105 }, (_, index) => ({
+  id: 'custom-limit-' + index, name: 'Custom ' + index, content: 'Safe test instructions.'
+}));
+const boundedBackup = createSkillBackupState({
+  customSkills: manyCustom,
+  selectedSkillIds: [...SKILL_CATALOG.map(item => item.id), ...manyCustom.map(item => item.id)],
+  profileId: 'balanced'
+});
+assert.equal(boundedBackup.customSkills.length, 100);
+assert.equal(boundedBackup.selectedSkillIds.length, MAX_SELECTED_SKILLS);
+assert.equal(boundedBackup.profileId, 'balanced');
+console.log('Skill backup compatibility tests passed.');
