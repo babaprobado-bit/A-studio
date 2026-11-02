@@ -58,18 +58,17 @@ Do not mix these scopes. If an earlier session finds a blocker, fix only what is
 ## Latest verified status — 2026-11-02
 
 - Product: **AI Studio**; “Alpha 1” is only a milestone label. Keep Android package ID `com.aistudio.alpha1`.
-- Current code implementation commit: `8f13635d258fbb84c34a8949827913740a13a792`. Latest test/documentation commit: `fd31a4355711c4089b7bc266743d79393c138bb4`. `main` is unchanged at `aab010319b6500002844bd24b11da85dd9ca3b00`.
+- Latest application/test commit: `389a8b87ee7ebef96eb8ba7d265ca60f0a1aea03`. It includes multi-file Skill import/BOM/CRLF and UI wiring tests plus an API Local Coder concurrency fix that locks the run button before key lookup/consent. `main` remains unchanged at `aab010319b6500002844bd24b11da85dd9ca3b00`.
 - PR #2 remains open and draft; do not merge without explicit instruction.
-- Skill Library: 38 original instructions; legacy profiles preserved; four additional presets; Markdown preview-before-save; bounded metadata; multi-file queue; duplicate-name warning; import cap 100; 12k body cap; 36k stage prompt cap.
-- New pure helper `prepareSkillImportQueue()` handles multiple .md files, case-insensitive extensions, invalid files, duplicate warnings, queue errors, BOM and CRLF. Tests also check preview fields, escaped metadata, Save/Skip/Escape wiring, file-picker reset and queue advancement.
-- Backup tests cover standard JSON/encrypted Skill round-trip, selected custom ID remapping, metadata, invalid password and legacy backup fallback.
-- API sequence is isolated in `src/local-coder-api.js`; fake-provider tests cover key presence, selected provider, explicit consent, Demo switch after approval, exactly three requests and no retry/fallback. Static tests check secret exclusion from workspace backup/activity logs. No real paid call was made.
-- Demo run [41480634456](https://github.com/babaprobado-bit/A-studio/actions/runs/41480634456) succeeded on app-code commit `8f13635...`. Artifact: `AI-Studio-Demo-APK`, ID `13158857865`, 3,769,601 bytes, expires `2026-11-16 16:23:16 UTC`. It is not the native GGUF APK.
-- The latest branch-head demo run [41480850421](https://github.com/babaprobado-bit/A-studio/actions/runs/41480850421) on `fd31a43...` passed JS/Vite, workshop, Skill Library (including UI-wiring and multi-file tests), device bridge and site checks; Gradle APK packaging was in progress at last check.
-- Native run [41480634490](https://github.com/babaprobado-bit/A-studio/actions/runs/41480634490) for app-code `8f13635...` was preparing the Capacitor Android project. Latest branch-head native run [41480850408](https://github.com/babaprobado-bit/A-studio/actions/runs/41480850408) for `fd31a43...` was preparing llama.cpp Android sources; no artifact from the new multi-file-import code yet.
-- A prior native APK is available from [run 41477367956](https://github.com/babaprobado-bit/A-studio/actions/runs/41477367956), artifact ID `13159701220`, 18,134,365 bytes. It predates the newly extracted multi-file import helper; do not treat it as the newest app-code package.
-- User reports a Redmi S12 and no current internet. Exact Android version, ABI and memory are unverified. No physical installation, model download, on-device inference or airplane-mode proof.
-- Remaining work: visually inspect Skill preview on a real browser/device, finish the current native build, then carry out Session 2 phone tests when internet is available. Session 4 owns REA/MCP.
+- Skill Library: 38 original instructions, legacy profiles preserved, four added presets, safe Markdown preview-before-save, bounded attribution metadata, multi-file queue, duplicate warnings, 100 custom Skill cap, BOM/CRLF support, and 36,000-character stage prompt limit.
+- Tests cover multi-file queue, invalid extension/parse, duplicates, 100-Skill bound, preview escaping, Save/Skip/Escape wiring, file picker reset and queue advancement.
+- Backup tests cover standard JSON/encrypted Skill round-trip, selected custom ID remapping, metadata, invalid password and legacy fallback.
+- API helper tests cover selected provider, key presence, explicit consent, Demo switch only after approval, exactly three stages, no retry/fallback, empty response and key boundaries. New API UI lock test verifies lock before first await and release in finally. No real paid API call was made.
+- Demo run [41481715511](https://github.com/babaprobado-bit/A-studio/actions/runs/41481715511) **succeeded** on commit `389a8b8...`; artifact `AI-Studio-Demo-APK`, ID `13160940289`, 3,769,515 bytes. This is the regular demo APK, not native GGUF.
+- Native run [41481715201](https://github.com/babaprobado-bit/A-studio/actions/runs/41481715201) is still running on `389a8b8...`; at last inspection it was preparing llama.cpp Android sources. No native APK artifact from this latest API-lock code yet.
+- A previously successful native GGUF artifact exists from [run 41477367956](https://github.com/babaprobado-bit/A-studio/actions/runs/41477367956), ID `13159701220`, but predates the newest multi-file Skill import and API double-submit lock.
+- User reports a Redmi S12 and no current internet. Exact Android version, ABI and memory remain unverified. No physical installation, model download, on-device inference or airplane-mode proof.
+- Remaining: inspect current native build, then visual browser/device test of Skill preview and physical Session 2 test after internet is available. Session 4 owns REA/MCP.
 
 ## Last verified snapshot (historical; re-check live)
 

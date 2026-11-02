@@ -2,19 +2,17 @@
 
 ## Latest continuation status — 2026-11-02
 
-- Product name: **AI Studio**; Alpha 1 is only an internal milestone. Keep `com.aistudio.alpha1`.
-- Latest app-code commit: `8f13635d258fbb84c34a8949827913740a13a792`. Latest test/documentation commit: `fd31a4355711c4089b7bc266743d79393c138bb4`. Main remains `aab010319b6500002844bd24b11da85dd9ca3b00`.
-- PR #2 is open/draft and remains unmerged.
-- Skills: 38 original instructions; old preset IDs compatible; additional Superpowers Development, Planning, Review and Caveman Short presets; up to eight selected. Markdown import previews every file before save and preserves bounded metadata.
-- `prepareSkillImportQueue()` extracts multi-file parsing into a pure helper; supports case-insensitive `.md`, rejects malformed/oversized entries, flags duplicates, and respects the 100 custom Skill cap. BOM/CRLF and multi-file behavior tests pass.
-- Stage prompt budget is strictly 36,000 characters including wrappers/separators. Backup restore remaps selected custom Skill IDs; tests cover standard/encrypted round-trip and legacy fallback.
-- API Local Coder orchestration is isolated with an injected provider function. Tests cover explicit consent, missing keys, fixed provider, exactly Plan/Code/Review, no retry/fallback, and key boundaries. No real paid API call.
-- Demo artifact for app-code `8f13635...`: [run 41480634456](https://github.com/babaprobado-bit/A-studio/actions/runs/41480634456), artifact `13158857865`, size 3,769,601 bytes. Regular demo only, no native llama.cpp.
-- Latest branch-head demo run [41480850421](https://github.com/babaprobado-bit/A-studio/actions/runs/41480850421) passed all JS/Vite/regression checks including Skill UI wiring, and was at Gradle packaging at last check.
-- Native run [41480634490](https://github.com/babaprobado-bit/A-studio/actions/runs/41480634490) for app code `8f13635...` was generating the Capacitor project. Branch-head native run [41480850408](https://github.com/babaprobado-bit/A-studio/actions/runs/41480850408) was preparing llama.cpp sources; no newest-source native artifact yet.
-- Earlier native APK artifact [13159701220](https://github.com/babaprobado-bit/A-studio/actions/runs/41477367956) is valid, but does not include the new extracted multi-file import helper.
-- User reports Redmi S12 and no internet currently. Device Android version, ABI and RAM are not verified; no physical install/model download/inference/airplane-mode test.
-- PR remains draft; main untouched.
+- Official product name is **AI Studio**; Alpha 1 is only a milestone label. Keep `com.aistudio.alpha1`.
+- Latest implementation/test commit: `389a8b87ee7ebef96eb8ba7d265ca60f0a1aea03`. `main` remains `aab010319b6500002844bd24b11da85dd9ca3b00`; PR #2 is open/draft and unmerged.
+- Skill Library includes original 38 instructions, backward-compatible presets, additional profiles, safe Markdown preview/import, multi-file queue, duplicate flags, BOM/CRLF parsing, 100 custom Skill limit, eight-selection cap and strict 36k prompt budget.
+- Static UI checks verify text-only preview, escaped metadata, Save/Skip/Escape wiring, picker reset and queue advancement.
+- Standard/encrypted Skill backup tests and legacy fallback pass; custom ID remapping preserves selection on restore.
+- API Local Coder is isolated in `src/local-coder-api.js`. Mocked tests cover consent, key presence, exactly three calls, stable provider, no retries/fallback and secret boundaries. A source/UI concurrency fix now locks the shared Local Coder control before the first await, preventing rapid duplicate chains, and unlocks in finally.
+- Demo run [41481715511](https://github.com/babaprobado-bit/A-studio/actions/runs/41481715511) succeeded on `389a8b8...`; artifact `13160940289`, 3,769,515 bytes. It does not contain native GGUF.
+- Native workflow [41481715201](https://github.com/babaprobado-bit/A-studio/actions/runs/41481715201) was still preparing llama.cpp Android sources at last check; no current native APK artifact.
+- Earlier native artifact `13159701220` from [run 41477367956](https://github.com/babaprobado-bit/A-studio/actions/runs/41477367956) is valid but predates the latest import queue and API concurrency changes.
+- User reports Redmi S12 and no current internet. Device Android version/ABI/RAM unverified; no physical install, model download, local inference or airplane-mode test.
+- Do not merge PR #2; main remains untouched.
 
 
 ## 1. Product goal
