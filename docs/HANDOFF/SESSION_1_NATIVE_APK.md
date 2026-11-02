@@ -1,5 +1,7 @@
 # Session 1 of 4 — Finish native Android GGUF APK
 
+> **Update — 2026-11-02:** Root cause confirmed. The Kotlin source had a single literal backslash before `.gguf`; Kotlin rejects `\.` as an unsupported string escape. Commit [`ffc332e`](https://github.com/babaprobado-bit/A-studio/commit/ffc332eb9d21b616c3fcdb199b21dc6bf69dc1c8) replaces it with `[.]`. Native GGUF workflow run [41389970211](https://github.com/babaprobado-bit/A-studio/actions/runs/41389970211) is testing that commit. At the latest check, steps 1–14 passed, `Build debug APK` was still running, `Upload APK` was pending, and no artifact had been uploaded. This run is not yet a successful build.
+
 ## Goal
 Make the optional native Android build actually compile and produce the GGUF-capable debug APK artifact. This session is about CI/build/plugin integration only; do not start broad Skill redesign or REA integration here.
 
@@ -37,14 +39,14 @@ Make the optional native Android build actually compile and produce the GGUF-cap
 | Site test returned 404 | test:site ran before Vite built dist. | npm run build now comes before smoke tests. | Verify current run. |
 | Native bridge patch failed | Generated Capacitor MainActivity was empty; script expected existing onCreate. | Commit 4b0c7b1 adds a Java/Kotlin onCreate when missing and registers plugin before super.onCreate. | Real generated project not yet verified after this fix. |
 | Coroutines dependency risk | llama.kt declares coroutines implementation-only; bridge calls runBlocking/Flow. | Patcher adds app-level coroutines-core 1.9.0. | Confirm real Gradle build. |
-| Kotlin compile failed at generated LocalLlmPlugin.kt line 40:53 | Gradle reports Unsupported escape sequence on filename-validation Regex. The GitHub source readback appears to contain two backslashes before .gguf, which should be a valid Kotlin string escape. | Not fixed yet. The previous patcher/MainActivity/SDK/test-order issues are already past this point. | Compare source bytes and generated Android copy; find where the escape is reduced/interpreted. Add a deterministic test/assertion and rerun native workflow. |
+| Kotlin compile failed at generated LocalLlmPlugin.kt line 40:53 | The source contained one literal backslash in `\.gguf`; Kotlin does not allow `\.` as a string escape. This was not a source/copy transformation bug. | Commit `ffc332eb9d21b616c3fcdb199b21dc6bf69dc1c8` replaces the regex dot with `[.]`, preserving validation without string escaping. | Verify native run 41389970211 reaches/passes Gradle compile and uploads the GGUF APK. If it fails, inspect its completed job logs and work from the first actual error. |
 
 Latest known run at handoff creation: run 41339891960, manually dispatched for SHA 4b0c7b1734611936f93c0764afb691e0f383a647. It completed failure at :app:compileDebugKotlin after 2m 8s; all earlier steps passed. Exact message: generated android/app/src/main/java/com/aistudio/alpha1/LocalLlmPlugin.kt:40:53 Unsupported escape sequence. No native artifact was uploaded. Re-check live status and current branch head.
 
 ## Exact work order
 1. Confirm current run status and PR head SHA.
 2. If failed, download log archive and isolate the failing step; don't guess from generic failure.
-3. First reproduce the Kotlin compiler error. Inspect line 40 in committed android-local-runtime/LocalLlmPlugin.kt and, in the generated Android project before Gradle, inspect android/app/src/main/java/com/aistudio/alpha1/LocalLlmPlugin.kt byte-for-byte (repr/hex or compiler snippet). GitHub source readback appeared to have two backslashes before .gguf, while Gradle says Unsupported escape sequence. Find the transformation/discrepancy before changing escaping blindly.
+3. The original compiler error is now understood: committed `android-local-runtime/LocalLlmPlugin.kt` contained one backslash before `.gguf`, producing unsupported Kotlin escape `\.`. Commit `ffc332eb9d21b616c3fcdb199b21dc6bf69dc1c8` changed the regex to `[.]`; do not revert this. Verify the active native CI run 41389970211 and inspect Gradle logs if it fails for a different reason.
 4. Validate patcher against actual generated android/ tree or reproduce with same Capacitor 7.4.0 template.
 4. Fix only actual error. Add test/fixture for every patcher regression.
 5. Run: npm run build; npm run test:workshop; npm run test:site; npm run test:skills; npm run test:device-local-coder.
