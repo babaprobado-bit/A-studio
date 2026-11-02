@@ -3,47 +3,47 @@
 ## Resume code
 `AI-STUDIO-SESSION3-SKILLS-API`
 
-## Current state
-- Official product name: **AI Studio**. “Alpha 1” is only an internal milestone label; keep Android package ID `com.aistudio.alpha1` unchanged.
+## Current verified state
+- Product: **AI Studio**; Alpha 1 is only an internal milestone; keep package ID `com.aistudio.alpha1`.
 - Repository: https://github.com/babaprobado-bit/A-studio
-- Feature branch: `feature/android-offline-skills-v1`
-- Latest branch head: `b37ba5744f797d956aab63f08fa61a45a55b8924`
-- Latest application implementation: `f9462c1b659da524ea51d0498351b10de767a911`; `b37ba57` changes the secret-boundary test only.
-- `main` remains unchanged at `aab010319b6500002844bd24b11da85dd9ca3b00`.
-- PR #2 remains open/draft. Do not merge.
-- Latest demo run [41477367948](https://github.com/babaprobado-bit/A-studio/actions/runs/41477367948) succeeded on branch head and uploaded `AI-Studio-Demo-APK`, artifact ID `13157453492`. This APK does not include native GGUF.
-- Latest native run [41477367956](https://github.com/babaprobado-bit/A-studio/actions/runs/41477367956) was still preparing llama.cpp Android sources at last inspection; no native artifact for the latest branch head yet.
-- An older native APK exists from [run 41472242158](https://github.com/babaprobado-bit/A-studio/actions/runs/41472242158), artifact ID `13157875497`, on old commit `c241769...`. It predates latest Skills/API code.
-- Skills implementation/tests now cover 38 starter Skills, retained legacy profiles, four added profiles, Markdown preview/metadata/limits, 36k strict prompt budget, standard/encrypted backup round-trip, legacy backup fallback and custom selected-ID remapping.
-- API orchestration is extracted to `src/local-coder-api.js`; fake tests cover consent, key presence, exact Plan/Code/Review sequence, selected provider only, no retry/fallback, and empty-response stop. Static checks cover secret exclusion from backups/logs. No paid API was called.
-- User reports a Redmi S12 and no current internet. Android version, ABI, RAM, physical install, GGUF download, local inference and airplane-mode operation are not verified.
+- Branch: `feature/android-offline-skills-v1`
+- App-code commit: `8f13635d258fbb84c34a8949827913740a13a792`
+- Latest test/doc commit: `fd31a4355711c4089b7bc266743d79393c138bb4`
+- `main` remains unchanged. PR #2 remains open/draft; do not merge.
+- Demo artifact for app code 8f: [run 41480634456](https://github.com/babaprobado-bit/A-studio/actions/runs/41480634456), artifact `13158857865`, 3,769,601 bytes. Does not contain native GGUF.
+- Latest branch-head demo run [41480850421](https://github.com/babaprobado-bit/A-studio/actions/runs/41480850421) passed regression checks including Skill multi-file/BOM/CRLF and preview UI-wiring tests; Gradle package was in progress.
+- Latest native run [41480850408](https://github.com/babaprobado-bit/A-studio/actions/runs/41480850408) was preparing llama.cpp Android sources; no native artifact containing the new Skill queue helper yet.
+- Earlier native artifact [13159701220](https://github.com/babaprobado-bit/A-studio/actions/runs/41477367956) exists but predates the latest Skill import helper.
+- Skill Library covers profile compatibility, SKILL.md preview, safe metadata, multi-file queue, duplicate warning, BOM/CRLF, size caps, backup round-trips and queue UI wiring.
+- API tests cover consent, key presence, selected provider, exactly three stages and no retry/fallback; no real paid API call.
+- User reports Redmi S12 and no current internet. No physical install/model download/inference/airplane-mode test is verified.
 
-## Read these before making changes
+## Read first
 1. `docs/HANDOFF/README.md`
 2. `docs/HANDOFF/PROJECT_STATE.md`
 3. `docs/HANDOFF/SESSION_3_SKILLS_AND_API.md`
 4. `docs/HANDOFF/SESSION_2_DEVICE_TESTING.md`
 
-## Copy-ready next prompt
+## Next prompt
 
 ```text
 AI-STUDIO-SESSION3-SKILLS-API
 
-Continue the existing AI Studio project in babaprobado-bit/A-studio. First inspect the live feature branch, PR #2 and current Actions status; do not assume this saved status is still live.
+Continue the existing AI Studio project in babaprobado-bit/A-studio. Inspect the live feature branch, PR #2 and Actions runs first.
 
-Latest branch head: b37ba5744f797d956aab63f08fa61a45a55b8924. Latest demo workflow 41477367948 succeeded and uploaded AI-Studio-Demo-APK artifact 13157453492. This is not native GGUF. Latest native run 41477367956 was still preparing llama.cpp Android sources at last check. There is an older native artifact 13157875497 on older c241769 code; do not mistake it for latest source.
+Current app-code commit: 8f13635d258fbb84c34a8949827913740a13a792.
+Latest test/doc commit: fd31a4355711c4089b7bc266743d79393c138bb4.
+Latest branch-head demo run 41480850421 passed tests and was packaging the APK. Latest native run 41480850408 was preparing llama.cpp Android sources. Recheck the live state.
 
-Read docs/HANDOFF/README.md, PROJECT_STATE.md, SESSION_3_SKILLS_AND_API.md and SESSION_2_DEVICE_TESTING.md. Skill import/profile/prompt-cap/backup and API consent/three-stage/fake-provider/key-boundary tests are now implemented and pass in the latest demo CI. Remaining Session 3 work is manual UI verification of duplicate-name and multi-file preview, optional BOM/CRLF parser tests, and final three-engine review.
+The Skill Library now has multi-file import queue, case-insensitive .md validation, duplicate warnings, BOM/CRLF parsing, preview-before-save, static preview control wiring checks and backup tests. API Local Coder is isolated and fake-provider tested for explicit consent, exact Plan/Code/Review sequence, no retry/fallback and secret boundaries.
 
-User reports Redmi S12 and no current internet. Do not claim phone installation, GGUF download, local inference or airplane-mode use until physically tested after connection is available.
-
-Preserve every feature. Work only on feature/android-offline-skills-v1, never modify main, keep PR #2 draft and do not merge without explicit instruction. Session 4 owns REA/MCP.
+Remaining: visually verify the multi-file/duplicate Skill preview in a browser/phone, finish the current native GGUF build and then do Session 2 physical Redmi S12 install/model/inference/offline checks when internet is available. Do not claim phone inference before testing. Preserve all features. Work only on feature/android-offline-skills-v1; never edit main; keep PR #2 draft and do not merge. Session 4 owns REA/MCP.
 ```
 
-## Key links
-- Repository: https://github.com/babaprobado-bit/A-studio
+## Links
+- Repo: https://github.com/babaprobado-bit/A-studio
 - PR #2: https://github.com/babaprobado-bit/A-studio/pull/2
 - Branch: https://github.com/babaprobado-bit/A-studio/tree/feature/android-offline-skills-v1
-- Latest demo: https://github.com/babaprobado-bit/A-studio/actions/runs/41477367948
-- Latest native build: https://github.com/babaprobado-bit/A-studio/actions/runs/41477367956
+- Latest demo: https://github.com/babaprobado-bit/A-studio/actions/runs/41480850421
+- Latest native: https://github.com/babaprobado-bit/A-studio/actions/runs/41480850408
 - Handoff: https://github.com/babaprobado-bit/A-studio/blob/feature/android-offline-skills-v1/docs/HANDOFF/README.md

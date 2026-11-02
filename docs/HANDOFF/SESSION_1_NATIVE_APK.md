@@ -3,6 +3,16 @@
 > **Session 1 complete — 2026-11-02:** The Kotlin failure was fixed in commit [`ffc332e`](https://github.com/babaprobado-bit/A-studio/commit/ffc332eb9d21b616c3fcdb199b21dc6bf69dc1c8) by using `[.]` in the GGUF filename regex. Native build run [41389970211](https://github.com/babaprobado-bit/A-studio/actions/runs/41389970211) succeeded, and the latest branch-tip native build [41390410229](https://github.com/babaprobado-bit/A-studio/actions/runs/41390410229) also completed successfully on app-code commit `a30696ff29cdda2dfe43e27a77286e97be026914`. All 16 build/upload steps passed. Artifact: `AI-Studio-Alpha-1.1-OnDevice-LocalCoder-APK`, ID `13117996643`, ZIP size `18,129,889` bytes, expires `2026-11-16 05:04:48 UTC`. The downloaded ZIP passed integrity inspection (`testzip() == None`) and contains `app-debug.apk` (54,453,328 bytes). **This verifies CI build and artifact contents only; no physical-phone install or offline inference test has been done.** Session 2 is next.
 
 
+
+## Native artifact and latest import feature — 2026-11-02
+
+- Native APK from branch-head source before the multi-file Skill import helper: [run 41477367956](https://github.com/babaprobado-bit/A-studio/actions/runs/41477367956), artifact ID `13159701220`, ZIP 18,134,365 bytes. Valid native GGUF APK, but not the newest app implementation.
+- Current app-code commit `8f13635d258fbb84c34a8949827913740a13a792` adds the extracted multi-file .md Skill import queue and BOM/CRLF handling.
+- Native build [41480634490](https://github.com/babaprobado-bit/A-studio/actions/runs/41480634490) for `8f13635...` was still generating the Capacitor Android project at last check.
+- Latest branch-head native build [41480850408](https://github.com/babaprobado-bit/A-studio/actions/runs/41480850408) was preparing llama.cpp Android sources. Await its artifact before treating the latest import change as packaged for Android.
+- Latest branch-head demo workflow [41480850421](https://github.com/babaprobado-bit/A-studio/actions/runs/41480850421) had passed all regression checks and was in Gradle packaging.
+- CI artifacts do not prove physical-phone installation or offline inference. Session 2 remains required.
+
 ## Later native build snapshot — 2026-11-02
 
 - Native run [41472242158](https://github.com/babaprobado-bit/A-studio/actions/runs/41472242158) succeeded on commit `c2417699cca0ec1381c6a41422f5b7d837c91f02`.

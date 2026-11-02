@@ -15,13 +15,14 @@ Do not use the regular demo APK for this test; it does not contain the native GG
 
 ## Latest project status — 2026-11-02
 
-- Official product name: AI Studio. Alpha 1 is only an internal milestone label.
-- User-reported phone: Redmi S12. Exact variant, Android version, ABI and available RAM are not yet verified from the device.
-- User reports no current internet access. A new GGUF model download cannot be completed until connection is available; do not mark model download, inference or offline testing as passed.
-- Latest branch head: `b37ba5744f797d956aab63f08fa61a45a55b8924`. Latest demo run [41477367948](https://github.com/babaprobado-bit/A-studio/actions/runs/41477367948) succeeded and uploaded `AI-Studio-Demo-APK` artifact ID `13157453492`. This app does not contain the native GGUF bridge.
-- Latest native GGUF run [41477367956](https://github.com/babaprobado-bit/A-studio/actions/runs/41477367956) is running on the same branch head; it was preparing llama.cpp Android sources at last inspection. Wait for artifact success before phone install.
-- Earlier native artifact [41472242158](https://github.com/babaprobado-bit/A-studio/actions/runs/41472242158), ID `13157875497`, is a valid successful native build but uses older commit `c241769...` and does not contain the latest Skills/API changes.
-- PR #2 remains draft and `main` is unchanged. No physical-device test has passed.
+- Product: AI Studio.
+- User-reported phone: Redmi S12; exact device variant, Android version, ABI and RAM have not been read from Android system information.
+- User reports no current internet connection. Initial GGUF model download cannot be tested now.
+- Earlier native artifact [run 41477367956](https://github.com/babaprobado-bit/A-studio/actions/runs/41477367956), ID `13159701220`, was successfully produced, but predates the new extracted multi-file Skill import helper.
+- Current app-code commit `8f13635...` demo APK artifact [13158857865](https://github.com/babaprobado-bit/A-studio/actions/runs/41480634456) is the standard demo only; it does not contain native GGUF.
+- Latest branch-head native run [41480850408](https://github.com/babaprobado-bit/A-studio/actions/runs/41480850408) was preparing llama.cpp Android sources at last inspection. Wait for its artifact before installing.
+- No physical phone installation, model download, inference or airplane-mode proof has passed. Do not infer device support from CI builds.
+- PR #2 remains draft, and main has not changed.
 
 
 ## Read first

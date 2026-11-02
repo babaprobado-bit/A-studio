@@ -1,53 +1,51 @@
 # Session 3 of 4 — Skills and Local Coder modes
 
 ## Goal
-Finish the Skills system and add regression coverage for the three Local Coder routes without removing existing functionality. REA/MCP stays in Session 4.
+Finish the Skill instruction library and verify the three Local Coder paths without removing current app functionality. REA/MCP is reserved for Session 4.
 
 ## Current implementation — 2026-11-02
 
 ### Skill Library
-- 38 original AI Studio starter instructions: 15 Superpowers-inspired, 22 Caveman-style and one AI Studio-authored Karpathy-inspired guideline summary.
-- Legacy profile IDs are preserved: `karpathy`, `superpowers`, `caveman`, `balanced`. Added `superpowers-development`, `planning`, `review`, `caveman-short`. The `custom` selector is manual selection, not a preset.
-- Maximum eight selected Skills; strict 36,000-character stage context budget including wrappers and inter-Skill separators.
-- Markdown import accepts `.md`, prepares multi-file import queues, shows a preview before saving each file, flags duplicate names, supports BOM/CRLF input and simple bounded scalar front matter (`name`, `description`, `stage`, `source`, `source_url`, `license`, `author`, `version`), and retains unknown scalar metadata. Multiline YAML/list front matter is not supported.
-- Duplicate names are allowed but warned about; each file is saved as a separate Skill with a generated ID. Multiple files are processed one at a time. Malformed front matter, empty content and oversized files are rejected.
-- Imported Markdown is untrusted text and is never executed.
-- Limits: 50 KB input file, 12,000 chars per Skill body, 100 custom Skills, eight selected Skills.
+- 38 original AI Studio-authored starter instructions: 15 Superpowers-inspired, 22 Caveman-style and one Karpathy-inspired guideline summary.
+- Legacy profile IDs remain compatible: `karpathy`, `superpowers`, `caveman`, `balanced`. Added `superpowers-development`, `planning`, `review`, `caveman-short`; `custom` is manual selection.
+- Maximum eight selected Skills. Strict 36,000-character stage prompt budget counts opening/closing wrappers and separators.
+- Markdown import previews each file before saving, supports bounded scalar front matter for name/description/stage/source/source_url/license/author/version, retains unknown scalar metadata and does not execute imported text.
+- Import preparation is extracted to `prepareSkillImportQueue()`: case-insensitive .md extension, multi-file queue, invalid extension/parse errors, duplicate-name flags (including collisions with existing Skills and earlier queued files), and 100-custom-Skill limit.
+- Parser handles UTF-8 BOM and CRLF as well as normal line endings. Limits: 50 KB source file, 12,000 chars per Skill body, 100 custom Skills, eight selected.
+- UI previews content through textContent, escapes metadata values, and has wired Save, Skip, and Escape-to-skip actions. File picker resets after selection to allow selecting the same file again.
 
-### Backup compatibility
-- `buildWorkspaceSnapshot()` includes the Skill state created by `createSkillBackupState()`. Standard JSON and encrypted exports use the same snapshot.
-- `restoreSkillBackupState()` normalizes and bounds custom Skills, remaps IDs, and remaps selected custom IDs with the new Skill IDs. This closes the earlier selection-loss bug on restore.
-- Legacy backups without a Skills section safely restore the Karpathy profile.
-- Regression tests cover standard JSON round-trip, encrypted round-trip, metadata, selected custom Skill remapping, wrong-password rejection, old backup fallback and size/count bounds.
+### Backups
+- Standard and encrypted backups share `buildWorkspaceSnapshot()` and `createSkillBackupState()`.
+- `restoreSkillBackupState()` normalizes Skills, bounds custom count, remaps custom IDs and remaps selected custom IDs to the restored IDs.
+- Legacy backups without a Skills field fall back to Karpathy.
+- Regression tests cover standard JSON and encrypted Skill round-trip, license/source metadata, wrong password rejection, legacy fallback and custom ID/selection remapping.
 
 ### Three Local Coder routes
-1. **PC / Ollama**: existing LAN endpoint. Keep default and do not confuse it with on-device inference.
-2. **Phone / GGUF**: native llama.kt/llama.cpp bridge. Separate weights download; first download needs internet; inference should run inside Android after download.
-3. **Cloud API**: OpenAI, Claude, Gemini, DeepSeek, Groq and OpenRouter. API mode requires a stored key and explicit confirmation before real calls. The selected provider is used for exactly Plan, Code and Review; the flow stops on errors and does not retry or fall back silently.
+1. **PC / Ollama** — stays default; endpoint is a different PC on a trusted LAN, not on-device inference.
+2. **Phone / GGUF** — native llama.kt/llama.cpp; model weights are downloaded separately; after download inference is designed to run locally.
+3. **Cloud API** — OpenAI, Claude, Gemini, DeepSeek, Groq and OpenRouter. Requires stored key and explicit consent before Plan/Code/Review requests.
 
-### API flow and key boundaries
-- API orchestration is in `src/local-coder-api.js`, with injected `confirmConsent`, `callProvider` and stage callbacks.
-- Only a boolean key-presence value enters this sequence helper; the secret itself remains in the existing secure-storage/provider call path.
-- Demo mode is disabled only after explicit consent. If the user cancels, no request is sent and Demo remains on.
-- Automated tests use fake provider calls; they do not contact providers or spend quota.
-- Static checks verify that workspace snapshots and Local Coder activity log arguments do not include provider secrets. No real paid API call has been made.
+### API safety and tests
+- API sequencing lives in `src/local-coder-api.js`, with injected provider and consent functions.
+- Only key-presence boolean enters the sequence helper; provider secret remains outside the workspace snapshot and activity log path.
+- Consent cancellation sends no requests; Demo switches off only after explicit approval; the selected provider gets exactly three sequential stage calls; errors/empty replies stop the sequence without retry or automatic fallback.
+- Fake-provider tests cover invalid provider, missing key, consent, Demo transition, exactly three requests, provider continuity, empty response, and failure stop. Static checks cover secret boundaries. No real paid API call made.
 
 ## Verified CI
 
-- Latest branch head: `b37ba5744f797d956aab63f08fa61a45a55b8924`.
-- Demo run [41477367948](https://github.com/babaprobado-bit/A-studio/actions/runs/41477367948) completed successfully on this branch head. It passed Vite and regression tests and uploaded `AI-Studio-Demo-APK`, artifact ID `13157453492`. This is not the native GGUF APK.
-- Native run [41477367956](https://github.com/babaprobado-bit/A-studio/actions/runs/41477367956) is still running on this branch head; at last inspection it was preparing llama.cpp Android sources. No latest-branch native artifact yet.
-- Earlier native artifact [41472242158](https://github.com/babaprobado-bit/A-studio/actions/runs/41472242158), artifact ID `13157875497`, succeeded on older commit `c241769...`; it predates the latest Skills/API changes.
-- No real paid API request or physical-phone test was performed.
+- Latest app-code commit: `8f13635d258fbb84c34a8949827913740a13a792`.
+- Latest test/documentation commit: `fd31a4355711c4089b7bc266743d79393c138bb4`.
+- Demo run [41480634456](https://github.com/babaprobado-bit/A-studio/actions/runs/41480634456) succeeded on app-code commit `8f13635...`; artifact `AI-Studio-Demo-APK` ID `13158857865`, 3,769,601 bytes. It is not native GGUF.
+- Latest branch-head demo run [41480850421](https://github.com/babaprobado-bit/A-studio/actions/runs/41480850421) passed JS/Vite, workshop, Skill Library (including new multi-file/BOM/CRLF/UI-wiring checks), device bridge and private-site checks; Gradle debug APK was in progress at last check.
+- Latest branch-head native run [41480850408](https://github.com/babaprobado-bit/A-studio/actions/runs/41480850408) was preparing llama.cpp Android sources at last inspection. No native artifact from the new multi-file import app code yet.
+- Older native artifact [13159701220](https://github.com/babaprobado-bit/A-studio/actions/runs/41477367956) is valid but predates the extracted Skill import helper.
 
 ## Remaining work
 
-- [x] Add static UI-wiring regression checks for preview content escaping, Save/Skip buttons, Escape-to-skip, repeated file selection and queue advancement.
-- [ ] Manually verify the visual duplicate-name and multi-file import preview UI on a browser/phone.
-- [x] Add automated BOM, CRLF, multi-file queue, duplicate-name warning, invalid-extension, malformed-file and 100-Skill limit tests.
-- [ ] Run the full three-engine regression on a real capable PC/phone when available; native phone testing is tracked in Session 2.
-- [ ] Re-check the native build on the latest branch head and update the handoff with its final artifact status.
-- [ ] Do not start REA/MCP here; Session 4 owns that work.
+- [ ] Manually inspect duplicate-name and multi-file Skill preview visuals on a browser or physical phone. Static UI-wiring tests are not a visual test.
+- [ ] Finish latest native GGUF build; then complete Session 2 installation/model/inference/offline acceptance on a real supported phone.
+- [ ] Perform final three-engine review and document any remaining unsupported-device fallback behavior.
+- [ ] Do not start REA/MCP here; Session 4 owns it.
 
 ## Regression commands
 
@@ -63,16 +61,16 @@ npm run test:device-local-coder
 
 ## Session exit criteria
 
-- [x] Requested profiles implemented and legacy profile IDs retained.
-- [x] SKILL.md preview, source/license metadata and import limits implemented.
-- [x] Eight-Skill and strict 36k context limits covered by tests.
-- [x] Standard/encrypted Skill backup round-trip and legacy fallback tests.
-- [x] Custom selected Skill ID remapping on restore.
-- [x] API provider selection, missing key, consent, Demo transition, exactly three stages, no retry/fallback and error stop tested with fakes.
-- [x] Static checks for secret exclusion from backup and activity log.
-- [ ] Manual preview UI verification.
-- [ ] Latest native GGUF APK build and real-device testing; physical-device acceptance remains Session 2.
+- [x] Profiles and old IDs preserved.
+- [x] SKILL.md preview, metadata attribution, input bounds and multi-file queue.
+- [x] BOM/CRLF, duplicate-name and file-limit tests.
+- [x] UI wiring checks for preview/save/skip/Escape/queue advancement.
+- [x] Eight-Skill and strict 36k stage context caps.
+- [x] Standard/encrypted Skill backup round-trip and legacy fallback.
+- [x] API consent, exact three stages, no retry/fallback and secret boundary checks.
+- [ ] Visual UI verification.
+- [ ] Current native build and physical-device verification (Session 2).
 
 ## Copy-ready prompt for next conversation
 
-Continue AI Studio Session 3 from the live branch `feature/android-offline-skills-v1`. Read README.md, PROJECT_STATE.md and this file first. Latest branch head is `b37ba5744f797d956aab63f08fa61a45a55b8924`; latest demo run [41477367948](https://github.com/babaprobado-bit/A-studio/actions/runs/41477367948) succeeded with artifact `13157453492`; latest native run [41477367956](https://github.com/babaprobado-bit/A-studio/actions/runs/41477367956) was still preparing llama.cpp Android sources at last check. Manually verify Skills import preview/multiple-file behavior and recheck the native workflow. Do not merge PR #2, do not change main, preserve all features. Real phone is reported as Redmi S12 and has no internet currently; do not claim offline device inference. Session 4 owns REA/MCP.
+Continue AI Studio on `feature/android-offline-skills-v1`. Read README.md, PROJECT_STATE.md, this file and SESSION_2_DEVICE_TESTING.md. Latest app-code commit is `8f13635d258fbb84c34a8949827913740a13a792`; latest test/doc commit is `fd31a4355711c4089b7bc266743d79393c138bb4`. The demo build for 8f succeeded and uploaded artifact `13158857865`; latest branch-head demo run `41480850421` passed tests and was packaging. Latest native run `41480850408` was preparing llama.cpp sources. Check current Actions before assuming status. Remaining: visual Skill import preview and latest native build; physical Redmi S12 testing is blocked because user reports no internet. Keep PR #2 draft, do not edit main or merge. Session 4 is for REA/MCP.
