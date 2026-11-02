@@ -61,6 +61,8 @@ let customSkills = [];
 let skillLibrary = [...SKILL_CATALOG];
 let selectedSkillIds = getProfileSkillIds('karpathy');
 let skillProfileId = 'karpathy';
+let pendingSkillImports = [];
+let skillImportFailures = [];
 let codeFileSaveTimer = null;
 let codeFileLoadLock = false;
 let busy = false;
@@ -865,22 +867,119 @@ async function applySkillProfile(profileId){
   if(!SKILL_PROFILES[profileId])return;
   skillProfileId=profileId;selectedSkillIds=getProfileSkillIds(profileId);await persistSkillState();renderSkillLibrary();showToast(SKILL_PROFILES[profileId].name+' profili etkin.');
 }
-async function importSkillFiles(fileList){
-  const files=Array.from(fileList||[]);let added=0;const errors=[];
-  for(const file of files){
-    if(!/\\.md$/i.test(file.name)){errors.push(file.name+': yalnızca .md');continue;}
-    try{
-      const parsed=parseSkillMarkdown(await file.text(),file.name);
-      const id='custom-'+parsed.id.replace(/^custom-/,'')+'-'+Date.now().toString(36)+'-'+added;
-      customSkills.push({...parsed,id,builtIn:false});added++;
-    }catch(error){errors.push(file.name+': '+(error.message||'okunamadı'));}
+function renderSkillImportPreview() {
+  const dialog = $('skillImportDialog');
+  if (!dialog) return;
+  if (!pendingSkillImports.length) {
+    if (dialog.open) dialog.close();
+    if (skillImportFailures.length) showToast('Bazı dosyalar atlandı: ' + skillImportFailures.slice(0, 3).join(' · '));
+    skillImportFailures = [];
+    return;
   }
-  customSkills=customSkills.slice(-100);skillLibrary=[...SKILL_CATALOG,...customSkills];
-  if(added){skillProfileId='custom';const first=customSkills.slice(-added).map(s=>s.id);selectedSkillIds=[...new Set([...selectedSkillIds,...first])].slice(0,MAX_SELECTED_SKILLS);await persistSkillState();}
-  renderSkillLibrary();showToast(added+' Skill içe aktarıldı.'+(errors.length?' '+errors.length+' dosya atlandı.':''));
+
+  const entry = pendingSkillImports[0];
+  const item = entry.skill;
+  $('skillImportPreviewFile').textContent = entry.fileName;
+  $('skillImportPreviewName').textContent = item.name;
+  $('skillImportPreviewDescription').textContent = item.description || 'Açıklama belirtilmedi';
+  $('skillImportPreviewStage').textContent = item.stage === 'all' ? 'Tüm aşamalar' : item.stage;
+  $('skillImportPreviewContent').textContent = item.content;
+  const rows = [
+    ['Kaynak', item.source || 'Belirtilmedi'],
+    ['Kaynak adresi', item.sourceUrl || 'Belirtilmedi'],
+    ['Lisans', item.license || 'Belirtilmedi'],
+    ['Yazar', item.author || 'Belirtilmedi'],
+    ['Sürüm', item.version || 'Belirtilmedi']
+  ];
+  $('skillImportPreviewMetadata').innerHTML = rows.map(([label, value]) =>
+    '<div><dt>' + esc(label) + '</dt><dd>' + esc(value) + '</dd></div>'
+  ).join('');
+  const extra = Object.entries(item.metadata || {});
+  $('skillImportPreviewExtra').textContent = extra.length
+    ? 'Ek alanlar kaybolmaz; kayıtla birlikte saklanır: ' + extra.map(([key, value]) => key + ': ' + value).join(' · ')
+    : 'Ek ön bilgi alanı yok.';
+  $('skillImportPreviewWarning').textContent = [
+    entry.duplicateName ? 'Aynı isimde başka bir Skill var. İkisi ayrı kayıt olarak korunacak.' : '',
+    entry.unsupportedStage ? 'Bilinmeyen stage değeri “all” olarak kullanılacak; özgün değer saklandı.' : '',
+    'İçerik yalnızca metin talimatı olarak kaydedilir; kod veya komut çalıştırılmaz.'
+  ].filter(Boolean).join(' ');
+  if (!dialog.open) dialog.showModal();
 }
+
+async function importSkillFiles(fileList) {
+  const files = Array.from(fileList || []);
+  const queue = [];
+  const errors = [];
+  for (const file of files) {
+    if (!/\.md$/i.test(file.name)) {
+      errors.push(file.name + ': yalnızca .md dosyaları destekleniyor');
+      continue;
+    }
+    if (customSkills.length + queue.length >= 100) {
+      errors.push(file.name + ': en fazla 100 özel Skill saklanabilir');
+      continue;
+    }
+    try {
+      const parsed = parseSkillMarkdown(await file.text(), file.name);
+      const duplicateName = [...customSkills, ...queue.map(entry => entry.skill)]
+        .some(existing => existing.name.trim().toLowerCase() === parsed.name.trim().toLowerCase());
+      queue.push({
+        fileName: file.name,
+        skill: { ...parsed, group: 'Custom', builtIn: false },
+        duplicateName,
+        unsupportedStage: Boolean(parsed.metadata?.unsupported_stage)
+      });
+    } catch (error) {
+      errors.push(file.name + ': ' + (error.message || 'okunamadı'));
+    }
+  }
+  pendingSkillImports = queue;
+  skillImportFailures = errors;
+  if (!pendingSkillImports.length) {
+    if (errors.length) showToast('Skill içe aktarılamadı: ' + errors.slice(0, 3).join(' · '));
+    return;
+  }
+  renderSkillImportPreview();
+}
+
+function nextSkillImportId(item) {
+  const base = 'custom-' + String(item.id || item.name).replace(/^custom-/, '');
+  const stamp = Date.now().toString(36);
+  let candidate = base + '-' + stamp;
+  let suffix = 2;
+  while (customSkills.some(existing => existing.id === candidate)) candidate = base + '-' + stamp + '-' + suffix++;
+  return candidate.slice(0, 100);
+}
+
+async function acceptSkillImport() {
+  const entry = pendingSkillImports.shift();
+  if (!entry) return;
+  if (customSkills.length >= 100) {
+    skillImportFailures.push(entry.fileName + ': özel Skill sınırı dolu');
+    renderSkillImportPreview();
+    return;
+  }
+  const saved = { ...entry.skill, id: nextSkillImportId(entry.skill), builtIn: false, group: 'Custom' };
+  customSkills = [...customSkills, saved];
+  skillLibrary = [...SKILL_CATALOG, ...customSkills];
+  skillProfileId = 'custom';
+  const selectedNow = selectedSkillIds.filter(id => skillLibrary.some(item => item.id === id));
+  const autoSelected = selectedNow.length < MAX_SELECTED_SKILLS;
+  selectedSkillIds = (autoSelected ? [...selectedNow, saved.id] : selectedNow).slice(0, MAX_SELECTED_SKILLS);
+  await persistSkillState();
+  renderSkillLibrary();
+  showToast(autoSelected ? 'Skill kaydedildi ve seçildi.' : 'Skill kaydedildi. Sekiz Skill sınırı dolu; seçmek için birini kaldır.');
+  renderSkillImportPreview();
+}
+
+function skipSkillImport() {
+  const entry = pendingSkillImports.shift();
+  if (entry) skillImportFailures.push(entry.fileName + ': önizlemede atlandı');
+  renderSkillImportPreview();
+}
+
 function exportSkillLibrary(){
-  const chosen=getSelectedSkills();downloadText('ai-studio-skills.json',JSON.stringify({format:'ai-studio-skills-v1',profileId:skillProfileId,selectedSkillIds,customSkills,selected:chosen.map(({id,name,group,stage,description,content,source})=>({id,name,group,stage,description,content,source}))},null,2),'application/json;charset=utf-8');
+  const chosen=getSelectedSkills();downloadText('ai-studio-skills.json',JSON.stringify({format:'ai-studio-skills-v1',profileId:skillProfileId,selectedSkillIds,customSkills,selected:chosen.map(({id,name,group,stage,description,content,source,sourceUrl,license,author,version,metadata})=>({id,name,group,stage,description,content,source,sourceUrl,license,author,version,metadata}))},null,2),'application/json;charset=utf-8');
 }
 
 function renderBuiltinTools(){ $('builtinTools').innerHTML=builtinTools.map(t=>'<button class="tool-card" data-tool="'+t.id+'"><span class="tool-symbol">'+esc(t.icon)+'</span><strong>'+esc(t.name)+'</strong><small>'+esc(t.desc)+'</small></button>').join('');}
@@ -1037,6 +1136,9 @@ $('pluginForm').addEventListener('submit',addPlugin);
 $('skillProfileSelect').addEventListener('change',e=>applySkillProfile(e.target.value));
 $('skillImportBtn').addEventListener('click',()=>$('skillImportFiles').click());
 $('skillImportFiles').addEventListener('change',async e=>{if(e.target.files?.length)await importSkillFiles(e.target.files);e.target.value='';});
+$('skillImportAccept').addEventListener('click',acceptSkillImport);
+$('skillImportSkip').addEventListener('click',skipSkillImport);
+$('skillImportDialog').addEventListener('cancel',event=>{event.preventDefault();skipSkillImport();});
 $('skillExportBtn').addEventListener('click',exportSkillLibrary);
 $('exportPlugins').addEventListener('click',()=>downloadText('ai-studio-prompt-plugins.json',JSON.stringify({format:'ai-studio-prompts-v1',plugins:userPlugins.filter(p=>p.kind!=='builtin')},null,2),'application/json;charset=utf-8'));
 $('importPluginsBtn').addEventListener('click',()=> $('importPluginsFile').click());

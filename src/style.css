@@ -10,3 +10,41 @@
 .device-local-model-panel{margin:14px 0}.device-profile{padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--panel);font-size:12px;color:var(--muted);display:grid;gap:5px}.device-profile strong{color:var(--text)}.device-local-model-panel .row-actions{flex-wrap:wrap}.device-local-model-panel .field-label{margin-top:10px}
 
 #localCoderApiSettings{margin:8px 0;padding:12px}
+
+/* Safe, explicit review step before a custom Skill is stored. */
+.skill-import-dialog {
+  width: min(720px, calc(100vw - 28px));
+  max-width: 720px;
+  max-height: 86vh;
+  padding: 0;
+  overflow: auto;
+  border: 1px solid var(--line, #394150);
+  border-radius: 16px;
+  color: var(--text, #f4f6fb);
+  background: var(--panel, #171c26);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, .42);
+}
+.skill-import-dialog::backdrop { background: rgba(4, 8, 16, .72); }
+.skill-import-preview { display: grid; gap: 12px; padding: 20px; }
+.skill-import-preview h3 { margin: 0; }
+.skill-import-preview-content {
+  max-height: 30vh;
+  margin: 0;
+  padding: 12px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  border: 1px solid var(--line, #394150);
+  border-radius: 10px;
+  color: var(--text, #f4f6fb);
+  background: rgba(0, 0, 0, .18);
+  font: 12px/1.55 ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+.skill-import-preview-metadata { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 16px; margin: 0; }
+.skill-import-preview-metadata div { min-width: 0; }
+.skill-import-preview-metadata dt { color: var(--muted, #9aa5b5); font-size: 11px; }
+.skill-import-preview-metadata dd { margin: 2px 0 0; overflow-wrap: anywhere; font-size: 13px; }
+@media (max-width: 520px) {
+  .skill-import-preview { padding: 14px; }
+  .skill-import-preview-metadata { grid-template-columns: 1fr; }
+}

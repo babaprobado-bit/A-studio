@@ -384,54 +384,34 @@ export const SKILL_CATALOG = Object.freeze([
   }
 ]);
 export const SKILL_PROFILES = Object.freeze({
-  "karpathy": {
-    "name": "Karpathy Guidelines",
-    "description": "Tek temel kalite kuralı.",
-    "skillIds": [
-      "karpathy-guidelines"
-    ]
+  karpathy: { name: 'Karpathy Guidelines', description: 'Tek temel kalite kuralı.', skillIds: ['karpathy-guidelines'] },
+  superpowers: {
+    name: 'Superpowers', description: 'Planlama, araştırma, test ve inceleme.',
+    skillIds: ['sp-clarify','sp-codebase-map','sp-incremental-plan','sp-root-cause','sp-test-first','sp-minimal-diff','sp-compatibility','sp-edge-review']
   },
-  "superpowers": {
-    "name": "Superpowers",
-    "description": "Planlama, araştırma, test ve inceleme.",
-    "skillIds": [
-      "sp-clarify",
-      "sp-codebase-map",
-      "sp-incremental-plan",
-      "sp-root-cause",
-      "sp-test-first",
-      "sp-minimal-diff",
-      "sp-compatibility",
-      "sp-edge-review"
-    ]
+  'superpowers-development': {
+    name: 'Superpowers Development', description: 'Kod geliştirme, API sözleşmesi, güvenlik ve performans.',
+    skillIds: ['sp-clarify','sp-codebase-map','sp-incremental-plan','sp-test-first','sp-minimal-diff','sp-api-contract','sp-secure-defaults','sp-performance-budget']
   },
-  "caveman": {
-    "name": "Caveman",
-    "description": "Kısa, doğrudan ve basit çalışma.",
-    "skillIds": [
-      "cv-concise",
-      "cv-plain",
-      "cv-one-step",
-      "cv-no-guess",
-      "cv-small-steps",
-      "cv-simple-solution",
-      "cv-keep-working",
-      "cv-honest-tests"
-    ]
+  planning: {
+    name: 'Planning', description: 'Görevi anla, kapsamı belirle ve test edilebilir plana dönüştür.',
+    skillIds: ['sp-clarify','sp-codebase-map','sp-incremental-plan','sp-assumption-check','cv-one-step','cv-simple-solution','cv-tradeoffs','cv-mvp']
   },
-  "balanced": {
-    "name": "Dengeli Geliştirme",
-    "description": "Genel geliştirme için karışık paket.",
-    "skillIds": [
-      "karpathy-guidelines",
-      "sp-clarify",
-      "sp-codebase-map",
-      "sp-minimal-diff",
-      "sp-test-first",
-      "sp-compatibility",
-      "cv-concise",
-      "cv-no-guess"
-    ]
+  review: {
+    name: 'Review', description: 'Hata, uyumluluk, uç durum ve yayın kontrolü.',
+    skillIds: ['sp-root-cause','sp-reproduce','sp-compatibility','sp-edge-review','sp-docs-sync','sp-release-gate','cv-keep-working','cv-honest-tests']
+  },
+  caveman: {
+    name: 'Caveman', description: 'Kısa, doğrudan ve basit çalışma.',
+    skillIds: ['cv-concise','cv-plain','cv-one-step','cv-no-guess','cv-small-steps','cv-simple-solution','cv-keep-working','cv-honest-tests']
+  },
+  'caveman-short': {
+    name: 'Caveman Short Mode', description: 'En kısa ve anlaşılır yanıtlar; önemli uyarıları korur.',
+    skillIds: ['cv-concise','cv-plain','cv-one-step','cv-no-guess','cv-small-steps','cv-good-errors','cv-readable','cv-final-summary']
+  },
+  balanced: {
+    name: 'Dengeli Geliştirme', description: 'Genel geliştirme için karışık paket.',
+    skillIds: ['karpathy-guidelines','sp-clarify','sp-codebase-map','sp-minimal-diff','sp-test-first','sp-compatibility','cv-concise','cv-no-guess']
   }
 });
 
@@ -445,55 +425,111 @@ export function normalizeSkill(raw, options = {}) {
   const content = String(raw.content || raw.body || '').trim();
   if (!name || !content || content.length > MAX_IMPORTED_SKILL_CHARS) return null;
   const id = String(raw.id || (options.idPrefix || 'custom') + '-' + slug(name)).slice(0, 100);
-  const stage = ['plan','code','review','all'].includes(raw.stage) ? raw.stage : 'all';
-  return { id, name, group: String(raw.group || 'Custom').slice(0, 40), stage, description: String(raw.description || '').trim().slice(0, 240), content, source: String(raw.source || 'Imported SKILL.md').slice(0, 160), builtIn: raw.builtIn === true };
+  const stage = ['plan', 'code', 'review', 'all'].includes(raw.stage) ? raw.stage : 'all';
+  const metadata = {};
+  if (raw.metadata && typeof raw.metadata === 'object' && !Array.isArray(raw.metadata)) {
+    for (const [key, value] of Object.entries(raw.metadata).slice(0, 12)) {
+      if (!/^[a-zA-Z0-9_-]{1,40}$/.test(key)) continue;
+      if (typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'boolean') continue;
+      metadata[key] = String(value).slice(0, 160);
+    }
+  }
+  return {
+    id, name, group: String(raw.group || 'Custom').slice(0, 40), stage,
+    description: String(raw.description || '').trim().slice(0, 240),
+    content,
+    source: String(raw.source || 'Imported SKILL.md').trim().slice(0, 500),
+    sourceUrl: String(raw.sourceUrl || '').trim().slice(0, 500),
+    license: String(raw.license || '').trim().slice(0, 120),
+    author: String(raw.author || '').trim().slice(0, 120),
+    version: String(raw.version || '').trim().slice(0, 40),
+    metadata,
+    builtIn: raw.builtIn === true
+  };
 }
 
 export function parseSkillMarkdown(markdown, fileName = 'SKILL.md') {
   const source = String(markdown || '').replace(/^\uFEFF/, '').trim();
   if (!source) throw new Error('SKILL.md dosyası boş.');
   if (source.length > 50000) throw new Error('Dosya 50 KB sınırını aşıyor.');
-  let header = {}; let body = source;
+
+  let header = {};
+  let body = source;
   if (source.startsWith('---')) {
-    const end = source.indexOf('\n---', 3);
-    if (end > 0) {
-      const front = source.slice(3, end); body = source.slice(end + 4).trim();
-      for (const line of front.split(/\r?\n/)) {
-        const match = line.match(/^([a-zA-Z_-]+)\s*:\s*(.*)$/);
-        if (match) header[match[1].toLowerCase()] = match[2].replace(/^['"]|['"]$/g, '').trim();
-      }
+    const frontMatter = source.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
+    if (!frontMatter) throw new Error('SKILL.md ön bilgisi kapanmamış; baştaki --- satırını kapat.');
+    body = source.slice(frontMatter[0].length).trim();
+    for (const [index, line] of frontMatter[1].split(/\r?\n/).entries()) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      const match = trimmed.match(/^([a-zA-Z][a-zA-Z0-9_-]{0,39})\s*:\s*(.*)$/);
+      if (!match) throw new Error('Ön bilgi satırı ' + (index + 1) + ' okunamadı.');
+      header[match[1].toLowerCase()] = match[2].replace(/^['"]|['"]$/g, '').trim();
     }
   }
+
   const heading = body.match(/^#\s+(.+)$/m);
   const name = header.name || (heading ? heading[1].trim() : String(fileName).replace(/\.md$/i, '')) || 'Imported Skill';
   const description = header.description || '';
   const stageRaw = String(header.stage || 'all').toLowerCase();
-  const stage = ['plan','code','review','all'].includes(stageRaw) ? stageRaw : 'all';
-  const content = body.replace(/^#\s+.+\n?/, '').trim();
+  const validStage = ['plan', 'code', 'review', 'all'].includes(stageRaw);
+  const stage = validStage ? stageRaw : 'all';
+  const content = body.replace(/^#\s+.+(?:\r?\n|$)/, '').trim();
   if (!content) throw new Error('Skill içeriği bulunamadı.');
   if (content.length > MAX_IMPORTED_SKILL_CHARS) throw new Error('Skill metni 12.000 karakter sınırını aşıyor.');
-  return normalizeSkill({ name, description, stage, content, group: 'Custom', source: 'Imported: ' + fileName });
+
+  const known = new Set(['name', 'description', 'stage', 'source', 'source_url', 'sourceurl', 'license', 'author', 'version']);
+  const metadata = {};
+  for (const [key, value] of Object.entries(header)) {
+    if (!known.has(key)) metadata[key] = value;
+  }
+  if (!validStage) metadata.unsupported_stage = stageRaw;
+
+  return normalizeSkill({
+    name, description, stage, content, group: 'Custom',
+    source: header.source || ('Imported: ' + fileName),
+    sourceUrl: header.source_url || header.sourceurl || '',
+    license: header.license || '',
+    author: header.author || '',
+    version: header.version || '',
+    metadata
+  });
 }
 
 export function buildStageSkillContext(skills, stageId, limits = {}) {
   const maxSkills = Math.max(0, Math.min(MAX_SELECTED_SKILLS, Number(limits.maxSkills ?? MAX_SELECTED_SKILLS)));
   const maxChars = Math.max(0, Math.min(MAX_STAGE_SKILL_CHARS, Number(limits.maxChars ?? MAX_STAGE_SKILL_CHARS)));
-  const stage = ['plan','code','review'].includes(stageId) ? stageId : 'all';
-  const candidates = (Array.isArray(skills) ? skills : []).map(skill => normalizeSkill(skill)).filter(Boolean).filter(skill => skill.stage === 'all' || skill.stage === stage).slice(0, maxSkills);
-  const header = '\\n\\n--- AI STUDIO SKILLS (' + stage.toUpperCase() + ') ---\\n';
-  const footer = '\\n--- END SKILLS ---';
+  const stage = ['plan', 'code', 'review'].includes(stageId) ? stageId : 'all';
+  const eligible = (Array.isArray(skills) ? skills : [])
+    .map(item => normalizeSkill(item))
+    .filter(Boolean)
+    .filter(item => item.stage === 'all' || item.stage === stage);
+  const candidates = eligible.slice(0, maxSkills);
+  const header = '\n\n--- AI STUDIO SKILLS (' + stage.toUpperCase() + ') ---\n';
+  const footer = '\n--- END SKILLS ---';
   const contentBudget = Math.max(0, maxChars - header.length - footer.length);
-  const blocks = []; let used = 0; const includedIds = []; const excludedIds = [];
-  for (const skill of candidates) {
-    const block = '### ' + skill.name + '\\n' + skill.content;
+  const blocks = [];
+  let used = 0;
+  const includedIds = [];
+  const excludedIds = [];
+  for (const item of candidates) {
+    const block = '### ' + item.name + '\n' + item.content;
     const remaining = contentBudget - used;
-    if (remaining < 100) { excludedIds.push(skill.id); continue; }
+    if (remaining < 100) {
+      excludedIds.push(item.id);
+      continue;
+    }
     const clipped = block.length > remaining ? block.slice(0, remaining) : block;
-    blocks.push(clipped); used += clipped.length; includedIds.push(skill.id);
-    if (clipped.length < block.length) { excludedIds.push(skill.id); break; }
+    blocks.push(clipped);
+    used += clipped.length;
+    includedIds.push(item.id);
+    if (clipped.length < block.length) {
+      excludedIds.push(item.id);
+      break;
+    }
   }
-  const omittedByCount = (Array.isArray(skills) ? skills.length : 0) > maxSkills;
-  const promptText = blocks.length ? header + blocks.join('\\n\\n') + footer : '';
+  const omittedByCount = eligible.length > maxSkills;
+  const promptText = blocks.length ? header + blocks.join('\n\n') + footer : '';
   return { promptText, includedIds, excludedIds, charCount: promptText.length, maxChars, stage, omittedByCount };
 }
 export function getProfileSkillIds(profileId) {
