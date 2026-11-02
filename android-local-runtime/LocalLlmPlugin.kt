@@ -37,7 +37,7 @@ class LocalLlmPlugin : Plugin() {
     }
 
     private fun safeModelFile(name: String): File {
-        require(name.matches(Regex("^[A-Za-z0-9._-]+\.gguf$"))) { "Model dosya adı geçersiz." }
+        require(name.matches(Regex("^[A-Za-z0-9._-]+[.]gguf$"))) { "Model dosya adı geçersiz." }
         val root = modelDirectory().canonicalFile
         val target = File(root, name).canonicalFile
         require(target.parentFile == root) { "Model yolu geçersiz." }
