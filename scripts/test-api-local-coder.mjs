@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { buildLocalCoderStages } from '../src/workshop-data.js';
 import { runApiLocalCoderSequence } from '../src/local-coder-api.js';
 
@@ -126,3 +127,23 @@ await assert.rejects(runApiLocalCoderSequence({
   confirmConsent: async () => true
 }), /Plan, Code ve Review/);
 console.log('API Local Coder mocked consent and routing tests passed.');
+
+const mainSource = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
+const snapshotStart = mainSource.indexOf('function buildWorkspaceSnapshot()');
+const snapshotEnd = mainSource.indexOf('async function exportWorkspace()', snapshotStart);
+assert.ok(snapshotStart >= 0 && snapshotEnd > snapshotStart, 'workspace snapshot function must exist');
+const snapshotSource = mainSource.slice(snapshotStart, snapshotEnd);
+assert.doesNotMatch(snapshotSource, /getSecret|runtimeKeys|apiKey|secret/i,
+  'workspace backups must not read or include provider secrets');
+
+const apiStart = mainSource.indexOf('async function runApiLocalCoderWorkshop()');
+const apiEnd = mainSource.indexOf('async function runLocalCoderWorkshop()', apiStart);
+assert.ok(apiStart >= 0 && apiEnd > apiStart, 'API Local Coder entry point must exist');
+const apiSource = mainSource.slice(apiStart, apiEnd);
+assert.match(apiSource, /hasKey:Boolean\(key\)/,
+  'the API sequence receives only a key-presence flag, not the key value');
+const activityCalls = [...apiSource.matchAll(/logAgentActivity\(([\\s\\S]*?)\\);/g)];
+assert.ok(activityCalls.length >= 3, 'API flow activity should be logged');
+assert.ok(activityCalls.every(match => !/\\bkey\\b|secret/i.test(match[1])),
+  'provider secrets must never be included in activity log arguments');
+console.log('API Local Coder secret-boundary checks passed.');
