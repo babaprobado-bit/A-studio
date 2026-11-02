@@ -141,6 +141,15 @@ const apiStart = mainSource.indexOf('async function runApiLocalCoderWorkshop()')
 const apiEnd = mainSource.indexOf('async function runLocalCoderWorkshop()', apiStart);
 assert.ok(apiStart >= 0 && apiEnd > apiStart, 'API Local Coder entry point must exist');
 const apiSource = mainSource.slice(apiStart, apiEnd);
+const busyLockIndex = apiSource.indexOf('busy=true;');
+const keyLookupIndex = apiSource.indexOf('await getSecret(providerId)');
+assert.ok(busyLockIndex >= 0 && keyLookupIndex > busyLockIndex,
+  'API run lock must be set before the first awaited secure-key lookup');
+assert.ok(apiSource.indexOf("$('localCoderRun').disabled=true;") < keyLookupIndex,
+  'API run button must disable before secure-key lookup');
+assert.ok(apiSource.includes('finally{') && apiSource.includes('busy=false;'),
+  'API run lock must always be released in finally');
+
 assert.ok(apiSource.includes('hasKey:Boolean(key)'),
   'the API sequence receives only a key-presence flag, not the key value');
 const activityArguments = apiSource.split('logAgentActivity(').slice(1)

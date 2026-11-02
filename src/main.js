@@ -583,15 +583,25 @@ async function runDeviceLocalCoderWorkshop(){
 }
 async function runApiLocalCoderWorkshop(){
   if(busy){showToast('Başka bir ajan zinciri çalışıyor.');return;}
-  const task=$('localCoderTask').value.trim();if(!task){showToast('Önce Local Coder görevini yaz.');return;}
+  const task=$('localCoderTask').value.trim();
+  if(!task){showToast('Önce Local Coder görevini yaz.');return;}
   const providerId=$('localCoderApiProvider')?.value||settings.localCoderApiProvider||'openai';
   if(!providers[providerId]||providerId==='ollama'){showToast('API sağlayıcısı seçilmedi.');return;}
-  const key=await getSecret(providerId);
-  if(!key){showToast(providers[providerId].name+' API anahtarı yok. Modeller ekranından ekle.');go('models');return;}
-  const sourceCode=$('localCoderUseCode').checked?$('codePad').value.slice(0,10000):'';
-  const stages=buildLocalCoderStages({task,language:$('codeLanguage').value,sourceCode});
-  let flowStarted=false;
+
+  // Lock before the first await (including secure-key lookup and consent).
+  // This prevents rapid double taps from launching duplicate billable chains.
+  busy=true;
+  $('localCoderRun').disabled=true;
+  $('localCoderRun').textContent='API ajanı hazırlanıyor…';
   try{
+    const key=await getSecret(providerId);
+    if(!key){
+      showToast(providers[providerId].name+' API anahtarı yok. Modeller ekranından ekle.');
+      go('models');
+      return;
+    }
+    const sourceCode=$('localCoderUseCode').checked?$('codePad').value.slice(0,10000):'';
+    const stages=buildLocalCoderStages({task,language:$('codeLanguage').value,sourceCode});
     const result=await runApiLocalCoderSequence({
       providerId,
       providers,
@@ -607,11 +617,7 @@ async function runApiLocalCoderWorkshop(){
       onApproved:async()=>{
         settings.localCoderApiProvider=providerId;
         await setPref(DB.settings,settings);
-        busy=true;flowStarted=true;
-        $('localCoderRun').disabled=true;
         $('localCoderRun').textContent='API ajanı çalışıyor…';
-        $('localCoderReview').value='';
-        $('localCoderOutput').value='';
         await logAgentActivity('Local Coder · '+providers[providerId].name,'Başladı',task);
       },
       makePrompt:(stage,previous)=>{
@@ -632,7 +638,11 @@ async function runApiLocalCoderWorkshop(){
     });
     if(result.status==='cancelled')return;
     if(result.status==='invalid-provider'){showToast('API sağlayıcısı seçilmedi.');return;}
-    if(result.status==='missing-key'){showToast(providers[providerId].name+' API anahtarı yok. Modeller ekranından ekle.');go('models');return;}
+    if(result.status==='missing-key'){
+      showToast(providers[providerId].name+' API anahtarı yok. Modeller ekranından ekle.');
+      go('models');
+      return;
+    }
     $('localCoderStatus').textContent=providers[providerId].name+' ile 3 aşamalı Local Coder zinciri tamamlandı. Kod çalıştırılmadı.';
     await logAgentActivity('Local Coder · API','Tamamlandı','Kod taslağı ve inceleme notu hazır; kod otomatik çalıştırılmadı.');
     showToast('API tabanlı Local Coder tamamlandı. Taslağı incele.');
@@ -641,11 +651,9 @@ async function runApiLocalCoderWorkshop(){
     await logAgentActivity('Local Coder · API','Hata',error.message||'API isteği başarısız');
     showToast('API Local Coder çalışamadı.');
   }finally{
-    if(flowStarted){
-      busy=false;
-      $('localCoderRun').disabled=false;
-      $('localCoderRun').textContent='Yerel ajan zincirini çalıştır';
-    }
+    busy=false;
+    $('localCoderRun').disabled=false;
+    $('localCoderRun').textContent='Yerel ajan zincirini çalıştır';
   }
 }
 
