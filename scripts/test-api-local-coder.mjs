@@ -133,17 +133,21 @@ const snapshotStart = mainSource.indexOf('function buildWorkspaceSnapshot()');
 const snapshotEnd = mainSource.indexOf('async function exportWorkspace()', snapshotStart);
 assert.ok(snapshotStart >= 0 && snapshotEnd > snapshotStart, 'workspace snapshot function must exist');
 const snapshotSource = mainSource.slice(snapshotStart, snapshotEnd);
-assert.doesNotMatch(snapshotSource, /getSecret|runtimeKeys|apiKey|secret/i,
-  'workspace backups must not read or include provider secrets');
+for (const token of ['getSecret', 'runtimeKeys', 'apiKey', 'secret']) {
+  assert.equal(snapshotSource.includes(token), false, 'workspace backup must not contain ' + token);
+}
 
 const apiStart = mainSource.indexOf('async function runApiLocalCoderWorkshop()');
 const apiEnd = mainSource.indexOf('async function runLocalCoderWorkshop()', apiStart);
 assert.ok(apiStart >= 0 && apiEnd > apiStart, 'API Local Coder entry point must exist');
 const apiSource = mainSource.slice(apiStart, apiEnd);
-assert.match(apiSource, /hasKey:Boolean\(key\)/,
+assert.ok(apiSource.includes('hasKey:Boolean(key)'),
   'the API sequence receives only a key-presence flag, not the key value');
-const activityCalls = [...apiSource.matchAll(/logAgentActivity\(([\s\S]*?)\);/g)];
-assert.ok(activityCalls.length >= 3, 'API flow activity should be logged');
-assert.ok(activityCalls.every(match => !/\bkey\b|secret/i.test(match[1])),
-  'provider secrets must never be included in activity log arguments');
+const activityArguments = apiSource.split('logAgentActivity(').slice(1)
+  .map(fragment => fragment.slice(0, fragment.indexOf(');')));
+assert.ok(activityArguments.length >= 3, 'API flow activity should be logged');
+for (const argumentText of activityArguments) {
+  assert.equal(argumentText.includes('key'), false, 'provider key must not appear in activity logs');
+  assert.equal(argumentText.includes('secret'), false, 'provider secret must not appear in activity logs');
+}
 console.log('API Local Coder secret-boundary checks passed.');
