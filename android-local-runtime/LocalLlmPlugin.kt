@@ -54,6 +54,9 @@ class LocalLlmPlugin : Plugin() {
             val arm64 = Build.SUPPORTED_ABIS.any { it.equals("arm64-v8a", true) }
             val result = JSObject()
             result.put("supported", arm64 && Build.VERSION.SDK_INT >= 29)
+            result.put("manufacturer", Build.MANUFACTURER ?: "unknown")
+            result.put("deviceModel", Build.MODEL ?: "unknown")
+            result.put("hardware", Build.HARDWARE ?: "unknown")
             result.put("abi", Build.SUPPORTED_ABIS.firstOrNull() ?: "unknown")
             result.put("supportedAbis", Build.SUPPORTED_ABIS.joinToString(","))
             result.put("androidSdk", Build.VERSION.SDK_INT)

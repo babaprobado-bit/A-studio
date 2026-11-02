@@ -75,6 +75,14 @@ File sizes are estimates. Model files are not committed or bundled in the APK. T
 
 DownloadManager is Wi-Fi-only by default (allowMetered=false) and disallows roaming. Files are stored in app-specific external files under models. Kotlin checks filename and GGUF magic header before loading. App exposes load/unload/delete. Current UI does not provide a clear cancel-download button; JS polls DownloadManager status.
 
+### Device capability detection and model recommendation
+
+The native Android `getDeviceInfo` bridge reports manufacturer/model label, Android SDK, supported ABI list, processor core count, total RAM, currently available RAM, Android low-memory pressure and free model-storage space. The UI keeps a manual model selector for Qwen2.5-Coder 0.5B, 1.5B and 3B GGUF variants, and marks the best estimated fit for the current phone.
+
+Model recommendations use coarse guardrails (RAM, available RAM, CPU core count and approximately 15% storage headroom): 0.5B = 4 GB total RAM / 4 CPU cores / 1.5 GB available RAM; 1.5B = 8 GB / 6 cores / 2.3 GB available RAM; 3B = 12 GB / 8 cores / 3.8 GB available RAM. An Android low-memory warning blocks a new model load until memory pressure clears. The app refreshes memory/storage readings before download and load. These are conservative heuristics, not a CPU benchmark or a guarantee of speed, thermal behavior or stability. The smaller model remains manually selectable; a user override is warned about rather than silently changed.
+
+No physical-device test has been performed for this capability update. Real Android compatibility, actual model load and generation, and airplane-mode inference remain Session 2 acceptance tests.
+
 ### Native workflow
 The workflow currently:
 1. Uses GitHub Actions Ubuntu 24.04, Node 20, Java 21 and preinstalled Android SDK.

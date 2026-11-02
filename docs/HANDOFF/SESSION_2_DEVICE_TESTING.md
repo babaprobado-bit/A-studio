@@ -5,6 +5,14 @@ Once Session 1 produces the native GGUF APK, test installation, model management
 
 Do not use the regular demo APK for this test; it does not contain the native GGUF bridge. Use artifact from build-android-local-coder.yml.
 
+## Software-side progress (2026-11-02; not a device-test pass)
+
+- The native model manager exposes manual selection of Qwen2.5-Coder 0.5B, 1.5B and 3B GGUF variants.
+- The Android bridge now reports manufacturer/model label, Android SDK, ABI, CPU core count, total/available RAM, low-memory pressure and free model storage.
+- The app recommends a model using approximate RAM/CPU/storage thresholds, labels model fit in the picker, preserves manual selection and refreshes live resource readings before download/load.
+- These heuristics do not replace real performance, thermal or memory-stability testing. No physical-phone install, GGUF inference or airplane-mode test has been completed.
+- Initial GGUF download still requires internet. After a complete model download, inference is intended to run locally without internet or an API key.
+
 ## Read first
 - docs/HANDOFF/README.md
 - docs/HANDOFF/PROJECT_STATE.md

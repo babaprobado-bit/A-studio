@@ -1,5 +1,5 @@
 import { Capacitor } from '@capacitor/core';
-import { DeviceLocalCoder, DEVICE_MODEL_CATALOG, chooseRecommendedDeviceModel, formatModelBytes } from './device-local-coder.js';
+import { DeviceLocalCoder, DEVICE_MODEL_CATALOG, assessDeviceModel, chooseRecommendedDeviceModel, formatModelBytes } from './device-local-coder.js';
 import { Preferences } from '@capacitor/preferences';
 import { SecureStoragePlugin } from 'capacitor-secure-storage-plugin';
 import './style.css';
@@ -403,24 +403,49 @@ function renderDeviceModelDescription(){
   const select=$('onDeviceModelCatalog'), description=$('onDeviceModelDescription');
   if(!select||!description)return;
   const model=DEVICE_MODEL_CATALOG.find(item=>item.id===select.value)||DEVICE_MODEL_CATALOG[0];
-  description.textContent=model.name+' · yaklaşık '+formatModelBytes(model.sizeBytes)+' indirme · '+model.minRamGb+' GB+ RAM önerisi. '+model.summary;
+  const info=deviceLocalState?.device;
+  const assessment=info?assessDeviceModel(model,info):null;
+  let fit='Telefon bilgileri okunuyor.';
+  if(info&&!info.supported)fit='Bu cihaz yerel motoru desteklemiyor.';
+  else if(assessment){
+    if(assessment.fitsRecommended)fit='Bu telefon için uygun görünüyor.';
+    else fit='Uyarı: '+assessment.warnings.join('; ')+'.';
+  }
+  description.textContent=model.name+' · yaklaşık '+formatModelBytes(model.sizeBytes)+' indirme · '+model.minRamGb+' GB+ RAM · '+model.minCpuCores+'+ CPU çekirdeği önerisi (kaba tahmin). '+fit+' '+model.summary;
 }
 function renderDeviceLocalModelManager(){
   const panel=$('deviceLocalModelsPanel'); if(!panel)return;
   if(!nativeApp){panel.classList.add('hidden');syncLocalCoderEngineUI();return;}
   panel.classList.remove('hidden');
   const info=deviceLocalState?.device;
+  const recommendation=deviceLocalState?.recommendation;
   const summary=$('deviceLocalProfile');
   if(summary){
     if(!info)summary.textContent='Telefon bilgileri alınamadı.';
-    else summary.innerHTML='<strong>'+(info.supported?'Bu telefon yerel model motorunu destekliyor':'Bu telefon için yerel model motoru desteklenmiyor')+'</strong><span>Android '+esc(info.androidSdk)+' · '+esc(info.abi)+' · '+esc(info.processorCount)+' CPU çekirdeği</span><span>RAM: '+formatModelBytes(info.totalMemoryBytes)+' · Kullanılabilir: '+formatModelBytes(info.availableMemoryBytes)+'</span><span>Boş alan: '+formatModelBytes(info.freeStorageBytes)+'</span>';
+    else {
+      const deviceName=[info.manufacturer,info.deviceModel].filter(value=>value&&value!=='unknown').join(' ');
+      summary.innerHTML='<strong>'+(info.supported?'Bu telefon yerel model motorunu destekliyor':'Bu telefon için yerel model motoru desteklenmiyor')+'</strong>'
+        +(deviceName?'<span>Cihaz: '+esc(deviceName)+'</span>':'')
+        +'<span>Güç profili: '+esc(recommendation?.capabilityTier||'Belirlenemedi')+'</span>'
+        +'<span>Android '+esc(info.androidSdk)+' · '+esc(info.abi)+' · '+esc(info.processorCount)+' CPU çekirdeği</span>'
+        +'<span>RAM: '+formatModelBytes(info.totalMemoryBytes)+' · Kullanılabilir: '+formatModelBytes(info.availableMemoryBytes)+'</span>'
+        +'<span>Boş alan: '+formatModelBytes(info.freeStorageBytes)+'</span>';
+    }
   }
   const catalog=$('onDeviceModelCatalog');
   if(catalog){
     const previous=catalog.value;
-    catalog.innerHTML=DEVICE_MODEL_CATALOG.map(model=>'<option value="'+esc(model.id)+'">'+esc(model.name)+' · '+formatModelBytes(model.sizeBytes)+'</option>').join('');
-    if(DEVICE_MODEL_CATALOG.some(model=>model.id===previous))catalog.value=previous;
-    else if(deviceLocalState?.recommendation?.id)catalog.value=deviceLocalState.recommendation.id;
+    catalog.innerHTML=DEVICE_MODEL_CATALOG.map(model=>{
+      const assessment=info?assessDeviceModel(model,info):null;
+      const tags=[];
+      if(recommendation?.id===model.id&&!recommendation.isUnderpowered)tags.push('telefon için önerilen');
+      if(assessment&&!assessment.memoryOk)tags.push('RAM sınırı');
+      else if(assessment&&!assessment.cpuOk)tags.push('daha yavaş olabilir');
+      if(assessment&&!assessment.storageOk)tags.push('depolama yetersiz');
+      return '<option value="'+esc(model.id)+'">'+esc(model.name)+' · '+formatModelBytes(model.sizeBytes)+(tags.length?' · '+esc(tags.join(', ')):'')+'</option>';
+    }).join('');
+    if(DEVICE_MODEL_CATALOG.some(item=>item.id===previous))catalog.value=previous;
+    else if(recommendation?.id)catalog.value=recommendation.id;
   }
   const installed=$('installedLocalModel');
   if(installed){
@@ -445,7 +470,9 @@ async function refreshDeviceLocalModels(quiet=false){
     renderDeviceLocalModelManager();
     const recommendation=deviceLocalState.recommendation;
     if($('onDeviceModelStatus'))$('onDeviceModelStatus').textContent=deviceLocalState.device?.supported
-      ?'Model önerisi: '+recommendation.name+'. '+(recommendation.lowAvailableMemory?'Şu anki boş RAM düşük; diğer uygulamaları kapatıp tekrar dene.':'Modeli indirdikten sonra internet olmadan çalıştırabilirsin.')
+      ?(recommendation.isUnderpowered
+        ?'Telefon profili: '+recommendation.capabilityTier+'. '+recommendation.recommendationReason+' En küçük modeli denemeden önce boş RAM ve depolamayı kontrol et.'
+        :'Telefon profili: '+recommendation.capabilityTier+'. Önerilen model: '+recommendation.name+'. '+recommendation.recommendationReason+' Modeli indirdikten sonra internet olmadan çalıştırabilirsin.')
       :'Bu Android sürümü veya işlemci mimarisi yerel modeli desteklemiyor. PC / Ollama ve API sağlayıcıları çalışmaya devam eder.';
     return deviceLocalState;
   }catch(error){
@@ -457,7 +484,9 @@ async function refreshDeviceLocalModels(quiet=false){
 async function downloadSelectedDeviceModel(){
   const model=DEVICE_MODEL_CATALOG.find(item=>item.id===$('onDeviceModelCatalog')?.value);
   if(!model)return;
-  if(!confirm(model.name+' indirilsin mi? Yaklaşık '+formatModelBytes(model.sizeBytes)+' boş alan gerekir. İlk indirme internet ister; model indirildikten sonra çıkarım çevrimdışı yapılır. İndirme varsayılan olarak ücretli/mobil veri kullanmaz.'))return;
+  const assessment=deviceLocalState?.device?assessDeviceModel(model,deviceLocalState.device):null;
+  const warning=assessment&&!assessment.fitsRecommended?'\n\nCihaz uyarısı: '+assessment.warnings.join('; ')+'. Modeli elle seçtin; indirmek yine de mümkün olabilir, ancak yükleme veya hız sorunları yaşanabilir.':'';
+  if(!confirm(model.name+' indirilsin mi? Yaklaşık '+formatModelBytes(model.sizeBytes*1.15)+' boş alan bırak. İlk indirme internet ister; model indirildikten sonra çıkarım çevrimdışı yapılır. İndirme varsayılan olarak ücretli/mobil veri kullanmaz.'+warning))return;
   const button=$('downloadOnDeviceModel');button.disabled=true;
   if($('onDeviceModelStatus'))$('onDeviceModelStatus').textContent='İndirme başlatılıyor…';
   try{
