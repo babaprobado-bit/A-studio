@@ -2,14 +2,18 @@
 
 ## Latest continuation status — 2026-11-02
 
-- Official product name is **AI Studio**. “Alpha 1” is a development milestone label only. Android display name is AI Studio; keep the compatibility-sensitive application ID `com.aistudio.alpha1` unchanged.
-- Active branch head: `c2417699cca0ec1381c6a41422f5b7d837c91f02` (`Update private site smoke test for AI Studio name`). All work remains on `feature/android-offline-skills-v1`; `main` has not been modified.
-- Hardware-aware GGUF model choice is implemented in source and covered by JavaScript device-bridge tests: RAM, available RAM, CPU core count, Android low-memory state, ABI/Android support and free storage are considered. The user can manually choose 0.5B / 1.5B / 3B; recommendations are conservative estimates, not real performance benchmarks.
-- Demo Android workflow [41472090928](https://github.com/babaprobado-bit/A-studio/actions/runs/41472090928) completed successfully on `c2417699...`. Artifact `AI-Studio-Demo-APK` (ID `13155362741`, ZIP 3,765,056 bytes) was uploaded. This is the regular demo APK and does **not** include the native GGUF bridge; do not use it for Session 2 native inference tests.
-- Native GGUF workflow [41472242158](https://github.com/babaprobado-bit/A-studio/actions/runs/41472242158) was manually dispatched for the same `c2417699...` commit. At the latest check it was still in progress at the pinned `llama.kt` checkout step. Do not call it successful until it completes and uploads `AI-Studio-1.1-OnDevice-LocalCoder-APK`.
-- The earlier native run [41459856700](https://github.com/babaprobado-bit/A-studio/actions/runs/41459856700) succeeded on commit `7341a83ebbe57d9f4ae917c1a632856d44df6965`, which contains the hardware-aware model-selection code. The latest `c2417699...` native run is a separate verification after the product-name/test expectation correction.
-- The user reports their phone as Redmi S12 and says internet is currently unavailable. Exact Android version, ABI and device memory have not been read from the physical phone. No phone install, model download, on-device inference or airplane-mode inference has been performed. Do not claim any of these as passed.
-- PR #2 remains open/draft, base `main`, head `feature/android-offline-skills-v1`; do not merge without explicit user instruction.
+- Official product name is **AI Studio**. “Alpha 1” is only a development milestone label. Keep the compatibility-sensitive application ID `com.aistudio.alpha1` unchanged.
+- Latest code commit: `a277892d712d903e985a05d98440afc55f5684f2` on `feature/android-offline-skills-v1`. `main` remains unchanged at `aab010319b6500002844bd24b11da85dd9ca3b00`.
+- PR #2 remains open/draft, base `main`, head `feature/android-offline-skills-v1`. Do not merge without explicit user instruction.
+- Skill Library now has nine profile selector entries including the `custom` manual-selection mode. The pre-existing profile IDs remain compatible; added profiles are `superpowers-development`, `planning`, `review` and `caveman-short`. Max eight Skills per preset.
+- Markdown import now checks `.md` filenames correctly, previews each selected file before saving, supports bounded scalar front matter for source/source_url/license/author/version plus retained unknown metadata, warns about duplicate names and unsupported stages, and never executes imported text. Custom Skill limit remains 100; each content body max 12,000 chars; whole Markdown file max 50,000 chars.
+- Stage Skill prompt assembly now uses real line breaks and counts headers, footers, block separators and content against the 36,000-character limit. The latest Skill regression test passed on `a277892...`.
+- Demo build [41474730949](https://github.com/babaprobado-bit/A-studio/actions/runs/41474730949) is running for `a277892...`. JS checks, Vite build, Local Coder/workshop tests, Skill Library tests, device bridge tests and website smoke test passed; Gradle debug APK creation was still running at last check.
+- Native GGUF build [41474731858](https://github.com/babaprobado-bit/A-studio/actions/runs/41474731858) is running for `a277892...`; pinned llama.kt checkout succeeded and llama.cpp Android source preparation was in progress. No fresh native APK artifact yet.
+- The 36k boundary test found that separator newlines were not counted in the previous implementation. The code—not just the test—was fixed in commit `a277892...`; the latest Skill Library test step now passes.
+- Existing code review confirms standard and encrypted workspace exports both use `buildWorkspaceSnapshot()`, which includes `skills.customSkills`, `selectedSkillIds` and `profileId`. Import uses `normalizeSkill` and recognizes current/legacy IDs, with a Karpathy fallback when an old backup has no Skill section. Dedicated backup round-trip tests are still a follow-up.
+- API Local Coder still checks for a stored key, obtains explicit consent before three Plan/Code/Review requests, warns about possible quota/charges and does not silently retry/fallback. This was reviewed in source only; no real paid API call was made. Mocked dispatcher/consent tests remain a follow-up.
+- User reports Redmi S12 and no current internet access. Exact Android version, ABI and memory remain unverified. No physical-phone installation, GGUF download, local inference or airplane-mode test is complete.
 
 ## 1. Product goal
 

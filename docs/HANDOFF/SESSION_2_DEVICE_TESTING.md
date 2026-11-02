@@ -16,11 +16,12 @@ Do not use the regular demo APK for this test; it does not contain the native GG
 ## Latest project status — 2026-11-02
 
 - Official product name: AI Studio (Alpha 1 is only an internal milestone label).
-- User-reported test phone: Redmi S12. Exact device variant, Android version, ABI and available RAM are not yet verified from Android system information.
-- Internet is currently unavailable to the user. A GGUF download cannot be done until a connection is available; do not mark model download, inference or offline verification as passed.
-- Demo build [41472090928](https://github.com/babaprobado-bit/A-studio/actions/runs/41472090928) passed and created `AI-Studio-Demo-APK` (ID `13155362741`), but this is not the native GGUF APK.
-- Native build [41472242158](https://github.com/babaprobado-bit/A-studio/actions/runs/41472242158) is running for current branch commit `c2417699cca0ec1381c6a41422f5b7d837c91f02`; wait for its successful artifact upload before installation.
-- PR #2 remains draft and `main` remains untouched.
+- User-reported test phone: Redmi S12. Exact variant, Android version, ABI and available RAM are not verified from Android system information.
+- Internet is currently unavailable to the user. A fresh model download cannot be done until a connection is available; do not mark model download, inference or offline verification as passed.
+- Current code commit is `a277892d712d903e985a05d98440afc55f5684f2`. Demo workflow [41474730949](https://github.com/babaprobado-bit/A-studio/actions/runs/41474730949) has passed Vite build and all regression/smoke tests, and was still compiling the debug APK at last check.
+- Native GGUF workflow [41474731858](https://github.com/babaprobado-bit/A-studio/actions/runs/41474731858) is building the same commit; llama.kt checkout passed and llama.cpp Android source preparation was in progress. Wait for successful artifact upload before installation.
+- Earlier successful native build [41459856700](https://github.com/babaprobado-bit/A-studio/actions/runs/41459856700) used commit `7341a83...`; it is not the newest branch build.
+- PR #2 remains draft and `main` remains untouched. No phone test has passed.
 
 ## Read first
 - docs/HANDOFF/README.md

@@ -13,36 +13,29 @@ Make Skill system match prior requirements and polish three Local Coder modes wi
 - scripts/test-device-local-coder.mjs
 - README.md
 
-## Requirements already present
-- Original AI Studio starter set: 15 Superpowers-inspired, 22 Caveman-style, one Karpathy-inspired guideline summary (38 total).
-- Current profiles: karpathy, superpowers, caveman, balanced.
-- Karpathy is default-enabled.
-- Max 8 selected Skills.
-- Max 36,000 characters per Local Coder stage.
-- Custom .md / SKILL.md import; simple front matter: name, description, stage.
-- Imported Markdown is text only; never execute as code.
-- Stage mapping supports plan, code, review, all.
-- Skill settings/custom Skills included in workspace backup and restore; API keys excluded.
+## Current Skill implementation — 2026-11-02
 
-## Remaining Skill gaps
+- Original AI Studio starter set: 15 Superpowers-inspired instructions, 22 Caveman-style instructions and one AI Studio-authored Karpathy-inspired guideline summary (38 total).
+- Existing preset IDs retained for compatibility: `karpathy`, `superpowers`, `caveman`, `balanced`. New presets: `superpowers-development`, `planning`, `review`, `caveman-short`. The `custom` select entry is the manual-selection mode, not a preset. Karpathy remains default-enabled.
+- Max eight selected Skills. Each prompt stage has a strict 36,000-character budget including opening/closing wrappers and the newline separators between Skills.
+- Markdown import accepts `.md` files; each selected file is parsed and previewed before it is saved. Multiple files are handled one by one. User sees filename, title, description, stage, content and available source/license/author/version metadata.
+- Supported front matter is a bounded, simple scalar `key: value` format with `name`, `description`, `stage`, `source`, `source_url`, `license`, `author`, `version`. Unknown scalar keys are retained in metadata; malformed lines or unclosed front matter are rejected. Multiline YAML/list syntax is not supported.
+- Filename extension validation is fixed. Duplicate names are retained as separate custom Skills with unique IDs and a warning in the preview; duplicates do not overwrite existing Skills.
+- Imported content is text-only instructions and is never executed. The UI explicitly says this.
+- Limits: 50,000 chars per source file, 12,000 chars per Skill body, max 100 custom Skills, max eight selected at a time.
+- Stage context inserts actual line breaks rather than literal backslash-n text. Regression test covers malformed/empty/oversized files, front matter metadata, invalid stage fallback, eight-Skill cap and strict 36k cap.
+- Standard and encrypted export both use the same workspace snapshot, which includes custom Skills, selected IDs and profile ID. Workspace restore normalizes custom Skills and falls back to Karpathy if an older backup has no Skill data. Dedicated automated backup/restore round-trip tests still remain.
+- Latest Skill Library test passed on commit `a277892d712d903e985a05d98440afc55f5684f2`. Full demo build is still finishing Gradle; native GGUF build is still preparing llama.cpp sources. Check live Actions before continuing.
 
-Prior requirement list included:
-- Karpathy
-- Superpowers development
-- Planning
-- Review
-- Caveman short mode
+## Remaining Skill / API work
 
-Current source does not expose separate exact planning and review profiles or named superpowers-development alias. Add these while retaining current profile IDs for backward compatibility, or provide documented aliases. Profile definitions must respect eight-Skill maximum.
+- [ ] Add automated tests for standard workspace backup and encrypted backup Skill round-trip, custom profile persistence, and old backups with no Skill section.
+- [ ] Add mocked tests for API Local Coder provider selection, missing-key handling, demo-mode consent, exactly three stage requests, no retry/fallback and no API secret in backup/log data. Do not send real billable calls in tests.
+- [ ] Verify duplicate-name preview interaction and multiple-file queue manually or with a DOM test harness.
+- [ ] Consider adding UTF-8 BOM and CRLF front matter fixtures.
+- [ ] Maintain source/author/license attribution when importing external Skill files; do not copy copyrighted skill collections wholesale.
+- [ ] Keep imported Skills as untrusted text instructions; do not execute Markdown, scripts or arbitrary commands.
 
-Also review:
-- [ ] Add user-facing import preview (filename, parsed title/description/stage, content, source/license metadata) before saving/activating.
-- [ ] Parse safe, bounded license and source metadata from front matter or separate import dialog; unknown fields should be retained or shown unsupported, not silently lost.
-- [ ] Make clear imported Skills are instructions, not trusted tools/code.
-- [ ] Define duplicate-ID/name behavior for repeated imports.
-- [ ] Preserve custom profile selection and custom Skills across restart, standard backup and encrypted backup.
-- [ ] Add tests for empty/malformed/oversized Markdown, front matter edge cases, duplicate names, wrong stages, 8-item cap, 36k cap, custom profile backup/restore, old backups without skills.
-- [ ] Keep starter text original and AI Studio-authored. Do not copy full copyrighted text from third-party Skill collections; provide attribution/links where appropriate and obey licenses.
 
 ## Three Local Coder modes
 
@@ -80,13 +73,13 @@ Run:
 Add tests for API dispatcher routing/consent/provider selection without calling a real paid API where possible. Use mocks/fakes and label them. Do not claim real API test unless real authorized request sent with permission.
 
 ## Session exit criteria
-- [ ] Five profile concepts implemented or documented equivalent.
-- [ ] Profile IDs and old backup compatibility maintained.
-- [ ] SKILL.md import supports preview and source/license info.
-- [ ] Max 8 and 36k constraints tested, including edge cases.
-- [ ] API consent/provider selection verified with mocked provider; no secret reaches backups/logs.
-- [ ] Device GGUF compatible with Session 2 measured limits.
-- [ ] README, project state and tests match actual behavior.
+- [x] Five requested profile concepts implemented while retaining legacy profile IDs.
+- [x] SKILL.md import preview and bounded source/license metadata implemented.
+- [x] Max 8 and strict 36k stage context constraints covered by the passing Skill regression test.
+- [ ] Automated standard/encrypted backup round-trip and legacy backup tests.
+- [ ] Mocked API consent/provider-routing tests; no real paid API request made.
+- [ ] Device GGUF compared against real Session 2 measurements (still blocked on physical-device test).
+- [ ] README, project state and tests match actual behavior; CI/artifacts rechecked.
 
 ## Copy-ready prompt for next conversation
 

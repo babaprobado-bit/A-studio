@@ -13,7 +13,7 @@ Purpose: this is the durable project memory for continuing AI Studio across four
 - Open draft PR: #2 — https://github.com/babaprobado-bit/A-studio/pull/2
 - Base branch is still main. Do not push feature work directly to main.
 - This is the Android/Capacitor AI Studio app plus its private web workspace. It is not the user's completed game project.
-- Latest verified app-code commit used for the successful native GGUF APK: `a30696ff29cdda2dfe43e27a77286e97be026914`. Handoff-document commits may advance the branch beyond this code commit; always inspect the live branch head before starting.
+- Latest code commit: `a277892d712d903e985a05d98440afc55f5684f2`. Its JavaScript, Vite, Local Coder, Skill Library, device bridge and private-site checks have passed; the demo APK is still compiling Gradle and the native GGUF APK is still building. Earlier successful native artifacts exist on older commits, but they do not verify this latest source.
 
 ## Read order for every new conversation
 
@@ -25,7 +25,7 @@ Purpose: this is the durable project memory for continuing AI Studio across four
    - SESSION_3_SKILLS_AND_API.md
    - SESSION_4_REA_MCP_AND_RELEASE.md
 4. ROADMAP.md and current GitHub PR/Actions only as needed.
-5. `docs/HANDOFF/NEW_CHAT_STARTER.md` — copy-ready resume code and prompt for Session 2.
+5. `docs/HANDOFF/NEW_CHAT_STARTER.md` — copy-ready resume code and prompt for the active Session 3 work.
 
 Do not trust the status snapshot below without checking GitHub. CI can finish between conversations. These docs are a handoff, not a substitute for querying the current branch, PR, workflow and artifacts.
 
@@ -57,15 +57,18 @@ Do not mix these scopes. If an earlier session finds a blocker, fix only what is
 
 ## Latest verified status — 2026-11-02
 
-- Official product name: **AI Studio**. “Alpha 1” is a milestone label, not the product name. Keep Android application ID `com.aistudio.alpha1` stable.
-- Current feature branch head: `c2417699cca0ec1381c6a41422f5b7d837c91f02`. `main` is unchanged.
-- PR #2 is open and remains a draft; base `main`, head `feature/android-offline-skills-v1`. Do not merge yet.
-- Hardware-aware GGUF model selection is implemented in source and tested by JS bridge tests. It inspects Android/ABI support, RAM, available RAM, low-memory state, CPU core count and storage; manual selection of 0.5B/1.5B/3B remains available. Thresholds are heuristics only.
-- Demo workflow [41472090928](https://github.com/babaprobado-bit/A-studio/actions/runs/41472090928) passed on `c2417699...` and produced `AI-Studio-Demo-APK` (artifact ID `13155362741`). This APK does not contain the native GGUF bridge and is not the Session 2 native test artifact.
-- Native GGUF workflow [41472242158](https://github.com/babaprobado-bit/A-studio/actions/runs/41472242158) is running for `c2417699...`. At last inspection it was still fetching the pinned llama.kt engine. Wait for a successful run and artifact upload before treating the current branch as having a fresh native APK.
-- Earlier native run [41459856700](https://github.com/babaprobado-bit/A-studio/actions/runs/41459856700) passed on `7341a83...` (the hardware-aware model-selection commit), but do not substitute that result for the current `c2417699...` run.
-- User reports a Redmi S12 and no current internet access. No physical-phone installation, separate GGUF download, on-device generation or airplane-mode test has been performed. Session 2 remains incomplete.
-- Use `docs/HANDOFF/SESSION_2_DEVICE_TESTING.md` and `docs/HANDOFF/NEW_CHAT_STARTER.md` to continue. Preserve all features; never modify `main`; never merge PR #2 without explicit instruction.
+- Official product name: **AI Studio**. “Alpha 1” is an internal milestone label only. Keep Android application ID `com.aistudio.alpha1` stable.
+- Current feature branch head: `a277892d712d903e985a05d98440afc55f5684f2`. `main` remains unchanged at `aab010319b6500002844bd24b11da85dd9ca3b00`.
+- PR #2 remains open and draft, base `main`, head `feature/android-offline-skills-v1`. Do not merge without explicit user instruction.
+- Skill Library updates in commits `9f1577a...`, `6ddc063...` and `a277892...` fix the .md filename filter, add a save-before-preview flow, metadata retention, duplicate warnings and new profile presets, correct real newline insertion, and enforce the 36,000-character stage cap including block separators.
+- Existing profile IDs `karpathy`, `superpowers`, `caveman` and `balanced` remain. Added `superpowers-development`, `planning`, `review` and `caveman-short`; every preset stays within the eight-Skill selection cap.
+- Demo workflow [41474730949](https://github.com/babaprobado-bit/A-studio/actions/runs/41474730949) is running on `a277892...`. Vite, Local Coder/reuse, Skill Library, device bridge and private-site checks passed; Gradle debug APK creation was still in progress at last inspection. No artifact had been uploaded yet.
+- Native GGUF workflow [41474731858](https://github.com/babaprobado-bit/A-studio/actions/runs/41474731858) is running on `a277892...`; it had passed setup/native build-tools and pinned llama.kt checkout, and was preparing llama.cpp Android sources. No APK artifact had been uploaded yet.
+- The previous demo run [41474499329](https://github.com/babaprobado-bit/A-studio/actions/runs/41474499329) on `6ddc063...` failed the Skill boundary test. That exposed a real prompt-size accounting bug: inter-Skill separators were not counted. Commit `a277892...` fixes the budget and the latest Skill Library test step passed. Do not use the older failure as the current branch status.
+- The earlier native GGUF build [41459856700](https://github.com/babaprobado-bit/A-studio/actions/runs/41459856700) succeeded on `7341a83...` and included the hardware-aware selector. It remains a historical build, not a verification of `a277892...`.
+- User reports a Redmi S12 and no current internet access. Exact Android version, ABI and device memory have not been read from the phone. No physical installation, separate GGUF download, on-device inference or airplane-mode test has passed. Session 2 remains incomplete.
+- Session 3 Skills code is improved, but mocked API-dispatch/consent tests and explicit standard/encrypted backup round-trip regression tests remain to be completed. See `SESSION_3_SKILLS_AND_API.md`.
+- Use `docs/HANDOFF/SESSION_3_SKILLS_AND_API.md` for the next source task. Preserve all features; never edit `main`; keep PR #2 draft; never merge without explicit instruction.
 
 ## Last verified snapshot (historical; re-check live)
 
