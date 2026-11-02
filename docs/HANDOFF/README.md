@@ -10,7 +10,7 @@ Purpose: this is the durable project memory for continuing AI Studio Alpha 1 acr
 - Open draft PR: #2 — https://github.com/babaprobado-bit/A-studio/pull/2
 - Base branch is still main. Do not push feature work directly to main.
 - This is the Android/Capacitor AI Studio app plus its private web workspace. It is not the user's completed game project.
-- Last documented feature-branch commit: 4b0c7b1734611936f93c0764afb691e0f383a647. Always check the live branch head before starting; a later chat may already have added commits.
+- Latest verified app-code commit used for the successful native GGUF APK: `a30696ff29cdda2dfe43e27a77286e97be026914`. Handoff-document commits may advance the branch beyond this code commit; always inspect the live branch head before starting.
 
 ## Read order for every new conversation
 
@@ -22,6 +22,7 @@ Purpose: this is the durable project memory for continuing AI Studio Alpha 1 acr
    - SESSION_3_SKILLS_AND_API.md
    - SESSION_4_REA_MCP_AND_RELEASE.md
 4. ROADMAP.md and current GitHub PR/Actions only as needed.
+5. `docs/HANDOFF/NEW_CHAT_STARTER.md` — copy-ready resume code and prompt for Session 2.
 
 Do not trust the status snapshot below without checking GitHub. CI can finish between conversations. These docs are a handoff, not a substitute for querying the current branch, PR, workflow and artifacts.
 
@@ -51,6 +52,15 @@ Do not mix these scopes. If an earlier session finds a blocker, fix only what is
 - Any external tool/MCP/REA command execution must be opt-in, permission-scoped, visible and user-approved. No unrestricted shell or computer control.
 - Be honest about tests that were not run.
 
+## Latest verified status — 2026-11-02
+
+- PR #2 is open and remains a draft; base is `main`, head is `feature/android-offline-skills-v1`. Do not merge yet.
+- Session 1 is complete: native GGUF workflow [41390410229](https://github.com/babaprobado-bit/A-studio/actions/runs/41390410229) succeeded on app-code commit `a30696ff29cdda2dfe43e27a77286e97be026914`.
+- Artifact `AI-Studio-Alpha-1.1-OnDevice-LocalCoder-APK` (ID `13117996643`) is downloadable from the workflow run page until `2026-11-16 05:04:48 UTC`. Artifact ZIP size: `18,129,889` bytes; SHA-256: `10c752445aa442a3e87e76041742cd469c3613f760985b40139a1d20e4070e94`.
+- The ZIP passed integrity inspection and contains `app-debug.apk` (54,453,328 bytes). This is a debug APK, not a signed production release.
+- No physical-phone installation or offline-inference test has been completed. Session 2 must test on a real Android 10+ / arm64-v8a phone. The separate GGUF model download requires internet once; offline inference must be proven after that download.
+- **Next session: Session 2 — physical-device install, model download/load, inference and airplane-mode verification.** Use `docs/HANDOFF/NEW_CHAT_STARTER.md` to open a fresh chat without losing context.
+
 ## Last verified snapshot (historical; re-check live)
 
 At the last inspection on 2026-11-01:
@@ -67,6 +77,8 @@ At the last inspection on 2026-11-01:
 - Repository: https://github.com/babaprobado-bit/A-studio
 - Feature branch: https://github.com/babaprobado-bit/A-studio/tree/feature/android-offline-skills-v1
 - Draft PR #2: https://github.com/babaprobado-bit/A-studio/pull/2
+- Latest successful native GGUF build/artifact: https://github.com/babaprobado-bit/A-studio/actions/runs/41390410229
+- New-chat resume prompt: https://github.com/babaprobado-bit/A-studio/blob/feature/android-offline-skills-v1/docs/HANDOFF/NEW_CHAT_STARTER.md
 - Regular Android workflow: https://github.com/babaprobado-bit/A-studio/actions/workflows/build-android-demo.yml
 - Native GGUF Android workflow: https://github.com/babaprobado-bit/A-studio/actions/workflows/build-android-local-coder.yml
 - Native build run at last inspection: https://github.com/babaprobado-bit/A-studio/actions/runs/41339891960

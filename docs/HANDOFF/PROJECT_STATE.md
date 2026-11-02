@@ -87,7 +87,16 @@ The workflow currently:
 8. Runs npx cap sync android, then Gradle assembleDebug.
 9. Uploads AI-Studio-Alpha-1.1-OnDevice-LocalCoder-APK for 14 days.
 
-Native CI run 41339891960 failed at :app:compileDebugKotlin with `LocalLlmPlugin.kt:40:53 — Unsupported escape sequence`. Root cause is now confirmed: the Kotlin source contained a single literal backslash before `.gguf`, so the string contained invalid escape `\.`. This was not a copy/patcher transformation issue. Commit `ffc332eb9d21b616c3fcdb199b21dc6bf69dc1c8` changes the regex suffix to `[.]` and is being tested by native workflow run 41389970211 (head SHA `ffc332eb9d21b616c3fcdb199b21dc6bf69dc1c8`). At the latest check on 2026-11-02 around 04:46 UTC, build preparation and regression steps 1–14 succeeded; Gradle `Build debug APK` (step 15) was still in progress, `Upload APK` (step 16) was pending, and no GGUF artifact existed yet. Do not mark native build successful until run 41389970211 completes and the artifact is verified. Regular demo APK workflow is separate and its APK does not include the native GGUF bridge.
+Historical native run 41339891960 failed at `:app:compileDebugKotlin` with `LocalLlmPlugin.kt:40:53 — Unsupported escape sequence`. Root cause: the Kotlin source had one literal backslash before `.gguf`, creating invalid escape `\.`. Commit `ffc332eb9d21b616c3fcdb199b21dc6bf69dc1c8` fixed this using `[.]`.
+
+**Verified native GGUF APK build — 2026-11-02:**
+- Native run [41389970211](https://github.com/babaprobado-bit/A-studio/actions/runs/41389970211) completed successfully on commit `ffc332eb9d21b616c3fcdb199b21dc6bf69dc1c8`.
+- The latest branch-tip native run [41390410229](https://github.com/babaprobado-bit/A-studio/actions/runs/41390410229) completed successfully on app-code commit `a30696ff29cdda2dfe43e27a77286e97be026914`; all setup, native-source, regression, Capacitor sync, Gradle debug APK and artifact-upload steps passed.
+- Artifact name: `AI-Studio-Alpha-1.1-OnDevice-LocalCoder-APK`; artifact ID: `13117996643`; archive size: `18,129,889` bytes; expires `2026-11-16 05:04:48 UTC`.
+- The downloaded artifact ZIP passed integrity validation and contains `app-debug.apk` of `54,453,328` bytes. The APK is a debug build, not a signed production release.
+- The model weights are not bundled in the APK. The first separate model download needs internet; offline inference after downloading is intended but is not yet demonstrated on a phone.
+- **Physical-device install, model load/inference and airplane-mode tests remain uncompleted.** Continue with `docs/HANDOFF/SESSION_2_DEVICE_TESTING.md`. Do not claim real-device support until those checks pass.
+- Regular demo APK workflow is separate; do not use the demo APK for native GGUF tests.
 
 ### Patcher bug already fixed
 First native build reached patch step but failed with “BridgeActivity onCreate call missing.” Cause: generated Capacitor MainActivity was empty, while patcher assumed existing onCreate. Commit 4b0c7b1 changed patcher to add a complete Java/Kotlin onCreate when absent and register LocalLlmPlugin before super.onCreate. It was tested twice against:
