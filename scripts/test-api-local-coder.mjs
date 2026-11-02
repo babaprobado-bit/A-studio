@@ -142,8 +142,8 @@ assert.ok(apiStart >= 0 && apiEnd > apiStart, 'API Local Coder entry point must 
 const apiSource = mainSource.slice(apiStart, apiEnd);
 assert.match(apiSource, /hasKey:Boolean\(key\)/,
   'the API sequence receives only a key-presence flag, not the key value');
-const activityCalls = [...apiSource.matchAll(/logAgentActivity\(([\\s\\S]*?)\\);/g)];
+const activityCalls = [...apiSource.matchAll(/logAgentActivity\(([\s\S]*?)\);/g)];
 assert.ok(activityCalls.length >= 3, 'API flow activity should be logged');
-assert.ok(activityCalls.every(match => !/\\bkey\\b|secret/i.test(match[1])),
+assert.ok(activityCalls.every(match => !/\bkey\b|secret/i.test(match[1])),
   'provider secrets must never be included in activity log arguments');
 console.log('API Local Coder secret-boundary checks passed.');
