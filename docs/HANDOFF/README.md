@@ -13,7 +13,7 @@ Purpose: this is the durable project memory for continuing AI Studio across four
 - Open draft PR: #2 — https://github.com/babaprobado-bit/A-studio/pull/2
 - Base branch is still main. Do not push feature work directly to main.
 - This is the Android/Capacitor AI Studio app plus its private web workspace. It is not the user's completed game project.
-- Latest app-code/test commit: `985a53f844c661939e5f46ddb8be0fcc2eb1d4d3`. The last successful APKs are older (app-code commit `9400716...`); current-source demo/native builds are running. Always inspect live Actions before using an APK.
+- Latest app-code/test commit: `0a8083466792b14310bc5cb2dbf681552d8cfd81`. It adds cancellation for large local GGUF imports. Current-source native/demo builds are running; the last successful APK pair is older. Always inspect live Actions before using an APK.
 
 ## Read order for every new conversation
 
@@ -57,19 +57,19 @@ Do not mix these scopes. If an earlier session finds a blocker, fix only what is
 
 ## Latest verified status — 2026-11-03
 
-- Latest branch head and app-code/test commit: `985a53f844c661939e5f46ddb8be0fcc2eb1d4d3`. `main` remains unchanged at `aab010319b6500002844bd24b11da85dd9ca3b00`. PR #2 is open, draft and unmerged.
-- Native GGUF APK and demo APK builds for current source are running: [native 41702571644](https://github.com/babaprobado-bit/A-studio/actions/runs/41702571644) and [demo 41702571666](https://github.com/babaprobado-bit/A-studio/actions/runs/41702571666). No artifact from this exact SHA has been verified yet.
-- Last successful APK pair remains from app-code commit `9400716...`: native [41580209560](https://github.com/babaprobado-bit/A-studio/actions/runs/41580209560), artifact `13205399062`; demo [41580209607](https://github.com/babaprobado-bit/A-studio/actions/runs/41580209607), artifact `13205386533`. These do not contain later local-import/live-screen fixes.
-- New offline model path: user can select an already-owned `.gguf` file through Android's file picker. Copy the file to the phone first using USB, memory card or file sharing; the import itself does not require internet. It does not download or provide the model file.
-- Native import writes to app-scoped `.part`, sanitizes the file name, enforces an 8 GB cap, checks free storage, reports progress approximately every 8 MB, rechecks storage approximately every 16 MB and validates the GGUF header before promoting it to the installed model list.
-- Model download can be cancelled from the in-app control; failed/interrupted download cleanup remains tracked separately. The import picker can be cancelled before selection; cancelling an in-progress large file copy is not yet implemented.
-- Recent commits: `6f10570` atomic partial download handling; `9400716` model-specific license details; `2e20d23` Android local file import; `562f8ea` import progress/storage checks; `4953749` import-listener cleanup; `5f2aca6` live index screen controls; `985a53f` real-screen control wiring tests.
-- The real model manager UI is inside `index.html`; its controls must stay synchronized with `src/device-local-coder-panel.html`. Tests now read the live `index.html` and check the cancel/import/license IDs and JS event bindings.
+- Latest branch head and app-code/test commit: `0a8083466792b14310bc5cb2dbf681552d8cfd81`. `main` remains unchanged at `aab010319b6500002844bd24b11da85dd9ca3b00`. PR #2 is open, draft and unmerged.
+- Current-source native build [41703474174](https://github.com/babaprobado-bit/A-studio/actions/runs/41703474174) and demo build [41703474052](https://github.com/babaprobado-bit/A-studio/actions/runs/41703474052) are running. Demo regression checks through Capacitor sync have passed; Gradle packaging is active. Native build is in Android tools setup. No artifact from this exact SHA has been verified.
+- Last successful native/demo APK pair is older source SHA `9400716...`: native [41580209560](https://github.com/babaprobado-bit/A-studio/actions/runs/41580209560), artifact `13205399062`; demo [41580209607](https://github.com/babaprobado-bit/A-studio/actions/runs/41580209607). These do not include the latest local-import controls/cancellation.
+- Offline model path: Android file picker imports an already-owned `.gguf` file. Copy the file to the phone first by USB, memory card or file sharing; import itself does not need internet. This path does not download or provide a model file.
+- Local import writes to app-scoped `.part`, sanitizes the file name, enforces an 8 GB cap, checks free storage, reports progress approximately every 8 MB, rechecks storage approximately every 16 MB and validates the GGUF header before model-list insertion.
+- Large local imports can now be cancelled in-app. Native code checks a cancellation flag during the copy, deletes the incomplete `.part` file and resolves the import as cancelled. The import picker can also be cancelled before file selection.
+- DownloadManager model downloads also have an in-app cancel action and partial-file cleanup. The actual model-manager controls live in `index.html`; the test checks that screen and the JS event bindings, not just a detached HTML fragment.
+- Recent commits: `6f10570` atomic partial download handling; `9400716` model-specific license details; `2e20d23` Android local file import; `562f8ea` import progress/storage checks; `4953749` import-listener cleanup; `5f2aca6` live index screen controls; `985a53f` actual-screen regression tests; `0a80834` cancel large local imports.
 - Skill Library: 38 original starter instructions, backward-compatible profiles, additional presets, safe SKILL.md preview/import, multi-file queue, duplicate flags, BOM/CRLF handling, 100 custom Skill cap, eight-selection cap, strict 36k stage prompt budget and backup/restore tests.
 - API Local Coder: mocked provider tests cover explicit consent, selected provider, exactly three stages, no retries/fallback, errors and secret boundaries. UI busy lock is acquired before async key lookup/consent; no real paid API calls were made.
-- Model licensing is shown in the picker: 0.5B/1.5B GGUF are tagged Apache-2.0; 3B GGUF is tagged `qwen-research` and warns about non-commercial research/evaluation. Model weights are not bundled in the APK.
-- User reports no current internet. The USB/SD/file-picker path is relevant when a `.gguf` file is already available locally. No physical installation, model load, local inference or airplane-mode test has been performed; CI and JS fakes do not prove device behavior.
-- Continue source hardening and offline-first development while internet is unavailable. Keep PR #2 draft; never change `main` or merge without explicit instruction. Physical-device acceptance remains deferred, not the current coding goal.
+- Model licensing: 0.5B/1.5B GGUF are tagged Apache-2.0; 3B GGUF is tagged `qwen-research` and warns about non-commercial research/evaluation. Model weights are not bundled in the APK.
+- User reports no current internet. The USB/SD/file-picker path is useful when a `.gguf` file is already available locally. No physical installation, model load, local inference or airplane-mode test has been performed; CI and JS fakes do not prove device behavior.
+- Continue source hardening and offline-first development while internet is unavailable. Keep PR #2 draft; never change `main` or merge without explicit instruction.
 
 ## Last verified snapshot (historical; re-check live)
 

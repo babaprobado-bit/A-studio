@@ -7,20 +7,20 @@ Do not use the regular demo APK for this test; it does not contain the native GG
 
 ## Software-side progress — 2026-11-03 (source/CI work only, not a device-test pass)
 
-- Latest source head: `985a53f844c661939e5f46ddb8be0fcc2eb1d4d3`.
-- Current-source native build [41702571644](https://github.com/babaprobado-bit/A-studio/actions/runs/41702571644) and demo build [41702571666](https://github.com/babaprobado-bit/A-studio/actions/runs/41702571666) were in progress at the last check. No artifact for this exact commit had been verified.
-- Last successful native APK artifact `13205399062` [run 41580209560](https://github.com/babaprobado-bit/A-studio/actions/runs/41580209560) and demo artifact `13205386533` [run 41580209607](https://github.com/babaprobado-bit/A-studio/actions/runs/41580209607) use older app-code commit `9400716...`; do not use them as proof of the latest file-import UI.
-- Native model management now includes DownloadManager cancellation and a local GGUF file picker. A user can transfer an already-owned `.gguf` file to the phone by USB/SD/file sharing and import it without internet.
-- Import is app-scoped and temporary-file based: sanitized name, 8 GB cap, free-space checks, progress notifications every ~8 MB, rechecks every ~16 MB, optional source-size equality and GGUF magic validation before final rename.
-- Commit `5f2aca6` synchronized the import, cancel and license controls into the actual `index.html`. Commit `985a53f` added static regression checks that inspect the live page and verify its buttons and main.js handlers.
-- JavaScript fake-plugin tests cover import success/cancel/error, lock release and progress-listener cleanup. They do not verify the Android document picker, storage provider behavior or actual model inference.
+- Latest source head: `0a8083466792b14310bc5cb2dbf681552d8cfd81`.
+- Current-source native build [41703474174](https://github.com/babaprobado-bit/A-studio/actions/runs/41703474174) and demo build [41703474052](https://github.com/babaprobado-bit/A-studio/actions/runs/41703474052) are running. Demo regression checks and Capacitor sync passed; Gradle packaging is active. Native build is preparing Android tools. No artifact from this exact commit is verified yet.
+- Last successful artifacts `13205399062` and `13205386533` are from older app-code commit `9400716...`; they predate the actual-screen local-import and cancel controls.
+- Native model management now includes DownloadManager cancellation and local GGUF import. A user can transfer an already-owned `.gguf` file to the phone by USB/SD/file sharing and import it without internet.
+- Import writes to app-scoped `.part`, enforces an 8 GB cap, sanitizes names, checks storage, reports progress every ~8 MB and rechecks free space every ~16 MB; GGUF magic is checked before final rename.
+- Large local imports can now be cancelled in-app. The native plugin checks a cancellation flag during copy, removes the incomplete `.part`, and resolves the import as cancelled. Mock tests cover the JavaScript cancellation request and state cleanup.
+- Commit `5f2aca6` synchronized import/cancel/license controls into the real `index.html`; `985a53f` tests those controls and their event handlers; `0a80834` adds local-import cancellation.
 
 ## Latest project status — 2026-11-03
 
-- User reports no current internet. Do not pause coding for physical-device proof; continue offline-first source and test work.
-- The offline file-import path is useful only when a `.gguf` model file is already available locally or can be copied to the phone. The app does not contain or create model weights; it does not fetch a model without a network.
-- Device remains user-reported Redmi S12, but Android version, ABI and RAM are still unverified.
-- No physical APK installation, GGUF import on Android, local model load/inference or airplane-mode proof has passed. CI and JS fake-plugin tests prove neither native runtime behavior nor device compatibility.
+- User reports no current internet. Do not pause coding for physical-device proof; continue offline-first source and tests.
+- The local import path is useful only when the `.gguf` file is already available locally or can be copied to the phone. The app does not bundle or create model weights.
+- Device remains user-reported Redmi S12; Android version, ABI and RAM are unverified.
+- No physical APK installation, GGUF import on Android, model load/inference or airplane-mode proof has passed. CI and JS mocks do not prove native runtime behavior or phone compatibility.
 - PR #2 remains open/draft; main unchanged at `aab010319b6500002844bd24b11da85dd9ca3b00`.
 
 ## Read first
@@ -56,7 +56,7 @@ Do not use the regular demo APK for this test; it does not contain the native GG
 - [ ] Verify model appears in installed list after restart.
 - [ ] Confirm files remain app-scoped.
 - [ ] Test low storage, failed network, duplicate download, interrupted download, app restart during download and cancellation.
-- [ ] For local import, test picker cancellation, duplicate/sanitized file names, non-GGUF extension, invalid header, unknown source size, insufficient free storage and cleanup of partial `.part` files.
+- [ ] For local import, test picker cancellation, in-copy cancel, duplicate/sanitized file names, non-GGUF extension, invalid header, unknown source size, insufficient free storage and cleanup of partial `.part` files.
 - [ ] Confirm failed/interrupted downloads leave no visible installed .gguf; latest code uses .part files and cleans failed/missing DownloadManager tasks. Verify this on-device.
 - [ ] Verify actual GGUF header is accepted.
 
@@ -88,7 +88,7 @@ Do not use the regular demo APK for this test; it does not contain the native GG
 - [ ] Confirm errors are actionable and switching back to Ollama/API works.
 
 ## Known limitations to verify
-- Download cancellation is available in the in-app model manager; verify Android DownloadManager task and partial-file cleanup after cancellation/restart. There is no in-app cancel action once a large local file import has begun.
+- Download and large local-import cancellation are available in the in-app model manager. Verify Android DownloadManager task/partial cleanup and SAF stream cancellation on-device.
 - RAM thresholds are approximate and can be wrong due to reserved/system memory.
 - GGUF files are stored in app-specific external files; uninstall removes them.
 - Larger 1.5B/3B may be impractical on low-memory devices even if download succeeds.

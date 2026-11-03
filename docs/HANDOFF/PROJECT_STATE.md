@@ -3,13 +3,13 @@
 ## Latest continuation status — 2026-11-03
 
 - Product is **AI Studio**; keep Android ID `com.aistudio.alpha1`.
-- Latest branch head: `985a53f844c661939e5f46ddb8be0fcc2eb1d4d3`. Base `main` is unchanged at `aab010319b6500002844bd24b11da85dd9ca3b00`. PR #2 stays open/draft/unmerged.
-- Current-source Actions: native [41702571644](https://github.com/babaprobado-bit/A-studio/actions/runs/41702571644) and demo [41702571666](https://github.com/babaprobado-bit/A-studio/actions/runs/41702571666) were in progress when this status was written; do not claim a current-source APK artifact until status and artifact are checked.
-- Last successful build pair is older source SHA `9400716...`: native [41580209560](https://github.com/babaprobado-bit/A-studio/actions/runs/41580209560), artifact `13205399062`; demo [41580209607](https://github.com/babaprobado-bit/A-studio/actions/runs/41580209607), artifact `13205386533`.
-- Offline GGUF transfer: Android `ACTION_OPEN_DOCUMENT` file picker imports an existing `.gguf` file from local storage. The user can copy a model file to the phone by USB, SD card or file sharing; the app import itself requires no internet. No model weights are bundled or downloaded by this flow.
-- Import implementation uses app-scoped `.part`, sanitized file names, an 8 GB max, free-space headroom checks, progress notifications every ~8 MB, free-space rechecks every ~16 MB, source-size check and GGUF magic verification before the file becomes installed.
-- The import UI and cancel/license controls are present in the actual `index.html`, not only the detached panel fragment. Static regression tests check real app markup and event wiring.
-- Download cancellation is exposed in-app. Mid-copy cancellation for a large local import is not implemented yet; Android file-picker cancellation before selection is supported.
+- Latest branch head: `0a8083466792b14310bc5cb2dbf681552d8cfd81`. Base `main` remains `aab010319b6500002844bd24b11da85dd9ca3b00`. PR #2 stays open/draft/unmerged.
+- Current-source native build [41703474174](https://github.com/babaprobado-bit/A-studio/actions/runs/41703474174) and demo build [41703474052](https://github.com/babaprobado-bit/A-studio/actions/runs/41703474052) are running. Demo regression checks through Capacitor sync passed; Gradle packaging is active. Native build is setting up Android tools. No artifact from this exact SHA has been verified yet.
+- Last successful APK pair is older source SHA `9400716...`: native [41580209560](https://github.com/babaprobado-bit/A-studio/actions/runs/41580209560), artifact `13205399062`; demo [41580209607](https://github.com/babaprobado-bit/A-studio/actions/runs/41580209607).
+- Offline GGUF transfer: Android `ACTION_OPEN_DOCUMENT` imports an existing `.gguf` file. The user can copy a model file to the phone by USB, SD card or file sharing; app import itself needs no internet. Model weights are not bundled or created by this flow.
+- Local import uses app-scoped `.part`, sanitized filenames, an 8 GB maximum, free-space checks, progress notifications ~8 MB, rechecks ~16 MB, source-size check and GGUF magic verification before installed-model insertion.
+- Large local imports now have an in-app cancel button. Native copy checks an AtomicBoolean cancellation flag during streaming, removes the partial file and resolves as cancelled. DownloadManager downloads also have an in-app cancel path.
+- The actual model-manager UI lives in `index.html`; license/import/download-cancel/local-import-cancel controls and their handlers are statically checked by the regression suite.
 - Skills Library: 38 original instructions, safe multi-file SKILL.md import/preview, duplicate flags, BOM/CRLF, metadata, caps, backups and regression tests.
 - API Local Coder: explicit consent, fixed Plan/Code/Review sequence, fake-provider tests, no retry/fallback and pre-await busy lock; no paid API request was made.
 - Model license information is visible: 0.5B/1.5B Apache-2.0, 3B Qwen Research/non-commercial warning.
@@ -65,7 +65,7 @@ Do not replace these capabilities while adding Skills, GGUF or MCP.
 - src/device-local-coder.js — model catalogue, device capability recommendation and JS wrapper for native LocalLlm Capacitor plugin.
 - src/device-local-coder-panel.html — device model manager UI fragment.
 - src/device-local-coder.css — model manager styling.
-- android-local-runtime/LocalLlmPlugin.kt — native Android Capacitor plugin. It uses pinned tensai-app/llama.kt runtime (CPU-first nGpuLayers=0) to list, download, import local GGUF via Android document picker, load, chat, unload, delete and cancel downloads.
+- android-local-runtime/LocalLlmPlugin.kt — native Android Capacitor plugin. It uses pinned tensai-app/llama.kt runtime (CPU-first nGpuLayers=0) to list, download, import local GGUF via Android document picker, load, chat, unload, delete, cancel downloads and cancel local imports.
 - scripts/patch-android-local-runtime.py — patches generated Capacitor Android project, Gradle settings/app config, copies Kotlin plugin, registers it in MainActivity and copies upstream notices if present.
 - .github/workflows/build-android-local-coder.yml — optional native Android build workflow.
 - .github/workflows/build-android-demo.yml — regular Capacitor debug APK workflow.
@@ -90,7 +90,7 @@ src/device-local-coder.js currently declares three Qwen2.5-Coder GGUF entries:
 
 File sizes are estimates. Model files are not committed or bundled in the APK. The user downloads a model separately from a configured Hugging Face HTTPS endpoint; first download needs internet. Once downloaded, inference is intended to happen locally without network/API credentials.
 
-DownloadManager is Wi-Fi-only by default (allowMetered=false) and disallows roaming. Files are app-scoped under models. Downloads are written as `.part`; after DownloadManager success, Kotlin checks file size and GGUF magic before renaming to `.gguf`. Failed/missing tasks and stale partials are reconciled on refresh/restart. JS clears the active download ID in `finally`; the in-app cancel control calls native DownloadManager cancellation. Local file import uses `ACTION_OPEN_DOCUMENT`, app-scoped `.part`, safe filename normalization, an 8 GB cap, free-space headroom checks, progress updates (~8 MB), storage rechecks (~16 MB), exact-size check when available and GGUF header verification before final rename. Importing an already-present `.gguf` file does not require internet; copying it to the phone is a separate step. There is no cancel control once a large local import has begun.
+DownloadManager is Wi-Fi-only by default (allowMetered=false) and disallows roaming. Files are app-scoped under models. Downloads are written as `.part`; after DownloadManager success, Kotlin checks file size and GGUF magic before renaming to `.gguf`. Failed/missing tasks and stale partials are reconciled on refresh/restart. JS clears the active download ID in `finally`; the in-app cancel control calls native DownloadManager cancellation. Local file import uses `ACTION_OPEN_DOCUMENT`, app-scoped `.part`, safe filename normalization, an 8 GB cap, free-space headroom checks, progress updates (~8 MB), storage rechecks (~16 MB), exact-size check when available and GGUF header verification before final rename. Importing an already-present `.gguf` file does not require internet; copying it to the phone is a separate step. Large local imports can be cancelled through a native cancellation flag checked during streaming; cancellation cleans the partial `.part` file. Actual Android provider/stream cancellation still needs physical verification.
 
 ### Device capability detection and model recommendation
 
