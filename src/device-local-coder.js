@@ -124,6 +124,9 @@ export class DeviceLocalCoder {
     this.downloadStarting = false;
     this.downloadLoopActive = false;
     this.importStarting = false;
+    this.activeImportId = null;
+    this.importCounter = 0;
+    this.cancelImportRequested = false;
   }
 
   async refresh() {
@@ -242,12 +245,16 @@ export class DeviceLocalCoder {
       throw new Error('Başka bir model aktarımı sürüyor. Önce onu tamamla.');
     }
     this.importStarting = true;
+    this.importCounter += 1;
+    const importId = 'gguf-import-' + Date.now().toString(36) + '-' + this.importCounter.toString(36);
+    this.activeImportId = importId;
+    this.cancelImportRequested = false;
     let listener = null;
     try {
       if (typeof this.plugin.addListener === 'function') {
         listener = await this.plugin.addListener('localModelImportProgress', event => onProgress(event));
       }
-      const result = await this.plugin.importModel();
+      const result = await this.plugin.importModel({ importId });
       if (result?.imported) await this.refresh();
       return result || { cancelled: true };
     } finally {
@@ -257,7 +264,29 @@ export class DeviceLocalCoder {
         // Listener cleanup must not leave the model-import lock stuck.
       } finally {
         this.importStarting = false;
+        this.activeImportId = null;
+        this.cancelImportRequested = false;
       }
+    }
+  }
+
+  async cancelImport() {
+    if (!this.native || !this.plugin || !this.activeImportId) {
+      return { cancelRequested: false };
+    }
+    if (this.cancelImportRequested) {
+      return { cancelRequested: true, alreadyRequested: true };
+    }
+    const importId = this.activeImportId;
+    this.cancelImportRequested = true;
+    try {
+      const result = await this.plugin.cancelImport({ importId });
+      if (result?.cancelRequested) return result;
+      this.cancelImportRequested = false;
+      throw new Error('GGUF içe aktarma iptal isteği kabul edilmedi.');
+    } catch (error) {
+      this.cancelImportRequested = false;
+      throw error;
     }
   }
 

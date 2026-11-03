@@ -30,6 +30,8 @@ import java.io.FileOutputStream
 import java.io.RandomAccessFile
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
+import java.util.concurrent.CancellationException
+import java.util.concurrent.atomic.AtomicBoolean
 
 /** Private, on-device GGUF storage and llama.kt inference bridge. */
 @CapacitorPlugin(name = "LocalLlm")
@@ -38,6 +40,7 @@ class LocalLlmPlugin : Plugin() {
     @Volatile private var engine: LlamaEngine? = null
     @Volatile private var loadedFileName: String = ""
     private val activeImportFileNames = ConcurrentHashMap.newKeySet<String>()
+    private val activeImportRequests = ConcurrentHashMap<String, AtomicBoolean>()
     private val maxImportedModelBytes = 8L * 1024L * 1024L * 1024L
 
     private fun modelDirectory(): File {
@@ -130,7 +133,7 @@ class LocalLlmPlugin : Plugin() {
             }
     }
 
-    private fun importModelFromUri(uri: Uri): JSObject {
+    private fun importModelFromUri(uri: Uri, cancelFlag: AtomicBoolean): JSObject {
         val resolver = context.contentResolver
         var displayName = ""
         var declaredSize = -1L
@@ -177,14 +180,17 @@ class LocalLlmPlugin : Plugin() {
             var lastProgressBytes = 0L
             val storageCheckInterval = 16L * 1024L * 1024L
             val progressInterval = 8L * 1024L * 1024L
+            if (cancelFlag.get()) throw CancellationException("GGUF içe aktarma iptal edildi.")
             val source = resolver.openInputStream(uri)
                 ?: throw IllegalStateException("Seçilen dosya okunamadı.")
             source.use { input ->
                 FileOutputStream(partial).use { output ->
                     val buffer = ByteArray(1024 * 1024)
                     while (true) {
+                        if (cancelFlag.get()) throw CancellationException("GGUF içe aktarma iptal edildi.")
                         val count = input.read(buffer)
                         if (count < 0) break
+                        if (cancelFlag.get()) throw CancellationException("GGUF içe aktarma iptal edildi.")
                         if (count == 0) continue
                         copiedBytes += count.toLong()
                         if (copiedBytes > maxImportedModelBytes) {
@@ -222,10 +228,12 @@ class LocalLlmPlugin : Plugin() {
             if (declaredSize > 0 && copiedBytes != declaredSize) {
                 throw IllegalStateException("Model dosyası tam kopyalanamadı; kaynak ve hedef boyutları eşleşmiyor.")
             }
+            if (cancelFlag.get()) throw CancellationException("GGUF içe aktarma iptal edildi.")
             val finalFreeBytes = StatFs(modelDirectory().absolutePath).availableBytes
             if (finalFreeBytes < reserveBytes) {
                 throw IllegalStateException("GGUF dosyası için gereken boş alan kalmadı; işlem tamamlanamadı.")
             }
+            if (cancelFlag.get()) throw CancellationException("GGUF içe aktarma iptal edildi.")
             finalizeDownloadedModel(fileName)
             notifyListeners("localModelImportProgress", JSObject().apply {
                 put("fileName", fileName)
@@ -251,34 +259,82 @@ class LocalLlmPlugin : Plugin() {
 
     @PluginMethod
     fun importModel(call: PluginCall) {
+        val importId = call.getString("importId")
+            ?: run { call.reject("İçe aktarma kimliği eksik."); return }
+        if (!importId.matches(Regex("^[A-Za-z0-9_-]{1,80}$"))) {
+            call.reject("İçe aktarma kimliği geçersiz.")
+            return
+        }
+        val cancelFlag = AtomicBoolean(false)
+        if (activeImportRequests.putIfAbsent(importId, cancelFlag) != null) {
+            call.reject("Bu GGUF aktarımı zaten etkin.")
+            return
+        }
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
             addCategory(Intent.CATEGORY_OPENABLE)
             type = "*/*"
         }
-        startActivityForResult(call, intent, "importModelResult")
+        try {
+            startActivityForResult(call, intent, "importModelResult")
+        } catch (error: Exception) {
+            activeImportRequests.remove(importId, cancelFlag)
+            call.reject("Dosya seçici açılamadı: ${error.message}", error)
+        }
+    }
+
+    @PluginMethod
+    fun cancelImport(call: PluginCall) {
+        val importId = call.getString("importId")
+            ?: run { call.reject("İçe aktarma kimliği eksik."); return }
+        val cancelFlag = activeImportRequests[importId]
+        if (cancelFlag == null) {
+            call.resolve(JSObject().apply { put("cancelRequested", false) })
+            return
+        }
+        cancelFlag.set(true)
+        call.resolve(JSObject().apply { put("cancelRequested", true) })
     }
 
     @ActivityCallback
     private fun importModelResult(call: PluginCall?, result: ActivityResult) {
         if (call == null) return
+        val importId = call.getString("importId")
+        val cancelFlag = importId?.let { activeImportRequests[it] }
+        if (importId == null || cancelFlag == null) {
+            call.reject("İçe aktarma işleminin durumu bulunamadı.")
+            return
+        }
         if (result.resultCode != Activity.RESULT_OK) {
+            activeImportRequests.remove(importId, cancelFlag)
             call.resolve(JSObject().apply { put("cancelled", true) })
             return
         }
         val uri = result.data?.data
         if (uri == null) {
+            activeImportRequests.remove(importId, cancelFlag)
             call.reject("Dosya seçilemedi.")
             return
         }
         try {
             executor.execute {
                 try {
-                    call.resolve(importModelFromUri(uri))
+                    if (cancelFlag.get()) {
+                        call.resolve(JSObject().apply { put("cancelled", true) })
+                    } else {
+                        call.resolve(importModelFromUri(uri, cancelFlag))
+                    }
                 } catch (error: Exception) {
-                    call.reject("GGUF modeli içe aktarılamadı: ${error.message}", error)
+                    if (cancelFlag.get() || error is CancellationException) {
+                        call.resolve(JSObject().apply { put("cancelled", true) })
+                    } else {
+                        call.reject("GGUF modeli içe aktarılamadı: ${error.message}", error)
+                    }
+                } finally {
+                    activeImportRequests.remove(importId, cancelFlag)
                 }
             }
         } catch (error: Exception) {
+            activeImportRequests.remove(importId, cancelFlag)
             call.reject("Model içe aktarma başlatılamadı: ${error.message}", error)
         }
     }

@@ -542,9 +542,24 @@ async function cancelSelectedDeviceModel(){
     if(button)button.disabled=false;
   }
 }
+async function cancelDeviceModelImport(){
+  const button=$('cancelOnDeviceImport');
+  if(button)button.disabled=true;
+  try{
+    const result=await deviceLocalCoder.cancelImport();
+    if($('onDeviceModelStatus'))$('onDeviceModelStatus').textContent=result.cancelRequested
+      ?'GGUF aktarımı durduruluyor; yarım dosya temizleniyor…'
+      :'İptal edilecek etkin bir dosya aktarımı yok.';
+  }catch(error){
+    if($('onDeviceModelStatus'))$('onDeviceModelStatus').textContent='Aktarım iptal edilemedi: '+(error.message||'Tekrar dene.');
+    if(button)button.disabled=false;
+  }
+}
 async function importDeviceModelFile(){
   const button=$('importOnDeviceModel');
+  const cancelButton=$('cancelOnDeviceImport');
   if(button)button.disabled=true;
+  if(cancelButton){cancelButton.hidden=true;cancelButton.disabled=true;}
   if($('onDeviceModelStatus'))$('onDeviceModelStatus').textContent='GGUF dosyasını seç…';
   try{
     const result=await deviceLocalCoder.importModel(progress=>{
@@ -552,12 +567,17 @@ async function importDeviceModelFile(){
       const copied=formatModelBytes(progress.copiedBytes||0);
       const total=Number(progress.totalBytes||0);
       const progressLabel=Number(progress.progress)>=0?' · %'+Number(progress.progress):'';
+      if(cancelButton&&!progress.complete){
+        cancelButton.hidden=false;
+        cancelButton.disabled=deviceLocalCoder.cancelImportRequested;
+      }
+      if(cancelButton&&progress.complete){cancelButton.hidden=true;cancelButton.disabled=true;}
       $('onDeviceModelStatus').textContent=progress.complete
         ?'GGUF dosyası doğrulandı ve telefona kaydedildi; model listesi yenileniyor…'
         :'Model telefona kopyalanıyor: '+copied+' / '+(total>0?formatModelBytes(total):'boyut hesaplanıyor')+progressLabel;
     });
     if(result.cancelled){
-      if($('onDeviceModelStatus'))$('onDeviceModelStatus').textContent='Dosya seçimi iptal edildi.';
+      if($('onDeviceModelStatus'))$('onDeviceModelStatus').textContent='Dosya aktarımı iptal edildi veya dosya seçimi kapatıldı.';
       return;
     }
     await refreshDeviceLocalModels(true);
@@ -569,6 +589,7 @@ async function importDeviceModelFile(){
     showToast('GGUF modeli içe aktarılamadı.');
   }finally{
     if(button)button.disabled=!Boolean(deviceLocalState?.device?.supported);
+    if(cancelButton){cancelButton.hidden=true;cancelButton.disabled=true;}
   }
 }
 
@@ -1240,6 +1261,7 @@ $('onDeviceModelCatalog').addEventListener('change',renderDeviceModelDescription
 $('downloadOnDeviceModel').addEventListener('click',downloadSelectedDeviceModel);
 $('cancelOnDeviceDownload').addEventListener('click',cancelSelectedDeviceModel);
 $('importOnDeviceModel').addEventListener('click',importDeviceModelFile);
+$('cancelOnDeviceImport').addEventListener('click',cancelDeviceModelImport);
 $('refreshDeviceLocalModels').addEventListener('click',()=>refreshDeviceLocalModels());
 $('loadOnDeviceModel').addEventListener('click',loadSelectedDeviceModel);
 $('unloadOnDeviceModel').addEventListener('click',unloadDeviceModel);

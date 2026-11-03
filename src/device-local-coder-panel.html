@@ -7,7 +7,8 @@
   <p id="onDeviceModelDescription" class="fineprint"></p>
   <a id="onDeviceModelLicense" class="fineprint" target="_blank" rel="noopener noreferrer" hidden>Lisans koşullarını görüntüle</a>
   <div class="row-actions"><button id="downloadOnDeviceModel" class="btn primary" type="button">Modeli indir</button><button id="cancelOnDeviceDownload" class="btn ghost small danger-text" type="button" hidden disabled>İndirmeyi iptal et</button><button id="refreshDeviceLocalModels" class="btn ghost small" type="button">Yenile</button></div>
-  <div class="row-actions"><button id="importOnDeviceModel" class="btn ghost small" type="button">Dosyadan GGUF içe aktar</button><span class="fineprint">İnternet gerekmez: önceden elinde bulunan .gguf dosyasını USB, hafıza kartı veya dosya paylaşımıyla telefona kopyalayıp seçebilirsin.</span></div>
+  <div class="row-actions"><button id="importOnDeviceModel" class="btn ghost small" type="button">Dosyadan GGUF içe aktar</button><button id="cancelOnDeviceImport" class="btn ghost small danger-text" type="button" hidden disabled>Aktarımı iptal et</button></div>
+  <p class="fineprint">İnternet gerekmez: önceden elinde bulunan .gguf dosyasını USB, hafıza kartı veya dosya paylaşımıyla telefona kopyalayıp seçebilirsin.</p>
   <label class="field-label" for="installedLocalModel">Telefona indirilmiş modeller</label>
   <select id="installedLocalModel" class="input"><option value="">Henüz model yok</option></select>
   <label class="field-label" for="onDeviceContextSize">Bağlam boyutu</label>

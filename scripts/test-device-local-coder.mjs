@@ -9,11 +9,13 @@ for (const markup of [devicePanelMarkup,indexMarkup]) {
   assert.match(markup, /id="onDeviceModelLicense"/);
   assert.match(markup, /id="cancelOnDeviceDownload"/);
   assert.match(markup, /id="importOnDeviceModel"/);
+  assert.match(markup, /id="cancelOnDeviceImport"/);
   assert.match(markup, /İnternet gerekmez/);
   assert.match(markup, /USB, hafıza kartı/);
 }
 assert.match(mainSource, /GGUF dosyası doğrulandı ve telefona kaydedildi/);
 assert.match(mainSource, /\$\('importOnDeviceModel'\)\.addEventListener\('click',importDeviceModelFile\)/);
+assert.match(mainSource, /\$\('cancelOnDeviceImport'\)\.addEventListener\('click',cancelDeviceModelImport\)/);
 assert.match(mainSource, /\$\('cancelOnDeviceDownload'\)\.addEventListener\('click',cancelSelectedDeviceModel\)/);
 assert.equal((indexMarkup.match(/id="importOnDeviceModel"/g)||[]).length,1,'the actual app screen must contain one GGUF import button');
 assert.equal((indexMarkup.match(/id="cancelOnDeviceDownload"/g)||[]).length,1,'the actual app screen must contain one cancel button');
@@ -220,6 +222,32 @@ const cleanupFailureClient=new DeviceLocalCoder(true,{
 const cleanupFailureResult=await cleanupFailureClient.importModel();
 assert.equal(cleanupFailureResult.cancelled,true,'listener cleanup errors must not overwrite the import result');
 assert.equal(cleanupFailureClient.importStarting,false,'listener cleanup errors must still release the import lock');
+let nativeImportId = '';
+let resolveNativeImport;
+let nativeCancelArgs = null;
+const cancelImportClient = new DeviceLocalCoder(true,{
+  addListener:async()=>({remove:async()=>{}}),
+  importModel:async({importId})=>{
+    nativeImportId=importId;
+    return new Promise(resolve=>{resolveNativeImport=resolve;});
+  },
+  cancelImport:async({importId})=>{
+    nativeCancelArgs={importId};
+    resolveNativeImport({cancelled:true});
+    return {cancelRequested:true};
+  }
+});
+const pendingLocalImport = cancelImportClient.importModel();
+while(nativeImportId==='') await new Promise(resolve=>setTimeout(resolve,0));
+assert.match(nativeImportId,/^gguf-import-/);
+const cancelImportResult=await cancelImportClient.cancelImport();
+assert.equal(cancelImportResult.cancelRequested,true);
+assert.deepEqual(nativeCancelArgs,{importId:nativeImportId});
+assert.deepEqual(await pendingLocalImport,{cancelled:true});
+assert.equal(cancelImportClient.activeImportId,null,'cancelled file imports must release their id');
+assert.equal(cancelImportClient.importStarting,false,'cancelled file imports must release the import lock');
+assert.equal(cancelImportClient.cancelImportRequested,false,'cancel flag must clear after result resolution');
+
 const browserImportClient = new DeviceLocalCoder(false);
 await assert.rejects(() => browserImportClient.importModel(), /Android APK gerektirir/);
 
