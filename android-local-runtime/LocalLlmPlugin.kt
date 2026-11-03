@@ -214,19 +214,23 @@ class LocalLlmPlugin : Plugin() {
             }
             val manager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
             val removed = manager.remove(id)
-            preferences.edit().remove(fileName).apply()
             if (removed > 0) {
                 if (partial.exists() && !partial.delete()) {
                     throw IllegalStateException("Yarım kalan model dosyası temizlenemedi.")
                 }
+                preferences.edit().remove(fileName).apply()
                 call.resolve(JSObject().apply { put("cancelled", true); put("completed", false) })
             } else if (destination.isFile) {
-                partial.delete()
+                if (partial.exists() && !partial.delete()) {
+                    throw IllegalStateException("Yarım kalan model dosyası temizlenemedi.")
+                }
+                preferences.edit().remove(fileName).apply()
                 call.resolve(JSObject().apply { put("cancelled", false); put("completed", true) })
             } else {
                 if (partial.exists() && !partial.delete()) {
                     throw IllegalStateException("Yarım kalan model dosyası temizlenemedi.")
                 }
+                preferences.edit().remove(fileName).apply()
                 call.resolve(JSObject().apply { put("cancelled", false); put("completed", false) })
             }
         } catch (error: Exception) {
