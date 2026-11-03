@@ -57,7 +57,7 @@ Do not mix these scopes. If an earlier session finds a blocker, fix only what is
 
 ## Latest verified status — 2026-11-03
 
-- Latest branch head: `9400716fefaa41a96b6661b8f66370d57c3dd421`. `main` remains unchanged at `aab010319b6500002844bd24b11da85dd9ca3b00`. PR #2 is open, draft and unmerged.
+- Latest app-code commit packaged in the current APKs: `9400716fefaa41a96b6661b8f66370d57c3dd421`; later branch commits update handoff docs only. Check the live branch head before editing. `main` remains unchanged at `aab010319b6500002844bd24b11da85dd9ca3b00`. PR #2 is open, draft and unmerged.
 - Recent implementation commits:
   - `6f10570` — atomic GGUF downloads: DownloadManager writes to a temporary `.part` file; successful completion is promoted to `.gguf` only after size and GGUF magic-header checks. Failed/missing tasks are cleaned up and reconciled after app restart. JavaScript clears its active download ID in `finally`.
   - `9400716` — model picker displays model-specific license information and links, with an explicit non-commercial research/evaluation notice on 3B.

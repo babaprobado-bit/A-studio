@@ -10,7 +10,7 @@
 - Latest app-code commit packaged in these APKs: `9400716fefaa41a96b6661b8f66370d57c3dd421` (handoff docs have a later docs-only commit; recheck live branch head before editing)
 - `main` remains unchanged at `aab010319b6500002844bd24b11da85dd9ca3b00`.
 - PR #2 is open, draft and unmerged: https://github.com/babaprobado-bit/A-studio/pull/2
-- Native GGUF APK workflow [41580209560](https://github.com/babaprobado-bit/A-studio/actions/runs/41580209560) succeeded on latest branch head. Artifact `AI-Studio-1.1-OnDevice-LocalCoder-APK`, ID `13205399062`, 18,135,849 bytes.
+- Native GGUF APK workflow [41580209560](https://github.com/babaprobado-bit/A-studio/actions/runs/41580209560) succeeded on app-code commit `9400716...`; subsequent commits only changed handoff documentation. Artifact `AI-Studio-1.1-OnDevice-LocalCoder-APK`, ID `13205399062`, 18,135,849 bytes.
 - Demo workflow [41580209607](https://github.com/babaprobado-bit/A-studio/actions/runs/41580209607) succeeded on the same commit. Artifact `AI-Studio-Demo-APK`, ID `13205386533`, 3,769,925 bytes. This is not the native GGUF APK.
 - Commit `6f10570`: native GGUF downloads use temporary `.part` files, validate size and GGUF header before finalizing, clean failed/missing downloads, reconcile tracked tasks on refresh/restart, and clear JS active download ID in `finally`. Mock regression test covers failed-download reset and retry.
 - Commit `9400716`: model picker shows individual license names and links. 0.5B and 1.5B GGUF show Apache-2.0; 3B GGUF shows `qwen-research` with non-commercial research/evaluation warning.
