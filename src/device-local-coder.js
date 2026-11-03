@@ -251,8 +251,13 @@ export class DeviceLocalCoder {
       if (result?.imported) await this.refresh();
       return result || { cancelled: true };
     } finally {
-      if (listener?.remove) await listener.remove();
-      this.importStarting = false;
+      try {
+        if (listener?.remove) await listener.remove();
+      } catch (_) {
+        // Listener cleanup must not leave the model-import lock stuck.
+      } finally {
+        this.importStarting = false;
+      }
     }
   }
 

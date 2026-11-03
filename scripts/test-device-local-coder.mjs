@@ -193,7 +193,16 @@ const failedImportClient=new DeviceLocalCoder(true,{
 });
 await assert.rejects(()=>failedImportClient.importModel(),/simulated picker\/import failure/);
 assert.equal(failedImportClient.importStarting,false,'failed imports must release the import lock');
+
 assert.equal(failedImportListenerRemoved,true,'failed imports must remove their progress listener');
+
+const cleanupFailureClient=new DeviceLocalCoder(true,{
+  addListener:async()=>({remove:async()=>{throw new Error('simulated listener cleanup error');}}),
+  importModel:async()=>({cancelled:true})
+});
+const cleanupFailureResult=await cleanupFailureClient.importModel();
+assert.equal(cleanupFailureResult.cancelled,true,'listener cleanup errors must not overwrite the import result');
+assert.equal(cleanupFailureClient.importStarting,false,'listener cleanup errors must still release the import lock');
 const browserImportClient = new DeviceLocalCoder(false);
 await assert.rejects(() => browserImportClient.importModel(), /Android APK gerektirir/);
 
