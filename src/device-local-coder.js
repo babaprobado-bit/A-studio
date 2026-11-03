@@ -136,15 +136,19 @@ export class DeviceLocalCoder {
     if (!Number.isFinite(downloadId)) throw new Error('Android indirme görevi başlatılamadı.');
     this.activeDownloadId = downloadId;
     const startedAt = Date.now();
-    while (true) {
-      if (Date.now() - startedAt > 6 * 60 * 60 * 1000) throw new Error('İndirme zaman aşımına uğradı; bağlantıyı kontrol et.');
-      const status = await this.plugin.downloadStatus({ downloadId });
-      onProgress(status);
-      if (status.status === 'complete') break;
-      if (status.status === 'failed') throw new Error(status.reason || 'Model indirmesi başarısız oldu.');
-      await new Promise(resolve => setTimeout(resolve, 1000));
+    try {
+      while (true) {
+        if (Date.now() - startedAt > 6 * 60 * 60 * 1000) throw new Error('İndirme zaman aşımına uğradı; bağlantıyı kontrol et.');
+        const status = await this.plugin.downloadStatus({ downloadId, fileName: model.fileName });
+        onProgress(status);
+        if (status.status === 'complete') break;
+        if (status.status === 'failed') throw new Error(status.reason || 'Model indirmesi başarısız oldu.');
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    } finally {
+      // A failed/timed-out download must not leave the JS client locked to a stale id.
+      this.activeDownloadId = null;
     }
-    this.activeDownloadId = null;
     await this.refresh();
     return this.models;
   }

@@ -34,4 +34,21 @@ await local.download(DEVICE_MODEL_CATALOG[0]);
 await local.load(DEVICE_MODEL_CATALOG[0].fileName,2048);
 assert.equal((await local.generate([{role:'user',content:'test'}])).text,'offline result');
 await local.unload();
+
+let failDownload = true;
+const retryPlugin = {
+  getDeviceInfo: fake.getDeviceInfo,
+  listModels: fake.listModels,
+  downloadModel: async () => ({ downloadId: 88 }),
+  downloadStatus: async () => failDownload
+    ? { status: 'failed', reason: 'test network failure' }
+    : { status: 'complete', progress: 100 }
+};
+const retryClient = new DeviceLocalCoder(true, retryPlugin);
+await assert.rejects(() => retryClient.download(DEVICE_MODEL_CATALOG[0]), /test network failure/);
+assert.equal(retryClient.activeDownloadId, null, 'failed downloads must clear the active id');
+failDownload = false;
+await retryClient.download(DEVICE_MODEL_CATALOG[0]);
+assert.equal(retryClient.activeDownloadId, null, 'successful downloads must clear the active id');
+
 console.log('Device Local Coder bridge tests passed.');

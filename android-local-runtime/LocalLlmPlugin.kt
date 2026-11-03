@@ -44,6 +44,75 @@ class LocalLlmPlugin : Plugin() {
         return target
     }
 
+    private fun partialModelFile(name: String): File {
+        val target = safeModelFile(name)
+        val partial = File(target.parentFile, target.name + ".part").canonicalFile
+        require(partial.parentFile == target.parentFile) { "Model yolu geçersiz." }
+        return partial
+    }
+
+    private fun downloadPreferences() =
+        context.getSharedPreferences("aistudio_local_llm_downloads", Context.MODE_PRIVATE)
+
+    private fun finalizeDownloadedModel(fileName: String) {
+        val partial = partialModelFile(fileName)
+        val destination = safeModelFile(fileName)
+        if (destination.exists()) {
+            partial.delete()
+            return
+        }
+        if (!partial.isFile || partial.length() < 1024 * 1024) {
+            throw IllegalStateException("İndirilen model dosyası eksik.")
+        }
+        RandomAccessFile(partial, "r").use { input ->
+            val magic = ByteArray(4)
+            input.readFully(magic)
+            if (String(magic, Charsets.US_ASCII) != "GGUF") {
+                throw IllegalStateException("İndirilen dosyanın GGUF başlığı geçersiz.")
+            }
+        }
+        if (!partial.renameTo(destination)) {
+            throw IllegalStateException("Model dosyası tamamlanmış konuma taşınamadı.")
+        }
+    }
+
+    /** Reconcile downloads after app restart; only completed files get the .gguf extension. */
+    private fun reconcileDownloads() {
+        val preferences = downloadPreferences()
+        val entries = preferences.all.toList()
+        if (entries.isEmpty()) return
+        val manager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+        for ((fileName, rawId) in entries) {
+            val id = rawId as? Long ?: continue
+            var cursor: Cursor? = null
+            try {
+                cursor = manager.query(DownloadManager.Query().setFilterById(id))
+                if (cursor == null || !cursor.moveToFirst()) {
+                    partialModelFile(fileName).delete()
+                    preferences.edit().remove(fileName).apply()
+                    continue
+                }
+                val index = cursor.getColumnIndex(DownloadManager.COLUMN_STATUS)
+                if (index < 0) continue
+                when (cursor.getInt(index)) {
+                    DownloadManager.STATUS_SUCCESSFUL -> {
+                        try { finalizeDownloadedModel(fileName) }
+                        catch (_: Exception) { partialModelFile(fileName).delete() }
+                        preferences.edit().remove(fileName).apply()
+                    }
+                    DownloadManager.STATUS_FAILED -> {
+                        partialModelFile(fileName).delete()
+                        preferences.edit().remove(fileName).apply()
+                    }
+                }
+            } catch (_: Exception) {
+                // Keep an active/paused download tracked; the next refresh can reconcile it.
+            } finally {
+                cursor?.close()
+            }
+        }
+    }
+
     @PluginMethod
     fun getDeviceInfo(call: PluginCall) {
         try {
@@ -73,6 +142,7 @@ class LocalLlmPlugin : Plugin() {
     @PluginMethod
     fun listModels(call: PluginCall) {
         try {
+            reconcileDownloads()
             val result = JSArray()
             modelDirectory().listFiles { file -> file.isFile && file.extension.equals("gguf", true) }
                 ?.sortedBy { it.name }?.forEach { file ->
@@ -102,7 +172,13 @@ class LocalLlmPlugin : Plugin() {
             val url = call.getString("url") ?: throw IllegalArgumentException("İndirme adresi eksik.")
             val fileName = call.getString("fileName") ?: throw IllegalArgumentException("Model dosya adı eksik.")
             val destination = safeModelFile(fileName)
+            reconcileDownloads()
+            if (downloadPreferences().contains(fileName)) {
+                throw IllegalStateException("Bu model zaten indiriliyor.")
+            }
             if (destination.exists()) throw IllegalStateException("Model zaten telefonda bulunuyor.")
+            val partial = partialModelFile(fileName)
+            if (partial.exists() && !partial.delete()) throw IllegalStateException("Önceki eksik indirme temizlenemedi.")
             val uri = Uri.parse(url)
             if (uri.scheme != "https" || uri.host !in setOf("huggingface.co", "hf.co")) {
                 throw IllegalArgumentException("Yalnızca HTTPS Hugging Face model adresleri kabul edilir.")
@@ -113,9 +189,11 @@ class LocalLlmPlugin : Plugin() {
                 .setAllowedOverMetered(call.getBoolean("allowMetered") ?: false)
                 .setAllowedOverRoaming(false)
                 .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE)
-                .setDestinationInExternalFilesDir(context, "models", fileName)
+                .setDestinationInExternalFilesDir(context, "models", partial.name)
             val manager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-            call.resolve(JSObject().apply { put("downloadId", manager.enqueue(request)) })
+            val downloadId = manager.enqueue(request)
+            downloadPreferences().edit().putLong(fileName, downloadId).apply()
+            call.resolve(JSObject().apply { put("downloadId", downloadId) })
         } catch (error: Exception) { call.reject("Model indirilemedi: ${error.message}", error) }
     }
 
@@ -124,10 +202,25 @@ class LocalLlmPlugin : Plugin() {
         var cursor: Cursor? = null
         try {
             val id = call.getLong("downloadId") ?: throw IllegalArgumentException("İndirme kimliği eksik.")
+            val fileName = call.getString("fileName") ?: throw IllegalArgumentException("Model dosya adı eksik.")
+            val preferences = downloadPreferences()
+            val tracked = preferences.getLong(fileName, -1L) == id
+            val destination = safeModelFile(fileName)
+            if (!tracked && destination.isFile) {
+                call.resolve(JSObject().apply {
+                    put("status", "complete"); put("progress", 100); put("downloadedBytes", destination.length())
+                    put("totalBytes", destination.length()); put("reason", "")
+                })
+                return
+            }
+            if (!tracked) throw IllegalStateException("İndirme kaydı bulunamadı.")
             val manager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
             cursor = manager.query(DownloadManager.Query().setFilterById(id))
             if (cursor == null || !cursor.moveToFirst()) {
-                call.resolve(JSObject().apply { put("status", "failed"); put("reason", "İndirme görevi bulunamadı.") }); return
+                partialModelFile(fileName).delete()
+                preferences.edit().remove(fileName).apply()
+                call.resolve(JSObject().apply { put("status", "failed"); put("reason", "İndirme görevi bulunamadı.") })
+                return
             }
             val statusIndex = cursor.getColumnIndex(DownloadManager.COLUMN_STATUS)
             val reasonIndex = cursor.getColumnIndex(DownloadManager.COLUMN_REASON)
@@ -137,14 +230,33 @@ class LocalLlmPlugin : Plugin() {
             val statusCode = cursor.getInt(statusIndex)
             val downloaded = if (downloadedIndex >= 0) cursor.getLong(downloadedIndex) else 0L
             val total = if (totalIndex >= 0) cursor.getLong(totalIndex) else -1L
-            val reason = if (reasonIndex >= 0) cursor.getInt(reasonIndex).toString() else ""
-            val progress = if (total > 0) (downloaded * 100.0 / total).toInt().coerceIn(0, 100) else 0
-            val status = when (statusCode) {
+            var reason = if (reasonIndex >= 0) cursor.getInt(reasonIndex).toString() else ""
+            var status = when (statusCode) {
                 DownloadManager.STATUS_SUCCESSFUL -> "complete"
                 DownloadManager.STATUS_FAILED -> "failed"
                 else -> "running"
             }
-            call.resolve(JSObject().apply { put("status", status); put("progress", progress); put("downloadedBytes", downloaded); put("totalBytes", total); put("reason", reason) })
+            if (statusCode == DownloadManager.STATUS_SUCCESSFUL) {
+                try {
+                    finalizeDownloadedModel(fileName)
+                    preferences.edit().remove(fileName).apply()
+                } catch (error: Exception) {
+                    partialModelFile(fileName).delete()
+                    preferences.edit().remove(fileName).apply()
+                    status = "failed"
+                    reason = error.message ?: "İndirilen model doğrulanamadı."
+                }
+            } else if (statusCode == DownloadManager.STATUS_FAILED) {
+                partialModelFile(fileName).delete()
+                preferences.edit().remove(fileName).apply()
+            }
+            val progress = if (status == "complete") 100 else if (total > 0) {
+                (downloaded * 100.0 / total).toInt().coerceIn(0, 100)
+            } else 0
+            call.resolve(JSObject().apply {
+                put("status", status); put("progress", progress); put("downloadedBytes", downloaded)
+                put("totalBytes", total); put("reason", reason)
+            })
         } catch (error: Exception) { call.reject("İndirme durumu okunamadı: ${error.message}", error) }
         finally { cursor?.close() }
     }
