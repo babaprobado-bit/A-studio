@@ -121,6 +121,7 @@ export class DeviceLocalCoder {
     this.activeDownloadId = null;
     this.activeDownloadFileName = '';
     this.cancelRequested = false;
+    this.downloadStarting = false;
   }
 
   async refresh() {
@@ -134,50 +135,101 @@ export class DeviceLocalCoder {
 
   async download(model, onProgress = () => {}, options = {}) {
     if (!this.native) throw new Error('Model indirme yalnızca Android uygulamasında kullanılabilir.');
-    await this.refresh();
-    if (!this.device?.supported) throw new Error('Bu telefon Android 10+ ve 64-bit ARM gereksinimini karşılamıyor.');
-    if (!model?.url || !model?.fileName) throw new Error('Model kataloğu girdisi geçersiz.');
-    if (this.models.some(item => item.fileName === model.fileName)) throw new Error('Bu model zaten telefonda bulunuyor. Listeden yükleyebilirsin.');
-    const free = Number(this.device?.freeStorageBytes || 0);
-    if (free && free < model.sizeBytes * 1.15) throw new Error(`Yeterli boş depolama yok. Yaklaşık ${formatModelBytes(model.sizeBytes * 1.15)} gerekiyor.`);
-    const started = await this.plugin.downloadModel({ url: model.url, fileName: model.fileName, allowMetered: Boolean(options.allowMetered) });
-    const downloadId = Number(started.downloadId);
-    if (!Number.isFinite(downloadId)) throw new Error('Android indirme görevi başlatılamadı.');
-    this.activeDownloadId = downloadId;
-    this.activeDownloadFileName = model.fileName;
-    this.cancelRequested = false;
-    const startedAt = Date.now();
-    const timeoutMs = Math.max(1, Number(options.timeoutMs) || 6 * 60 * 60 * 1000);
-    const pollIntervalMs = Math.max(0, Number(options.pollIntervalMs) || 1000);
+    if (this.downloadStarting || this.activeDownloadId !== null) {
+      throw new Error('Zaten etkin bir model indirmesi var. Önce onu tamamla veya iptal et.');
+    }
+
+    this.downloadStarting = true;
+    let downloadId = null;
+    let terminalStatus = false;
+    let preserveDownloadState = false;
+    let completed = false;
     try {
+      await this.refresh();
+      if (!this.device?.supported) throw new Error('Bu telefon Android 10+ ve 64-bit ARM gereksinimini karşılamıyor.');
+      if (!model?.url || !model?.fileName) throw new Error('Model kataloğu girdisi geçersiz.');
+      if (this.models.some(item => item.fileName === model.fileName)) throw new Error('Bu model zaten telefonda bulunuyor. Listeden yükleyebilirsin.');
+      const free = Number(this.device?.freeStorageBytes || 0);
+      if (free && free < model.sizeBytes * 1.15) throw new Error(`Yeterli boş depolama yok. Yaklaşık ${formatModelBytes(model.sizeBytes * 1.15)} gerekiyor.`);
+
+      const started = await this.plugin.downloadModel({
+        url: model.url,
+        fileName: model.fileName,
+        allowMetered: Boolean(options.allowMetered)
+      });
+      downloadId = Number(started.downloadId);
+      if (!Number.isSafeInteger(downloadId) || downloadId < 0) {
+        throw new Error('Android indirme görevi başlatılamadı.');
+      }
+      this.activeDownloadId = downloadId;
+      this.activeDownloadFileName = model.fileName;
+      this.cancelRequested = false;
+      this.downloadStarting = false;
+
+      const startedAt = Date.now();
+      const timeoutMs = Math.max(1, Number(options.timeoutMs) || 6 * 60 * 60 * 1000);
+      const pollIntervalMs = Math.max(0, Number(options.pollIntervalMs) || 1000);
       while (true) {
         if (this.cancelRequested) throw new Error('İndirme kullanıcı tarafından iptal edildi.');
         if (Date.now() - startedAt > timeoutMs) {
-          try { await this.cancelDownload(); } catch (_) { /* Preserve timeout as the primary error. */ }
-          throw new Error('İndirme zaman aşımına uğradı; görev iptal edildi. Bağlantıyı kontrol et.');
+          const timeoutError = new Error('İndirme zaman aşımına uğradı; görev iptal edildi. Bağlantıyı kontrol et.');
+          try {
+            await this.cancelDownload();
+          } catch (cancelError) {
+            preserveDownloadState = this.activeDownloadId === downloadId;
+            if (preserveDownloadState) timeoutError.cancelError = cancelError.message;
+          }
+          throw timeoutError;
         }
-        let status;
-        try {
-          status = await this.plugin.downloadStatus({ downloadId, fileName: model.fileName });
-        } catch (error) {
-          if (this.cancelRequested) throw new Error('İndirme kullanıcı tarafından iptal edildi.');
-          throw error;
-        }
+
+        const status = await this.plugin.downloadStatus({ downloadId, fileName: model.fileName });
         onProgress(status);
         if (this.cancelRequested) throw new Error('İndirme kullanıcı tarafından iptal edildi.');
-        if (status.status === 'complete') break;
-        if (status.status === 'failed') throw new Error(status.reason || 'Model indirmesi başarısız oldu.');
+        if (status.status === 'complete') {
+          terminalStatus = true;
+          completed = true;
+          break;
+        }
+        if (status.status === 'failed') {
+          terminalStatus = true;
+          throw new Error(status.reason || 'Model indirmesi başarısız oldu.');
+        }
         await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
       }
+    } catch (error) {
+      if (
+        downloadId !== null &&
+        !terminalStatus &&
+        !this.cancelRequested &&
+        !preserveDownloadState &&
+        this.activeDownloadId === downloadId
+      ) {
+        try {
+          await this.cancelDownload();
+        } catch (cancelError) {
+          // The native task may still be running. Keep its id so the user can retry cancellation.
+          preserveDownloadState = this.activeDownloadId === downloadId;
+          if (preserveDownloadState) error.cancelError = cancelError.message;
+        }
+      }
+      throw error;
     } finally {
-      this.activeDownloadId = null;
-      this.activeDownloadFileName = '';
-      this.cancelRequested = false;
+      this.downloadStarting = false;
+      if (!preserveDownloadState) {
+        if (this.activeDownloadId === downloadId || downloadId === null) {
+          this.activeDownloadId = null;
+          this.activeDownloadFileName = '';
+        }
+        this.cancelRequested = false;
+      }
     }
-    await this.refresh();
+
+    if (completed) {
+      await this.refresh();
+      return this.models;
+    }
     return this.models;
   }
-
   async cancelDownload() {
     if (!this.native || !this.plugin || this.activeDownloadId === null || !this.activeDownloadFileName) {
       return { cancelled: false, completed: false };

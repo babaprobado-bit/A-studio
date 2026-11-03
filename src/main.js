@@ -511,10 +511,21 @@ async function downloadSelectedDeviceModel(){
     showToast('Model indirildi. Şimdi belleğe yükleyebilirsin.');
   }catch(error){
     const cancelled=error.message==='İndirme kullanıcı tarafından iptal edildi.';
-    if($('onDeviceModelStatus'))$('onDeviceModelStatus').textContent=cancelled?'Model indirmesi iptal edildi. Yarım kalan dosya temizlendi.':'İndirme tamamlanamadı: '+(error.message||'Wi-Fi bağlantısını ve depolama alanını kontrol et.');
+    const canRetryCancel=deviceLocalCoder.activeDownloadId!==null;
+    const detail=error.message||'Wi-Fi bağlantısını ve depolama alanını kontrol et.';
+    if($('onDeviceModelStatus'))$('onDeviceModelStatus').textContent=cancelled
+      ?'Model indirmesi iptal edildi. Yarım kalan dosya temizlendi.'
+      :'İndirme tamamlanamadı: '+detail+(canRetryCancel?' İndirme görevi hâlâ etkin olabilir; aşağıdaki iptal düğmesiyle tekrar deneyebilirsin.':'');
     if(cancelled)await refreshDeviceLocalModels(true);
     showToast(cancelled?'Model indirmesi iptal edildi.':'Model indirilemedi.');
-  }finally{button.disabled=false;if(cancelButton){cancelButton.hidden=true;cancelButton.disabled=true;}}
+  }finally{
+    button.disabled=false;
+    if(cancelButton){
+      const canRetryCancel=deviceLocalCoder.activeDownloadId!==null;
+      cancelButton.hidden=!canRetryCancel;
+      cancelButton.disabled=!canRetryCancel;
+    }
+  }
 }
 async function cancelSelectedDeviceModel(){
   const button=$('cancelOnDeviceDownload');if(button)button.disabled=true;

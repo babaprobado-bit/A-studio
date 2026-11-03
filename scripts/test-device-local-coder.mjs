@@ -114,4 +114,47 @@ assert.equal(retriedCancellation.cancelled, true, 'a second cancellation attempt
 await assert.rejects(retryCancelPending, /iptal edildi/i);
 assert.equal(retryCancelClient.activeDownloadId, null, 'the download finally block clears state after retry succeeds');
 
+let statusErrorCancelCalls = 0;
+const statusErrorPlugin = {
+  getDeviceInfo: fake.getDeviceInfo,
+  listModels: async () => ({ models: [] }),
+  downloadModel: async () => ({ downloadId: 202 }),
+  downloadStatus: async () => { throw new Error('temporary status bridge failure'); },
+  cancelDownload: async args => {
+    statusErrorCancelCalls += 1;
+    assert.deepEqual(args,{downloadId:202,fileName:DEVICE_MODEL_CATALOG[0].fileName});
+    return {cancelled:true,completed:false};
+  }
+};
+const statusErrorClient = new DeviceLocalCoder(true,statusErrorPlugin);
+await assert.rejects(
+  () => statusErrorClient.download(DEVICE_MODEL_CATALOG[0],()=>{},{pollIntervalMs:1}),
+  /temporary status bridge failure/
+);
+assert.equal(statusErrorCancelCalls,1,'status bridge errors must attempt native cancellation');
+assert.equal(statusErrorClient.activeDownloadId,null,'successful cleanup after status error clears the download id');
+
+let failedCleanupAttempts=0;
+const failedCleanupPlugin = {
+  getDeviceInfo: fake.getDeviceInfo,
+  listModels: async () => ({models:[]}),
+  downloadModel: async () => ({downloadId:203}),
+  downloadStatus: async () => {throw new Error('temporary download status error');},
+  cancelDownload: async () => {
+    failedCleanupAttempts += 1;
+    if(failedCleanupAttempts===1) throw new Error('native cancel unavailable');
+    return {cancelled:true,completed:false};
+  }
+};
+const failedCleanupClient = new DeviceLocalCoder(true,failedCleanupPlugin);
+await assert.rejects(
+  () => failedCleanupClient.download(DEVICE_MODEL_CATALOG[0]),
+  /temporary download status error/
+);
+assert.equal(failedCleanupClient.activeDownloadId,203,'failed automatic cleanup must retain id for manual retry');
+assert.equal(failedCleanupClient.activeDownloadFileName,DEVICE_MODEL_CATALOG[0].fileName);
+assert.equal(failedCleanupClient.cancelRequested,false);
+assert.equal((await failedCleanupClient.cancelDownload()).cancelled,true);
+assert.equal(failedCleanupClient.activeDownloadId,203,'manual cancellation leaves final cleanup to the waiting download loop');
+
 console.log('Device Local Coder bridge tests passed.');
