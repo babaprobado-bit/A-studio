@@ -497,10 +497,11 @@ async function downloadSelectedDeviceModel(){
   const warning=assessment&&!assessment.fitsRecommended?'\n\nCihaz uyarısı: '+assessment.warnings.join('; ')+'. Modeli elle seçtin; indirmek yine de mümkün olabilir, ancak yükleme veya hız sorunları yaşanabilir.':'';
   if(!confirm(model.name+' indirilsin mi? Yaklaşık '+formatModelBytes(model.sizeBytes*1.15)+' boş alan bırak. İlk indirme internet ister; model indirildikten sonra çıkarım çevrimdışı yapılır. İndirme varsayılan olarak ücretli/mobil veri kullanmaz.'+warning))return;
   const button=$('downloadOnDeviceModel');button.disabled=true;
-  const cancelButton=$('cancelOnDeviceDownload');if(cancelButton){cancelButton.hidden=false;cancelButton.disabled=false;}
+  const cancelButton=$('cancelOnDeviceDownload');if(cancelButton){cancelButton.hidden=false;cancelButton.disabled=true;}
   if($('onDeviceModelStatus'))$('onDeviceModelStatus').textContent='İndirme başlatılıyor…';
   try{
     await deviceLocalCoder.download(model,status=>{
+      if(cancelButton)cancelButton.disabled=false;
       const percent=Number(status.progress||0);
       if($('onDeviceModelStatus'))$('onDeviceModelStatus').textContent='Model indiriliyor: %'+percent+' · '+formatModelBytes(status.downloadedBytes||0)+' / '+(Number(status.totalBytes)>0?formatModelBytes(status.totalBytes):'hesaplanıyor');
     });
