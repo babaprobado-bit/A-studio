@@ -111,6 +111,23 @@ export function formatModelBytes(bytes) {
   return `${value} B`;
 }
 
+/**
+ * Conservative free-RAM estimate for loading an installed GGUF.
+ * Known catalogue entries use their reviewed thresholds; imported files use
+ * a size-based estimate because their model family is not known to the app.
+ * This is a guardrail, not a guarantee that inference will fit or be fast.
+ */
+export function estimateMinimumAvailableRamBytes(installedModel = {}) {
+  const fileName = String(installedModel?.fileName || '');
+  const knownModel = DEVICE_MODEL_CATALOG.find(item => item.fileName === fileName);
+  if (knownModel) return knownModel.requiredFreeRamBytes;
+
+  const sizeBytes = Number(installedModel?.sizeBytes || 0);
+  const baseline = 1536 * MIB;
+  if (!Number.isFinite(sizeBytes) || sizeBytes <= 0) return baseline;
+  return Math.max(baseline, Math.ceil(sizeBytes * 1.4 + 750 * MIB));
+}
+
 export class DeviceLocalCoder {
   constructor(isNativePlatform, pluginOverride = null) {
     this.native = Boolean(isNativePlatform);
@@ -328,12 +345,15 @@ export class DeviceLocalCoder {
     if (!this.native) throw new Error('Cihaz içi model motoru Android gerektirir.');
     await this.refresh();
     const model = DEVICE_MODEL_CATALOG.find(item => item.fileName === fileName);
-    if (!this.models.some(item => item.fileName === fileName)) throw new Error('GGUF dosyası telefonda bulunamadı. Önce indir.');
+    const installedModel = this.models.find(item => item.fileName === fileName);
+    if (!installedModel) throw new Error('GGUF dosyası telefonda bulunamadı. Önce indir.');
     const total = Number(this.device?.totalMemoryBytes || 0);
     const available = Number(this.device?.availableMemoryBytes || 0);
     if (this.device?.lowMemory) throw new Error('Android şu anda düşük bellek bildiriyor. Diğer uygulamaları kapatıp yeniden dene.');
-    if (model && total && total < model.minRamGb * GIB) throw new Error(`Bu model için yaklaşık ${model.minRamGb} GB toplam RAM öneriliyor; telefonda ${formatModelBytes(total)} var.`);
-    if (model && available && available < model.requiredFreeRamBytes) throw new Error(`Yetersiz boş RAM. Bu model için yaklaşık ${formatModelBytes(model.requiredFreeRamBytes)} boş bellek öneriliyor.`);
+    if (!Number.isFinite(available) || available <= 0) throw new Error('Boş RAM bilgisi okunamadı; model güvenli biçimde değerlendirilemiyor.');
+    if (model && total > 0 && total < model.minRamGb * GIB) throw new Error(`Bu model için yaklaşık ${model.minRamGb} GB toplam RAM öneriliyor; telefonda ${formatModelBytes(total)} var.`);
+    const minimumAvailable = estimateMinimumAvailableRamBytes(installedModel);
+    if (available < minimumAvailable) throw new Error(`Yetersiz boş RAM. Bu model için yaklaşık ${formatModelBytes(minimumAvailable)} boş bellek gerekiyor.`);
     const listener = await this.plugin.addListener('localModelLoadProgress', event => onProgress(event));
     try {
       const result = await this.plugin.loadModel({ fileName, contextSize: Math.max(1024, Math.min(Number(contextSize || 2048), 4096)) });

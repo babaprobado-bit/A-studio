@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { DEVICE_MODEL_CATALOG, DeviceLocalCoder, assessDeviceModel, chooseRecommendedDeviceModel, formatModelBytes } from '../src/device-local-coder.js';
+import { DEVICE_MODEL_CATALOG, DeviceLocalCoder, assessDeviceModel, chooseRecommendedDeviceModel, estimateMinimumAvailableRamBytes, formatModelBytes } from '../src/device-local-coder.js';
 
 const devicePanelMarkup = await readFile(new URL('../src/device-local-coder-panel.html', import.meta.url), 'utf8');
 const indexMarkup = await readFile(new URL('../index.html', import.meta.url), 'utf8');
@@ -39,6 +39,16 @@ assert.equal(noSpace.canDownload,false);
 assert.equal(chooseRecommendedDeviceModel({supported:false,totalMemoryBytes:8*1024**3,availableMemoryBytes:4*1024**3,freeStorageBytes:4*1024**3,processorCount:8}).canLoad,false);
 assert.equal(assessDeviceModel(DEVICE_MODEL_CATALOG[2],{supported:true,totalMemoryBytes:12*1024**3,availableMemoryBytes:4*1024**3,freeStorageBytes:4*1024**3,processorCount:8}).fitsRecommended,true);
 assert.equal(formatModelBytes(491*1024**2),'491 MB');
+assert.equal(
+  estimateMinimumAvailableRamBytes({fileName:DEVICE_MODEL_CATALOG[0].fileName,sizeBytes:DEVICE_MODEL_CATALOG[0].sizeBytes}),
+  DEVICE_MODEL_CATALOG[0].requiredFreeRamBytes,
+  'catalogue models should use their reviewed RAM threshold'
+);
+assert.equal(
+  estimateMinimumAvailableRamBytes({fileName:'imported-community-model.gguf',sizeBytes:2*1024**3}),
+  Math.ceil(2*1024**3*1.4+750*1024**2),
+  'imported GGUF files should receive a conservative size-based RAM estimate'
+);
 assert.equal(new DeviceLocalCoder(false).native,false);
 let loaded=''; let models=[];
 const fake={
@@ -58,6 +68,28 @@ await local.download(DEVICE_MODEL_CATALOG[0]);
 await local.load(DEVICE_MODEL_CATALOG[0].fileName,2048);
 assert.equal((await local.generate([{role:'user',content:'test'}])).text,'offline result');
 await local.unload();
+
+let customModelLoadCalls = 0;
+let customAvailableRam = 3 * 1024**3;
+const customModelPlugin = {
+  getDeviceInfo:async()=>({
+    supported:true,totalMemoryBytes:8*1024**3,availableMemoryBytes:customAvailableRam,
+    freeStorageBytes:8*1024**3,processorCount:8,lowMemory:false,loadedFileName:''
+  }),
+  listModels:async()=>({models:[{fileName:'imported-community-model.gguf',sizeBytes:2*1024**3,loaded:false}]}),
+  addListener:async()=>({remove:async()=>{}}),
+  loadModel:async({fileName})=>{customModelLoadCalls++;return {loaded:true,fileName};}
+};
+const customModelClient = new DeviceLocalCoder(true,customModelPlugin);
+await assert.rejects(
+  () => customModelClient.load('imported-community-model.gguf',2048),
+  /Yetersiz boş RAM/,
+  'custom imported models must be checked before native load'
+);
+assert.equal(customModelLoadCalls,0,'low-memory custom models must not reach the native loader');
+customAvailableRam = 4 * 1024**3;
+await customModelClient.load('imported-community-model.gguf',2048);
+assert.equal(customModelLoadCalls,1,'custom model should load through the bridge when the estimate is met');
 
 let failDownload = true;
 const retryPlugin = {
