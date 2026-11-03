@@ -10,7 +10,7 @@
 - Latest source/test commit: `6afe4ccfde5f29085a3ad0f2079f0f6addbe5107` (RAM guardrails for imported GGUF models; check live branch head before editing)
 - `main` remains unchanged at `aab010319b6500002844bd24b11da85dd9ca3b00`.
 - PR #2 is open, draft and unmerged: https://github.com/babaprobado-bit/A-studio/pull/2
-- Native GGUF builds [41706818257](https://github.com/babaprobado-bit/A-studio/actions/runs/41706818257) and [41706759331](https://github.com/babaprobado-bit/A-studio/actions/runs/41706759331) target `6afe4cc...`; both were fetching pinned llama.kt after Android tool setup at last check. No artifact for this SHA yet. Previous native artifact from `77527995...` is not current.
+- PR-triggered native GGUF build [41706759331](https://github.com/babaprobado-bit/A-studio/actions/runs/41706759331) targets `6afe4cc...`; Android tool setup, pinned llama.kt fetch and llama.cpp preparation passed, dependency installation was in progress. No artifact for this SHA yet. Duplicate manual run [41706818257](https://github.com/babaprobado-bit/A-studio/actions/runs/41706818257) has an accepted cancellation request. Previous native artifact from `77527995...` is not current.
 - Last successful APKs from older app-code SHA `9400716...`: native artifact `13205399062` [run 41580209560](https://github.com/babaprobado-bit/A-studio/actions/runs/41580209560); demo artifact `13205386533` [run 41580209607](https://github.com/babaprobado-bit/A-studio/actions/runs/41580209607). These do not include local import/cancel updates.
 
 ## Latest offline-first improvements

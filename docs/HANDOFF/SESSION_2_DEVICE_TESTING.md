@@ -9,7 +9,7 @@ Do not use the regular demo APK for this test; it does not contain the native GG
 
 - Latest source/test commit: `6afe4ccfde5f29085a3ad0f2079f0f6addbe5107`.
 - The commit adds JS plus native Kotlin memory guardrails for imported GGUF files. The device bridge regression test covers the estimated-RAM rejection/acceptance path.
-- Native build [41706818257](https://github.com/babaprobado-bit/A-studio/actions/runs/41706818257) and duplicate PR run [41706759331](https://github.com/babaprobado-bit/A-studio/actions/runs/41706759331) target this SHA. Both were at pinned llama.kt engine retrieval after Android tool setup at the last check; no artifact was yet available for this SHA.
+- PR-triggered native build [41706759331](https://github.com/babaprobado-bit/A-studio/actions/runs/41706759331) targets this SHA. It passed Android tool setup, pinned llama.kt retrieval and llama.cpp source preparation; AI Studio dependency installation was in progress at the last check. No artifact was available yet. Duplicate manual run [41706818257](https://github.com/babaprobado-bit/A-studio/actions/runs/41706818257) has an accepted cancellation request.
 - The prior successful native artifact `13262651732` from [41696652109](https://github.com/babaprobado-bit/A-studio/actions/runs/41696652109) belongs to older source `77527995...` and excludes this RAM guard change.
 - Native model management now includes DownloadManager cancellation and local GGUF import. A user can transfer an already-owned `.gguf` file to the phone by USB/SD/file sharing and import it without internet.
 - Import writes to app-scoped `.part`, enforces an 8 GB cap, sanitizes names, checks storage, reports progress every ~8 MB and rechecks free space every ~16 MB; GGUF magic is checked before final rename.
