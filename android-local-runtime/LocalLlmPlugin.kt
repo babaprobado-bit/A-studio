@@ -166,12 +166,17 @@ class LocalLlmPlugin : Plugin() {
             if (declaredSize > maxImportedModelBytes) {
                 throw IllegalArgumentException("Model dosyası 8 GB sınırını aşıyor.")
             }
-            val requiredBytes = if (declaredSize > 0) declaredSize + 32L * 1024L * 1024L else 0L
+            val reserveBytes = 32L * 1024L * 1024L
+            val requiredBytes = if (declaredSize > 0) declaredSize + reserveBytes else reserveBytes
             val freeBytes = StatFs(modelDirectory().absolutePath).availableBytes
-            if (requiredBytes > 0 && freeBytes < requiredBytes) {
+            if (freeBytes < requiredBytes) {
                 throw IllegalStateException("Modeli içe aktarmak için telefonda yeterli boş alan yok.")
             }
             var copiedBytes = 0L
+            var lastStorageCheckBytes = 0L
+            var lastProgressBytes = 0L
+            val storageCheckInterval = 16L * 1024L * 1024L
+            val progressInterval = 8L * 1024L * 1024L
             val source = resolver.openInputStream(uri)
                 ?: throw IllegalStateException("Seçilen dosya okunamadı.")
             source.use { input ->
@@ -186,6 +191,30 @@ class LocalLlmPlugin : Plugin() {
                             throw IllegalArgumentException("Model dosyası 8 GB sınırını aşıyor.")
                         }
                         output.write(buffer, 0, count)
+
+                        if (copiedBytes - lastStorageCheckBytes >= storageCheckInterval) {
+                            val remainingBytes = if (declaredSize > 0) {
+                                (declaredSize - copiedBytes).coerceAtLeast(0L) + reserveBytes
+                            } else reserveBytes
+                            val availableNow = StatFs(modelDirectory().absolutePath).availableBytes
+                            if (availableNow < remainingBytes) {
+                                throw IllegalStateException("İçe aktarma sırasında boş depolama alanı azaldı; işlem durduruldu.")
+                            }
+                            lastStorageCheckBytes = copiedBytes
+                        }
+                        if (copiedBytes - lastProgressBytes >= progressInterval) {
+                            val progress = if (declaredSize > 0) {
+                                ((copiedBytes * 100L) / declaredSize).toInt().coerceIn(0, 99)
+                            } else -1
+                            notifyListeners("localModelImportProgress", JSObject().apply {
+                                put("fileName", fileName)
+                                put("copiedBytes", copiedBytes)
+                                put("totalBytes", declaredSize)
+                                put("progress", progress)
+                                put("complete", false)
+                            })
+                            lastProgressBytes = copiedBytes
+                        }
                     }
                     output.fd.sync()
                 }
@@ -193,7 +222,18 @@ class LocalLlmPlugin : Plugin() {
             if (declaredSize > 0 && copiedBytes != declaredSize) {
                 throw IllegalStateException("Model dosyası tam kopyalanamadı; kaynak ve hedef boyutları eşleşmiyor.")
             }
+            val finalFreeBytes = StatFs(modelDirectory().absolutePath).availableBytes
+            if (finalFreeBytes < reserveBytes) {
+                throw IllegalStateException("GGUF dosyası için gereken boş alan kalmadı; işlem tamamlanamadı.")
+            }
             finalizeDownloadedModel(fileName)
+            notifyListeners("localModelImportProgress", JSObject().apply {
+                put("fileName", fileName)
+                put("copiedBytes", copiedBytes)
+                put("totalBytes", if (declaredSize > 0) declaredSize else copiedBytes)
+                put("progress", 100)
+                put("complete", true)
+            })
             return JSObject().apply {
                 put("imported", true)
                 put("fileName", fileName)

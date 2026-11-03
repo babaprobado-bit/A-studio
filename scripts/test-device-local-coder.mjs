@@ -160,19 +160,40 @@ assert.equal(failedCleanupClient.activeDownloadFileName,'');
 assert.equal(failedCleanupClient.downloadLoopActive,false);
 
 let importedModels = [];
+let importListenerRemoved = false;
+const importProgressEvents = [];
 const importPlugin = {
   getDeviceInfo: fake.getDeviceInfo,
   listModels: async () => ({ models: importedModels }),
+  addListener: async (eventName, callback) => {
+    assert.equal(eventName,'localModelImportProgress');
+    callback({fileName:'transferred-qwen.gguf',copiedBytes:8*1024**2,totalBytes:24*1024**2,progress:33,complete:false});
+    callback({fileName:'transferred-qwen.gguf',copiedBytes:24*1024**2,totalBytes:24*1024**2,progress:100,complete:true});
+    return {remove:async()=>{importListenerRemoved=true;}};
+  },
   importModel: async () => {
-    importedModels = [{ fileName: 'transferred-qwen.gguf', sizeBytes: 491 * 1024 ** 2, loaded: false }];
-    return { imported: true, fileName: 'transferred-qwen.gguf', sizeBytes: 491 * 1024 ** 2 };
+    importedModels = [{ fileName: 'transferred-qwen.gguf', sizeBytes: 24 * 1024 ** 2, loaded: false }];
+    return { imported: true, fileName: 'transferred-qwen.gguf', sizeBytes: 24 * 1024 ** 2 };
   }
 };
 const importClient = new DeviceLocalCoder(true, importPlugin);
-const importResult = await importClient.importModel();
+const importResult = await importClient.importModel(event=>importProgressEvents.push(event));
 assert.equal(importResult.imported, true);
 assert.equal(importClient.models[0].fileName, 'transferred-qwen.gguf', 'imported GGUF should appear in the installed model list');
 assert.equal(importClient.importStarting, false, 'the import lock must release after success');
+assert.equal(importListenerRemoved,true,'import progress listener must be removed after success');
+assert.equal(importProgressEvents.length,2,'import progress events must reach the UI callback');
+assert.equal(importProgressEvents[0].progress,33);
+assert.equal(importProgressEvents[1].complete,true);
+
+let failedImportListenerRemoved=false;
+const failedImportClient=new DeviceLocalCoder(true,{
+  addListener:async()=>({remove:async()=>{failedImportListenerRemoved=true;}}),
+  importModel:async()=>{throw new Error('simulated picker/import failure');}
+});
+await assert.rejects(()=>failedImportClient.importModel(),/simulated picker\/import failure/);
+assert.equal(failedImportClient.importStarting,false,'failed imports must release the import lock');
+assert.equal(failedImportListenerRemoved,true,'failed imports must remove their progress listener');
 const browserImportClient = new DeviceLocalCoder(false);
 await assert.rejects(() => browserImportClient.importModel(), /Android APK gerektirir/);
 

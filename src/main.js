@@ -547,7 +547,15 @@ async function importDeviceModelFile(){
   if(button)button.disabled=true;
   if($('onDeviceModelStatus'))$('onDeviceModelStatus').textContent='GGUF dosyasını seç…';
   try{
-    const result=await deviceLocalCoder.importModel();
+    const result=await deviceLocalCoder.importModel(progress=>{
+      if(!$('onDeviceModelStatus'))return;
+      const copied=formatModelBytes(progress.copiedBytes||0);
+      const total=Number(progress.totalBytes||0);
+      const progressLabel=Number(progress.progress)>=0?' · %'+Number(progress.progress):'';
+      $('onDeviceModelStatus').textContent=progress.complete
+        ?'Dosya kopyalandı; GGUF başlığı doğrulanıyor…'
+        :'Model telefona kopyalanıyor: '+copied+' / '+(total>0?formatModelBytes(total):'boyut hesaplanıyor')+progressLabel;
+    });
     if(result.cancelled){
       if($('onDeviceModelStatus'))$('onDeviceModelStatus').textContent='Dosya seçimi iptal edildi.';
       return;

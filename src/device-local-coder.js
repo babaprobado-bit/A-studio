@@ -234,7 +234,7 @@ export class DeviceLocalCoder {
     }
     return this.models;
   }
-  async importModel() {
+  async importModel(onProgress = () => {}) {
     if (!this.native || !this.plugin) {
       throw new Error('GGUF dosyası içe aktarma Android APK gerektirir.');
     }
@@ -242,11 +242,16 @@ export class DeviceLocalCoder {
       throw new Error('Başka bir model aktarımı sürüyor. Önce onu tamamla.');
     }
     this.importStarting = true;
+    let listener = null;
     try {
+      if (typeof this.plugin.addListener === 'function') {
+        listener = await this.plugin.addListener('localModelImportProgress', event => onProgress(event));
+      }
       const result = await this.plugin.importModel();
       if (result?.imported) await this.refresh();
       return result || { cancelled: true };
     } finally {
+      if (listener?.remove) await listener.remove();
       this.importStarting = false;
     }
   }
