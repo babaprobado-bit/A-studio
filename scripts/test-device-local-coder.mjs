@@ -1,5 +1,13 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { DEVICE_MODEL_CATALOG, DeviceLocalCoder, assessDeviceModel, chooseRecommendedDeviceModel, formatModelBytes } from '../src/device-local-coder.js';
+
+const devicePanelMarkup = await readFile(new URL('../src/device-local-coder-panel.html', import.meta.url), 'utf8');
+const mainSource = await readFile(new URL('../src/main.js', import.meta.url), 'utf8');
+assert.match(devicePanelMarkup, /id="importOnDeviceModel"/);
+assert.match(devicePanelMarkup, /İnternet gerekmez/);
+assert.match(devicePanelMarkup, /USB, hafıza kartı/);
+assert.match(mainSource, /GGUF dosyası doğrulandı ve telefona kaydedildi/);
 assert.equal(DEVICE_MODEL_CATALOG.length, 3);
 assert.ok(DEVICE_MODEL_CATALOG.every(model => model.url.startsWith('https://huggingface.co/')));
 assert.ok(DEVICE_MODEL_CATALOG.every(model => model.licenseUrl.startsWith('https://huggingface.co/')));

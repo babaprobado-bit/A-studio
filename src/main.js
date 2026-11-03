@@ -553,7 +553,7 @@ async function importDeviceModelFile(){
       const total=Number(progress.totalBytes||0);
       const progressLabel=Number(progress.progress)>=0?' · %'+Number(progress.progress):'';
       $('onDeviceModelStatus').textContent=progress.complete
-        ?'Dosya kopyalandı; GGUF başlığı doğrulanıyor…'
+        ?'GGUF dosyası doğrulandı ve telefona kaydedildi; model listesi yenileniyor…'
         :'Model telefona kopyalanıyor: '+copied+' / '+(total>0?formatModelBytes(total):'boyut hesaplanıyor')+progressLabel;
     });
     if(result.cancelled){
