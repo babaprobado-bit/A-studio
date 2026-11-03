@@ -7,10 +7,10 @@
 - Product: **AI Studio**. Keep Android application ID `com.aistudio.alpha1`.
 - Repo: https://github.com/babaprobado-bit/A-studio
 - Branch: `feature/android-offline-skills-v1`
-- Latest source head: `0a8083466792b14310bc5cb2dbf681552d8cfd81`
+- Latest app-code commit: `0a8083466792b14310bc5cb2dbf681552d8cfd81` (the latest handoff commit only changes documentation; recheck the live branch head before editing)
 - `main` remains unchanged at `aab010319b6500002844bd24b11da85dd9ca3b00`.
 - PR #2 is open, draft and unmerged: https://github.com/babaprobado-bit/A-studio/pull/2
-- Current-source native build [41703474174](https://github.com/babaprobado-bit/A-studio/actions/runs/41703474174) and demo build [41703474052](https://github.com/babaprobado-bit/A-studio/actions/runs/41703474052) were in progress at last check. Recheck live state and artifacts.
+- Current-source demo [41703474052](https://github.com/babaprobado-bit/A-studio/actions/runs/41703474052) succeeded and uploaded artifact `13264627023` (3,772,330 bytes). Native build [41703474174](https://github.com/babaprobado-bit/A-studio/actions/runs/41703474174) was still preparing pinned llama.kt/llama.cpp sources; recheck live before using it.
 - Last successful APKs from older app-code SHA `9400716...`: native artifact `13205399062` [run 41580209560](https://github.com/babaprobado-bit/A-studio/actions/runs/41580209560); demo artifact `13205386533` [run 41580209607](https://github.com/babaprobado-bit/A-studio/actions/runs/41580209607). These do not include local import/cancel updates.
 
 ## Latest offline-first improvements

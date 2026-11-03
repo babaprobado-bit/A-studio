@@ -24,7 +24,7 @@ This document separates implemented source, automated checks, CI APK builds and 
 ## Latest source and CI status
 
 - Current branch head: `0a8083466792b14310bc5cb2dbf681552d8cfd81`.
-- Native Android workflow [41703474174](https://github.com/babaprobado-bit/A-studio/actions/runs/41703474174) and demo workflow [41703474052](https://github.com/babaprobado-bit/A-studio/actions/runs/41703474052) were in progress at the last status check. Demo regression tests and Capacitor sync had passed; Gradle packaging was running. Native build was setting up Android tools. Check live state before claiming a current-source APK.
+- Demo workflow [41703474052](https://github.com/babaprobado-bit/A-studio/actions/runs/41703474052) succeeded for source `0a80834...` and uploaded artifact `13264627023` (3,772,330 bytes); all regression/build/upload steps passed. Native workflow [41703474174](https://github.com/babaprobado-bit/A-studio/actions/runs/41703474174) is still preparing pinned llama.kt/llama.cpp sources; check live state before claiming a native APK.
 - Last successful native/demo artifacts `13205399062` and `13205386533` are from older app-code SHA `9400716...`; they do not include these recent local import/cancellation UI changes.
 - Regression tests inspect the actual `index.html`, button IDs and event handlers; fake-plugin tests cover local import progress, cancellation and lock/listener cleanup. These are not physical device tests.
 
