@@ -155,6 +155,8 @@ assert.equal(failedCleanupClient.activeDownloadId,203,'failed automatic cleanup 
 assert.equal(failedCleanupClient.activeDownloadFileName,DEVICE_MODEL_CATALOG[0].fileName);
 assert.equal(failedCleanupClient.cancelRequested,false);
 assert.equal((await failedCleanupClient.cancelDownload()).cancelled,true);
-assert.equal(failedCleanupClient.activeDownloadId,203,'manual cancellation leaves final cleanup to the waiting download loop');
+assert.equal(failedCleanupClient.activeDownloadId,null,'manual cancellation after a stopped poll loop must clear the stale id');
+assert.equal(failedCleanupClient.activeDownloadFileName,'');
+assert.equal(failedCleanupClient.downloadLoopActive,false);
 
 console.log('Device Local Coder bridge tests passed.');

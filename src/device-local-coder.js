@@ -122,6 +122,7 @@ export class DeviceLocalCoder {
     this.activeDownloadFileName = '';
     this.cancelRequested = false;
     this.downloadStarting = false;
+    this.downloadLoopActive = false;
   }
 
   async refresh() {
@@ -165,6 +166,7 @@ export class DeviceLocalCoder {
       this.activeDownloadFileName = model.fileName;
       this.cancelRequested = false;
       this.downloadStarting = false;
+      this.downloadLoopActive = true;
 
       const startedAt = Date.now();
       const timeoutMs = Math.max(1, Number(options.timeoutMs) || 6 * 60 * 60 * 1000);
@@ -215,6 +217,7 @@ export class DeviceLocalCoder {
       throw error;
     } finally {
       this.downloadStarting = false;
+      this.downloadLoopActive = false;
       if (!preserveDownloadState) {
         if (this.activeDownloadId === downloadId || downloadId === null) {
           this.activeDownloadId = null;
@@ -241,9 +244,20 @@ export class DeviceLocalCoder {
       const result = await this.plugin.cancelDownload({ downloadId, fileName });
       if (result?.completed) {
         this.cancelRequested = false;
+        if (!this.downloadLoopActive) {
+          this.activeDownloadId = null;
+          this.activeDownloadFileName = '';
+        }
         return result;
       }
-      if (result?.cancelled) return result;
+      if (result?.cancelled) {
+        if (!this.downloadLoopActive) {
+          this.activeDownloadId = null;
+          this.activeDownloadFileName = '';
+          this.cancelRequested = false;
+        }
+        return result;
+      }
       this.cancelRequested = false;
       throw new Error('Android indirme görevi iptal edilemedi veya bulunamadı.');
     } catch (error) {
