@@ -7,7 +7,7 @@
 - Product: **AI Studio**. Alpha 1 is only a milestone label. Keep Android application ID `com.aistudio.alpha1`.
 - Repo: https://github.com/babaprobado-bit/A-studio
 - Branch: `feature/android-offline-skills-v1`
-- Latest branch head: `9400716fefaa41a96b6661b8f66370d57c3dd421`
+- Latest app-code commit packaged in these APKs: `9400716fefaa41a96b6661b8f66370d57c3dd421` (handoff docs have a later docs-only commit; recheck live branch head before editing)
 - `main` remains unchanged at `aab010319b6500002844bd24b11da85dd9ca3b00`.
 - PR #2 is open, draft and unmerged: https://github.com/babaprobado-bit/A-studio/pull/2
 - Native GGUF APK workflow [41580209560](https://github.com/babaprobado-bit/A-studio/actions/runs/41580209560) succeeded on latest branch head. Artifact `AI-Studio-1.1-OnDevice-LocalCoder-APK`, ID `13205399062`, 18,135,849 bytes.

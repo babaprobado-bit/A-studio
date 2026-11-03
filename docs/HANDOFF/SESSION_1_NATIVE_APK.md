@@ -6,7 +6,7 @@
 ## Latest verified build — 2026-11-03
 - Repository: https://github.com/babaprobado-bit/A-studio
 - Branch: `feature/android-offline-skills-v1`
-- Latest branch head at this checkpoint: `9400716fefaa41a96b6661b8f66370d57c3dd421`
+- Latest app-code commit packaged in these APKs: `9400716fefaa41a96b6661b8f66370d57c3dd421` (the handoff docs were committed afterward; check the live branch tip before editing)
 - Native workflow [41580209560](https://github.com/babaprobado-bit/A-studio/actions/runs/41580209560) completed successfully. Android SDK/tools, pinned llama.kt/llama.cpp preparation, dependencies, web build, regression checks, Capacitor generation and sync, Gradle `assembleDebug`, and artifact upload all passed.
 - Native artifact: `AI-Studio-1.1-OnDevice-LocalCoder-APK`, ID `13205399062`, 18,135,849 bytes.
 - Demo workflow [41580209607](https://github.com/babaprobado-bit/A-studio/actions/runs/41580209607) also passed. Demo artifact ID `13205386533`, 3,769,925 bytes. It does not contain the native GGUF bridge.

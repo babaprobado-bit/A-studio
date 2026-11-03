@@ -17,7 +17,7 @@ Do not use the regular demo APK for this test; it does not contain the native GG
 
 - User-reported test phone: Redmi S12. Exact Android version, supported ABI and available RAM remain unknown until read from the phone's device profile.
 - User previously reported no current internet. First model download cannot be tested without internet.
-- Latest feature branch head: `9400716fefaa41a96b6661b8f66370d57c3dd421`. PR #2 remains open/draft and unmerged; `main` unchanged at `aab010319b6500002844bd24b11da85dd9ca3b00`.
+- Latest app-code commit packaged in these APKs: `9400716fefaa41a96b6661b8f66370d57c3dd421`; docs-only handoff commits may make the live branch head newer. PR #2 remains open/draft and unmerged; `main` unchanged at `aab010319b6500002844bd24b11da85dd9ca3b00`.
 - No physical installation, actual GGUF download, native model load/inference or airplane-mode proof has passed. Do not infer phone compatibility from CI success.
 
 ## Read first

@@ -13,7 +13,7 @@ Purpose: this is the durable project memory for continuing AI Studio across four
 - Open draft PR: #2 — https://github.com/babaprobado-bit/A-studio/pull/2
 - Base branch is still main. Do not push feature work directly to main.
 - This is the Android/Capacitor AI Studio app plus its private web workspace. It is not the user's completed game project.
-- Latest branch head: `9400716fefaa41a96b6661b8f66370d57c3dd421` (model-license disclosure); previous implementation commit `6f10570eedb42b88cd42cd6139ac18b57a357d17` hardens GGUF downloads.
+- Latest app-code commit for the current APKs: `9400716fefaa41a96b6661b8f66370d57c3dd421` (model-license disclosure). A later docs-only commit updates these handoff files; recheck the live branch head before coding.
 
 ## Read order for every new conversation
 

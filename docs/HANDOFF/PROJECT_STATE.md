@@ -3,7 +3,7 @@
 ## Latest continuation status — 2026-11-03
 
 - Official product name is **AI Studio**; Alpha 1 is only a milestone label. Keep `com.aistudio.alpha1`.
-- Latest branch head: `9400716fefaa41a96b6661b8f66370d57c3dd421`; base `main` remains `aab010319b6500002844bd24b11da85dd9ca3b00`. PR #2 is open/draft, mergeable and unmerged.
+- Latest app-code commit for the current APKs: `9400716fefaa41a96b6661b8f66370d57c3dd421` (a later docs-only handoff commit may be the live branch tip; check GitHub before editing). Base `main` remains `aab010319b6500002844bd24b11da85dd9ca3b00`. PR #2 is open/draft, mergeable and unmerged.
 - Native Android GGUF build [41580209560](https://github.com/babaprobado-bit/A-studio/actions/runs/41580209560) succeeded on this branch head. Artifact `13205399062`, `AI-Studio-1.1-OnDevice-LocalCoder-APK`, 18,135,849 bytes. All native source setup, regression tests, Capacitor sync, Gradle and upload steps passed.
 - Demo build [41580209607](https://github.com/babaprobado-bit/A-studio/actions/runs/41580209607) succeeded on the same commit. Artifact `13205386533`, `AI-Studio-Demo-APK`, 3,769,925 bytes. It is not the native GGUF APK.
 - Commit `6f10570` makes model downloads atomic: DownloadManager stores to `.part`; successful completion is promoted to `.gguf` only after a size and GGUF-magic check; failed/missing tasks are cleaned up and reconciled after app restart. JavaScript active download ID is cleared in `finally`. A mock regression test covers failure and retry state.
