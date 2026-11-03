@@ -404,6 +404,7 @@ function syncLocalCoderEngineUI(){
 }
 function renderDeviceModelDescription(){
   const select=$('onDeviceModelCatalog'), description=$('onDeviceModelDescription');
+  const licenseLink=$('onDeviceModelLicense');
   if(!select||!description)return;
   const model=DEVICE_MODEL_CATALOG.find(item=>item.id===select.value)||DEVICE_MODEL_CATALOG[0];
   const info=deviceLocalState?.device;
@@ -414,7 +415,12 @@ function renderDeviceModelDescription(){
     if(assessment.fitsRecommended)fit='Bu telefon için uygun görünüyor.';
     else fit='Uyarı: '+assessment.warnings.join('; ')+'.';
   }
-  description.textContent=model.name+' · yaklaşık '+formatModelBytes(model.sizeBytes)+' indirme · '+model.minRamGb+' GB+ RAM · '+model.minCpuCores+'+ CPU çekirdeği önerisi (kaba tahmin). '+fit+' '+model.summary;
+  description.textContent=model.name+' · yaklaşık '+formatModelBytes(model.sizeBytes)+' indirme · '+model.minRamGb+' GB+ RAM · '+model.minCpuCores+'+ CPU çekirdeği önerisi (kaba tahmin). '+fit+' '+model.summary+(model.licenseNotice?' '+model.licenseNotice:'');
+  if(licenseLink){
+    licenseLink.href=model.licenseUrl||'#';
+    licenseLink.textContent='Lisans: '+(model.licenseName||'Belirtilmemiş')+' · Koşulları görüntüle';
+    licenseLink.hidden=!model.licenseUrl;
+  }
 }
 function renderDeviceLocalModelManager(){
   const panel=$('deviceLocalModelsPanel'); if(!panel)return;
