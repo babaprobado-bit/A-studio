@@ -3,10 +3,15 @@ import { readFile } from 'node:fs/promises';
 import { DEVICE_MODEL_CATALOG, DeviceLocalCoder, assessDeviceModel, chooseRecommendedDeviceModel, formatModelBytes } from '../src/device-local-coder.js';
 
 const devicePanelMarkup = await readFile(new URL('../src/device-local-coder-panel.html', import.meta.url), 'utf8');
+const indexMarkup = await readFile(new URL('../index.html', import.meta.url), 'utf8');
 const mainSource = await readFile(new URL('../src/main.js', import.meta.url), 'utf8');
-assert.match(devicePanelMarkup, /id="importOnDeviceModel"/);
-assert.match(devicePanelMarkup, /İnternet gerekmez/);
-assert.match(devicePanelMarkup, /USB, hafıza kartı/);
+for (const markup of [devicePanelMarkup,indexMarkup]) {
+  assert.match(markup, /id="onDeviceModelLicense"/);
+  assert.match(markup, /id="cancelOnDeviceDownload"/);
+  assert.match(markup, /id="importOnDeviceModel"/);
+  assert.match(markup, /İnternet gerekmez/);
+  assert.match(markup, /USB, hafıza kartı/);
+}
 assert.match(mainSource, /GGUF dosyası doğrulandı ve telefona kaydedildi/);
 assert.equal(DEVICE_MODEL_CATALOG.length, 3);
 assert.ok(DEVICE_MODEL_CATALOG.every(model => model.url.startsWith('https://huggingface.co/')));
