@@ -187,14 +187,17 @@ export class DeviceLocalCoder {
     this.cancelRequested = true;
     try {
       const result = await this.plugin.cancelDownload({ downloadId, fileName });
-      if (result?.completed) this.cancelRequested = false;
-      return result;
+      if (result?.completed) {
+        this.cancelRequested = false;
+        return result;
+      }
+      if (result?.cancelled) return result;
+      this.cancelRequested = false;
+      throw new Error('Android indirme görevi iptal edilemedi veya bulunamadı.');
     } catch (error) {
       this.cancelRequested = false;
+      // Keep the active id so the user can retry when native cancellation fails.
       throw error;
-    } finally {
-      this.activeDownloadId = null;
-      this.activeDownloadFileName = '';
     }
   }
 

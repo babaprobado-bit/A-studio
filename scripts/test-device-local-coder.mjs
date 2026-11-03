@@ -89,4 +89,29 @@ await assert.rejects(
 assert.equal(timeoutCancelCalled, true, 'timed-out downloads must cancel the native DownloadManager task');
 assert.equal(timeoutClient.activeDownloadId, null, 'timed-out downloads must clear the active id');
 
+
+let cancelAttempts = 0;
+const retryCancelPlugin = {
+  getDeviceInfo: fake.getDeviceInfo,
+  listModels: async () => ({ models: [] }),
+  downloadModel: async () => ({ downloadId: 101 }),
+  downloadStatus: async () => ({ status: 'running', progress: 10 }),
+  cancelDownload: async () => {
+    cancelAttempts += 1;
+    if (cancelAttempts === 1) throw new Error('temporary native cancellation failure');
+    return { cancelled: true, completed: false };
+  }
+};
+const retryCancelClient = new DeviceLocalCoder(true, retryCancelPlugin);
+const retryCancelPending = retryCancelClient.download(DEVICE_MODEL_CATALOG[0], () => {}, { pollIntervalMs: 1, timeoutMs: 5000 });
+while (retryCancelClient.activeDownloadId === null) await new Promise(resolve => setTimeout(resolve, 0));
+await assert.rejects(() => retryCancelClient.cancelDownload(), /temporary native cancellation failure/);
+assert.equal(retryCancelClient.activeDownloadId, 101, 'failed cancellation must retain the active id for retry');
+assert.equal(retryCancelClient.activeDownloadFileName, DEVICE_MODEL_CATALOG[0].fileName, 'failed cancellation must retain its filename');
+assert.equal(retryCancelClient.cancelRequested, false, 'failed cancellation must release the cancellation flag');
+const retriedCancellation = await retryCancelClient.cancelDownload();
+assert.equal(retriedCancellation.cancelled, true, 'a second cancellation attempt should succeed');
+await assert.rejects(retryCancelPending, /iptal edildi/i);
+assert.equal(retryCancelClient.activeDownloadId, null, 'the download finally block clears state after retry succeeds');
+
 console.log('Device Local Coder bridge tests passed.');

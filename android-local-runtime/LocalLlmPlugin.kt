@@ -224,7 +224,9 @@ class LocalLlmPlugin : Plugin() {
                 partial.delete()
                 call.resolve(JSObject().apply { put("cancelled", false); put("completed", true) })
             } else {
-                partial.delete()
+                if (partial.exists() && !partial.delete()) {
+                    throw IllegalStateException("Yarım kalan model dosyası temizlenemedi.")
+                }
                 call.resolve(JSObject().apply { put("cancelled", false); put("completed", false) })
             }
         } catch (error: Exception) {

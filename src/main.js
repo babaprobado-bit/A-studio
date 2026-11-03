@@ -520,7 +520,11 @@ async function cancelSelectedDeviceModel(){
   const button=$('cancelOnDeviceDownload');if(button)button.disabled=true;
   try{
     const result=await deviceLocalCoder.cancelDownload();
-    if($('onDeviceModelStatus'))$('onDeviceModelStatus').textContent=result.completed?'İndirme zaten tamamlanmış.':'İptal isteği gönderildi; yarım kalan dosya temizleniyor…';
+    if($('onDeviceModelStatus'))$('onDeviceModelStatus').textContent=result.completed
+      ?'İndirme zaten tamamlanmış.'
+      :result.cancelled
+        ?'İptal isteği gönderildi; yarım kalan dosya temizleniyor…'
+        :'İptal edilecek etkin bir indirme bulunamadı.';
   }catch(error){
     if($('onDeviceModelStatus'))$('onDeviceModelStatus').textContent='İndirme iptal edilemedi: '+(error.message||'Tekrar dene.');
     if(button)button.disabled=false;
