@@ -13,6 +13,10 @@ for (const markup of [devicePanelMarkup,indexMarkup]) {
   assert.match(markup, /USB, hafıza kartı/);
 }
 assert.match(mainSource, /GGUF dosyası doğrulandı ve telefona kaydedildi/);
+assert.match(mainSource, /\$\('importOnDeviceModel'\)\.addEventListener\('click',importDeviceModelFile\)/);
+assert.match(mainSource, /\$\('cancelOnDeviceDownload'\)\.addEventListener\('click',cancelSelectedDeviceModel\)/);
+assert.equal((indexMarkup.match(/id="importOnDeviceModel"/g)||[]).length,1,'the actual app screen must contain one GGUF import button');
+assert.equal((indexMarkup.match(/id="cancelOnDeviceDownload"/g)||[]).length,1,'the actual app screen must contain one cancel button');
 assert.equal(DEVICE_MODEL_CATALOG.length, 3);
 assert.ok(DEVICE_MODEL_CATALOG.every(model => model.url.startsWith('https://huggingface.co/')));
 assert.ok(DEVICE_MODEL_CATALOG.every(model => model.licenseUrl.startsWith('https://huggingface.co/')));
