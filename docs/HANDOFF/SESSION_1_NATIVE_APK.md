@@ -1,45 +1,28 @@
-# New chat starter — AI Studio
+# Session 1 — Native Android GGUF APK
 
-## Resume code
-`AI-STUDIO-SESSION3-SKILLS-API`
+## Status
+**Complete.** Native build and artifact packaging are verified in GitHub Actions. Physical-device support is **not** verified; that is Session 2.
 
-## Current verified state
-- Product: **AI Studio**; Alpha 1 is only an internal milestone; keep package ID `com.aistudio.alpha1`.
+## Latest verified build — 2026-11-03
 - Repository: https://github.com/babaprobado-bit/A-studio
 - Branch: `feature/android-offline-skills-v1`
-- Current code/test commit: `389a8b87ee7ebef96eb8ba7d265ca60f0a1aea03`
-- `main` remains unchanged; PR #2 is open/draft and unmerged.
-- Latest demo run [41481715511](https://github.com/babaprobado-bit/A-studio/actions/runs/41481715511) succeeded, artifact `AI-Studio-Demo-APK` ID `13160940289`. This does not include native GGUF.
-- Latest native run [41481715201](https://github.com/babaprobado-bit/A-studio/actions/runs/41481715201) was preparing llama.cpp Android sources; no artifact yet.
-- Native artifact `13159701220` exists from older source and predates the latest Skill import queue/API concurrency fix.
-- Skills: multi-file queue, preview-before-save, duplicate warning, BOM/CRLF, UI control wiring tests, strict caps, backup round-trip and legacy fallback.
-- API: fake-provider tests for consent, selected provider, fixed three-stage sequence, no retry/fallback, secrets excluded from backups/logs; concurrency fix locks before first await.
-- User reports Redmi S12 and no internet currently. No physical installation, GGUF download, inference or airplane-mode validation.
+- Latest branch head at this checkpoint: `9400716fefaa41a96b6661b8f66370d57c3dd421`
+- Native workflow [41580209560](https://github.com/babaprobado-bit/A-studio/actions/runs/41580209560) completed successfully. Android SDK/tools, pinned llama.kt/llama.cpp preparation, dependencies, web build, regression checks, Capacitor generation and sync, Gradle `assembleDebug`, and artifact upload all passed.
+- Native artifact: `AI-Studio-1.1-OnDevice-LocalCoder-APK`, ID `13205399062`, 18,135,849 bytes.
+- Demo workflow [41580209607](https://github.com/babaprobado-bit/A-studio/actions/runs/41580209607) also passed. Demo artifact ID `13205386533`, 3,769,925 bytes. It does not contain the native GGUF bridge.
+- Latest native APK includes commit `6f10570` partial-download hardening and `9400716` visible model-license information.
+- Model weights are separate downloads and are not bundled in the APK. Internet is needed for the first download; offline inference after download is intended, not yet proven.
 
-## Read first
-1. `docs/HANDOFF/README.md`
-2. `docs/HANDOFF/PROJECT_STATE.md`
-3. `docs/HANDOFF/SESSION_3_SKILLS_AND_API.md`
-4. `docs/HANDOFF/SESSION_2_DEVICE_TESTING.md`
+## Historical native build issue
+The initial Kotlin failure in run `41339891960` was caused by the invalid string escape in a filename regex. Commit `ffc332e` replaced the escaped dot with `[.]`; subsequent native runs passed. Keep that fix.
 
-## Next prompt
-
-```text
-AI-STUDIO-SESSION3-SKILLS-API
-
-Continue the AI Studio project in babaprobado-bit/A-studio. Inspect the live branch, PR #2 and latest GitHub Actions first.
-
-Latest code/test commit: 389a8b87ee7ebef96eb8ba7d265ca60f0a1aea03. Demo run 41481715511 succeeded, artifact 13160940289 (regular demo, no native GGUF). Native run 41481715201 was preparing llama.cpp Android sources at last check.
-
-Recent work: multi-file Skill import queue, BOM/CRLF parsing, duplicate handling and preview UI wiring tests; standard/encrypted backup tests and custom ID remapping; API fake-provider consent/three-stage/error tests; API run lock before secure key lookup to prevent double submissions.
-
-Next: recheck native workflow, manually inspect preview UI when a browser is available, then complete Session 2 physical Redmi S12 tests after internet is available. Do not claim local offline inference until it is tested. Keep PR #2 draft; do not edit main or merge. Session 4 owns REA/MCP.
-```
+## Handoff
+Session 1 deliverable is complete: a current-source native debug APK artifact exists. Next is **Session 2 — real Android device acceptance testing**. Do not claim native inference or airplane-mode behavior until verified on a physical supported device.
 
 ## Links
 - Repo: https://github.com/babaprobado-bit/A-studio
 - PR #2: https://github.com/babaprobado-bit/A-studio/pull/2
 - Branch: https://github.com/babaprobado-bit/A-studio/tree/feature/android-offline-skills-v1
-- Latest demo: https://github.com/babaprobado-bit/A-studio/actions/runs/41481715511
-- Latest native: https://github.com/babaprobado-bit/A-studio/actions/runs/41481715201
-- Handoff: https://github.com/babaprobado-bit/A-studio/blob/feature/android-offline-skills-v1/docs/HANDOFF/README.md
+- Native APK: https://github.com/babaprobado-bit/A-studio/actions/runs/41580209560
+- Demo APK: https://github.com/babaprobado-bit/A-studio/actions/runs/41580209607
+- Device-test checklist: https://github.com/babaprobado-bit/A-studio/blob/feature/android-offline-skills-v1/docs/HANDOFF/SESSION_2_DEVICE_TESTING.md

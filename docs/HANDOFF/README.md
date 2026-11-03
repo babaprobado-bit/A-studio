@@ -13,7 +13,7 @@ Purpose: this is the durable project memory for continuing AI Studio across four
 - Open draft PR: #2 — https://github.com/babaprobado-bit/A-studio/pull/2
 - Base branch is still main. Do not push feature work directly to main.
 - This is the Android/Capacitor AI Studio app plus its private web workspace. It is not the user's completed game project.
-- Latest branch head: `b37ba5744f797d956aab63f08fa61a45a55b8924` (the last commit adjusts a test only); latest application implementation commit: `f9462c1b659da524ea51d0498351b10de767a911`.
+- Latest branch head: `9400716fefaa41a96b6661b8f66370d57c3dd421` (model-license disclosure); previous implementation commit `6f10570eedb42b88cd42cd6139ac18b57a357d17` hardens GGUF downloads.
 
 ## Read order for every new conversation
 
@@ -55,20 +55,19 @@ Do not mix these scopes. If an earlier session finds a blocker, fix only what is
 - Any external tool/MCP/REA command execution must be opt-in, permission-scoped, visible and user-approved. No unrestricted shell or computer control.
 - Be honest about tests that were not run.
 
-## Latest verified status — 2026-11-02
+## Latest verified status — 2026-11-03
 
-- Product: **AI Studio**; “Alpha 1” is only a milestone label. Keep Android package ID `com.aistudio.alpha1`.
-- Latest application/test commit: `389a8b87ee7ebef96eb8ba7d265ca60f0a1aea03`. It includes multi-file Skill import/BOM/CRLF and UI wiring tests plus an API Local Coder concurrency fix that locks the run button before key lookup/consent. `main` remains unchanged at `aab010319b6500002844bd24b11da85dd9ca3b00`.
-- PR #2 remains open and draft; do not merge without explicit instruction.
-- Skill Library: 38 original instructions, legacy profiles preserved, four added presets, safe Markdown preview-before-save, bounded attribution metadata, multi-file queue, duplicate warnings, 100 custom Skill cap, BOM/CRLF support, and 36,000-character stage prompt limit.
-- Tests cover multi-file queue, invalid extension/parse, duplicates, 100-Skill bound, preview escaping, Save/Skip/Escape wiring, file picker reset and queue advancement.
-- Backup tests cover standard JSON/encrypted Skill round-trip, selected custom ID remapping, metadata, invalid password and legacy fallback.
-- API helper tests cover selected provider, key presence, explicit consent, Demo switch only after approval, exactly three stages, no retry/fallback, empty response and key boundaries. New API UI lock test verifies lock before first await and release in finally. No real paid API call was made.
-- Demo run [41481715511](https://github.com/babaprobado-bit/A-studio/actions/runs/41481715511) **succeeded** on commit `389a8b8...`; artifact `AI-Studio-Demo-APK`, ID `13160940289`, 3,769,515 bytes. This is the regular demo APK, not native GGUF.
-- Native run [41481715201](https://github.com/babaprobado-bit/A-studio/actions/runs/41481715201) is still running on `389a8b8...`; at last inspection it was preparing llama.cpp Android sources. No native APK artifact from this latest API-lock code yet.
-- A previously successful native GGUF artifact exists from [run 41477367956](https://github.com/babaprobado-bit/A-studio/actions/runs/41477367956), ID `13159701220`, but predates the newest multi-file Skill import and API double-submit lock.
-- User reports a Redmi S12 and no current internet. Exact Android version, ABI and memory remain unverified. No physical installation, model download, on-device inference or airplane-mode proof.
-- Remaining: inspect current native build, then visual browser/device test of Skill preview and physical Session 2 test after internet is available. Session 4 owns REA/MCP.
+- Latest branch head: `9400716fefaa41a96b6661b8f66370d57c3dd421`. `main` remains unchanged at `aab010319b6500002844bd24b11da85dd9ca3b00`. PR #2 is open, draft and unmerged.
+- Recent implementation commits:
+  - `6f10570` — atomic GGUF downloads: DownloadManager writes to a temporary `.part` file; successful completion is promoted to `.gguf` only after size and GGUF magic-header checks. Failed/missing tasks are cleaned up and reconciled after app restart. JavaScript clears its active download ID in `finally`.
+  - `9400716` — model picker displays model-specific license information and links, with an explicit non-commercial research/evaluation notice on 3B.
+- Native build [41580209560](https://github.com/babaprobado-bit/A-studio/actions/runs/41580209560) **succeeded** on `9400716...`. All setup, pinned llama.kt/llama.cpp, regression checks, Capacitor sync, Gradle debug APK and artifact-upload steps passed. Artifact `AI-Studio-1.1-OnDevice-LocalCoder-APK`, ID `13205399062`, 18,135,849 bytes.
+- Demo build [41580209607](https://github.com/babaprobado-bit/A-studio/actions/runs/41580209607) **succeeded** on the same commit. All checks and APK packaging passed. Artifact `AI-Studio-Demo-APK`, ID `13205386533`, 3,769,925 bytes. Demo APK is not the native GGUF build.
+- Skills: 38 original starter instructions, backward-compatible profiles, additional presets, safe SKILL.md preview/import, multi-file queue, duplicate flags, BOM/CRLF handling, 100 custom Skill cap, eight-selection cap, strict 36k stage prompt budget and backup/restore tests.
+- API Local Coder: mocked provider tests cover explicit consent, selected provider, exactly three stages, no retries/fallback, errors and secret boundaries. UI busy lock is acquired before async key lookup/consent; no real paid API calls were made.
+- Model licensing is shown in the picker: 0.5B and 1.5B GGUF are tagged Apache-2.0; 3B GGUF is tagged `qwen-research` and warns about non-commercial research/evaluation. Model weights are not bundled in the APK.
+- User-reported test phone: Redmi S12; exact Android version, arm64 ABI and RAM are still unverified. User reported no current internet. No physical installation, model download, local inference or airplane-mode test has passed.
+- Next work: Session 2 real-device acceptance testing when a supported phone and internet for first model download are available. Do not claim device compatibility/offline inference from CI or JavaScript mocks. Session 4 owns optional REA/MCP integration.
 
 ## Last verified snapshot (historical; re-check live)
 
@@ -86,11 +85,11 @@ At the last inspection on 2026-11-01:
 - Repository: https://github.com/babaprobado-bit/A-studio
 - Feature branch: https://github.com/babaprobado-bit/A-studio/tree/feature/android-offline-skills-v1
 - Draft PR #2: https://github.com/babaprobado-bit/A-studio/pull/2
-- Latest successful native GGUF build/artifact: https://github.com/babaprobado-bit/A-studio/actions/runs/41390410229
+- Latest successful native GGUF build/artifact: https://github.com/babaprobado-bit/A-studio/actions/runs/41580209560
 - New-chat resume prompt: https://github.com/babaprobado-bit/A-studio/blob/feature/android-offline-skills-v1/docs/HANDOFF/NEW_CHAT_STARTER.md
 - Regular Android workflow: https://github.com/babaprobado-bit/A-studio/actions/workflows/build-android-demo.yml
 - Native GGUF Android workflow: https://github.com/babaprobado-bit/A-studio/actions/workflows/build-android-local-coder.yml
-- Native build run at last inspection: https://github.com/babaprobado-bit/A-studio/actions/runs/41339891960
+- Latest native build: https://github.com/babaprobado-bit/A-studio/actions/runs/41580209560
 
 ## Updating this memory
 

@@ -1,19 +1,17 @@
 # AI Studio — Project state and technical handoff
 
-## Latest continuation status — 2026-11-02
+## Latest continuation status — 2026-11-03
 
 - Official product name is **AI Studio**; Alpha 1 is only a milestone label. Keep `com.aistudio.alpha1`.
-- Latest implementation/test commit: `389a8b87ee7ebef96eb8ba7d265ca60f0a1aea03`. `main` remains `aab010319b6500002844bd24b11da85dd9ca3b00`; PR #2 is open/draft and unmerged.
-- Skill Library includes original 38 instructions, backward-compatible presets, additional profiles, safe Markdown preview/import, multi-file queue, duplicate flags, BOM/CRLF parsing, 100 custom Skill limit, eight-selection cap and strict 36k prompt budget.
-- Static UI checks verify text-only preview, escaped metadata, Save/Skip/Escape wiring, picker reset and queue advancement.
-- Standard/encrypted Skill backup tests and legacy fallback pass; custom ID remapping preserves selection on restore.
-- API Local Coder is isolated in `src/local-coder-api.js`. Mocked tests cover consent, key presence, exactly three calls, stable provider, no retries/fallback and secret boundaries. A source/UI concurrency fix now locks the shared Local Coder control before the first await, preventing rapid duplicate chains, and unlocks in finally.
-- Demo run [41481715511](https://github.com/babaprobado-bit/A-studio/actions/runs/41481715511) succeeded on `389a8b8...`; artifact `13160940289`, 3,769,515 bytes. It does not contain native GGUF.
-- Native workflow [41481715201](https://github.com/babaprobado-bit/A-studio/actions/runs/41481715201) was still preparing llama.cpp Android sources at last check; no current native APK artifact.
-- Earlier native artifact `13159701220` from [run 41477367956](https://github.com/babaprobado-bit/A-studio/actions/runs/41477367956) is valid but predates the latest import queue and API concurrency changes.
-- User reports Redmi S12 and no current internet. Device Android version/ABI/RAM unverified; no physical install, model download, local inference or airplane-mode test.
-- Do not merge PR #2; main remains untouched.
-
+- Latest branch head: `9400716fefaa41a96b6661b8f66370d57c3dd421`; base `main` remains `aab010319b6500002844bd24b11da85dd9ca3b00`. PR #2 is open/draft, mergeable and unmerged.
+- Native Android GGUF build [41580209560](https://github.com/babaprobado-bit/A-studio/actions/runs/41580209560) succeeded on this branch head. Artifact `13205399062`, `AI-Studio-1.1-OnDevice-LocalCoder-APK`, 18,135,849 bytes. All native source setup, regression tests, Capacitor sync, Gradle and upload steps passed.
+- Demo build [41580209607](https://github.com/babaprobado-bit/A-studio/actions/runs/41580209607) succeeded on the same commit. Artifact `13205386533`, `AI-Studio-Demo-APK`, 3,769,925 bytes. It is not the native GGUF APK.
+- Commit `6f10570` makes model downloads atomic: DownloadManager stores to `.part`; successful completion is promoted to `.gguf` only after a size and GGUF-magic check; failed/missing tasks are cleaned up and reconciled after app restart. JavaScript active download ID is cleared in `finally`. A mock regression test covers failure and retry state.
+- Commit `9400716` displays exact per-model license names and links in the picker. 0.5B/1.5B GGUF are Apache-2.0; 3B GGUF is `qwen-research` with a non-commercial research/evaluation notice. Do not infer commercial use rights.
+- Skills Library includes 38 original AI Studio starter instructions, backward-compatible profiles, extra presets, safe Markdown preview/import, multi-file queue, duplicate flags, BOM/CRLF parsing, bounded metadata, 100 custom Skill limit, eight-selection cap and strict 36k prompt budget.
+- API Local Coder has mock-provider tests for consent, key checks, exactly three sequential stages, stable provider, no retry/fallback, failure stop and secret boundaries. The UI lock is acquired before async key lookup/consent to prevent double submissions. No real paid API calls were made.
+- User reports a Redmi S12 and no current internet. Exact Android SDK version, arm64 ABI and RAM are not verified. No physical install, GGUF download, inference or airplane-mode proof has passed. CI proves buildability only.
+- Next scope is Session 2 real-device testing; optional REA/MCP remains Session 4. Keep PR #2 draft; never change `main` or merge without explicit instruction.
 
 ## 1. Product goal
 
@@ -90,7 +88,7 @@ src/device-local-coder.js currently declares three Qwen2.5-Coder GGUF entries:
 
 File sizes are estimates. Model files are not committed or bundled in the APK. The user downloads a model separately from a configured Hugging Face HTTPS endpoint; first download needs internet. Once downloaded, inference is intended to happen locally without network/API credentials.
 
-DownloadManager is Wi-Fi-only by default (allowMetered=false) and disallows roaming. Files are stored in app-specific external files under models. Kotlin checks filename and GGUF magic header before loading. App exposes load/unload/delete. Current UI does not provide a clear cancel-download button; JS polls DownloadManager status.
+DownloadManager is Wi-Fi-only by default (allowMetered=false) and disallows roaming. Files are app-scoped under models. Downloads are written as `.part`; after DownloadManager success, Kotlin checks file size and GGUF magic before renaming to `.gguf`. Failed/missing tasks and stale partials are reconciled on refresh/restart. JS clears the active download ID in `finally`. App exposes load/unload/delete; there is still no in-app cancel-download control or guaranteed resume UX.
 
 ### Device capability detection and model recommendation
 
@@ -114,14 +112,17 @@ The workflow currently:
 
 Historical native run 41339891960 failed at `:app:compileDebugKotlin` with `LocalLlmPlugin.kt:40:53 — Unsupported escape sequence`. Root cause: the Kotlin source had one literal backslash before `.gguf`, creating invalid escape `\.`. Commit `ffc332eb9d21b616c3fcdb199b21dc6bf69dc1c8` fixed this using `[.]`.
 
-**Verified native GGUF APK build — 2026-11-02:**
-- Native run [41389970211](https://github.com/babaprobado-bit/A-studio/actions/runs/41389970211) completed successfully on commit `ffc332eb9d21b616c3fcdb199b21dc6bf69dc1c8`.
-- The latest branch-tip native run [41390410229](https://github.com/babaprobado-bit/A-studio/actions/runs/41390410229) completed successfully on app-code commit `a30696ff29cdda2dfe43e27a77286e97be026914`; all setup, native-source, regression, Capacitor sync, Gradle debug APK and artifact-upload steps passed.
-- Artifact name: `AI-Studio-Alpha-1.1-OnDevice-LocalCoder-APK`; artifact ID: `13117996643`; archive size: `18,129,889` bytes; expires `2026-11-16 05:04:48 UTC`.
-- The downloaded artifact ZIP passed integrity validation and contains `app-debug.apk` of `54,453,328` bytes. The APK is a debug build, not a signed production release.
-- The model weights are not bundled in the APK. The first separate model download needs internet; offline inference after downloading is intended but is not yet demonstrated on a phone.
-- **Physical-device install, model load/inference and airplane-mode tests remain uncompleted.** Continue with `docs/HANDOFF/SESSION_2_DEVICE_TESTING.md`. Do not claim real-device support until those checks pass.
-- Regular demo APK workflow is separate; do not use the demo APK for native GGUF tests.
+**Latest verified native GGUF APK build — 2026-11-03:**
+- Native run [41580209560](https://github.com/babaprobado-bit/A-studio/actions/runs/41580209560) completed successfully on latest branch head `9400716fefaa41a96b6661b8f66370d57c3dd421`.
+- All substantive native build steps passed: Android SDK/tools, pinned llama.kt and llama.cpp preparation, app dependencies, Vite build, regression commands, Capacitor generation/patch/sync, Gradle `assembleDebug`, and artifact upload.
+- Artifact: `AI-Studio-1.1-OnDevice-LocalCoder-APK`; ID `13205399062`; archive size `18,135,849` bytes; artifact retention is 14 days.
+- Demo run [41580209607](https://github.com/babaprobado-bit/A-studio/actions/runs/41580209607) also succeeded on the same commit; demo artifact ID `13205386533`, size `3,769,925` bytes. Do not use demo APK for GGUF testing.
+- The APK does not bundle model weights. The first separate model download requires internet. Offline inference after download is intended, but still requires a physical-device test.
+- The latest source changes hardened partial-download handling and added model-specific license disclosure; CI success proves compilation and mocked regression checks, not actual DownloadManager behavior on a phone.
+
+**Earlier native build history — 2026-11-02:**
+- Native run [41482249852](https://github.com/babaprobado-bit/A-studio/actions/runs/41482249852) succeeded on docs-head `010ea0f...`; artifact ID `13161381931`. It is superseded by the latest artifact above.
+- Older build [41390410229](https://github.com/babaprobado-bit/A-studio/actions/runs/41390410229) succeeded on commit `a30696ff29cdda2dfe43e27a77286e97be026914`; historical, not the latest app source.
 
 ### Patcher bug already fixed
 First native build reached patch step but failed with “BridgeActivity onCreate call missing.” Cause: generated Capacitor MainActivity was empty, while patcher assumed existing onCreate. Commit 4b0c7b1 changed patcher to add a complete Java/Kotlin onCreate when absent and register LocalLlmPlugin before super.onCreate. It was tested twice against:

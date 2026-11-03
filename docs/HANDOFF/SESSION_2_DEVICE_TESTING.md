@@ -5,24 +5,20 @@ Once Session 1 produces the native GGUF APK, test installation, model management
 
 Do not use the regular demo APK for this test; it does not contain the native GGUF bridge. Use artifact from build-android-local-coder.yml.
 
-## Software-side progress (2026-11-02; not a device-test pass)
+## Software-side progress — 2026-11-03 (not a device-test pass)
 
-- The native model manager exposes manual selection of Qwen2.5-Coder 0.5B, 1.5B and 3B GGUF variants.
-- The Android bridge now reports manufacturer/model label, Android SDK, ABI, CPU core count, total/available RAM, low-memory pressure and free model storage.
-- The app recommends a model using approximate RAM/CPU/storage thresholds, labels model fit in the picker, preserves manual selection and refreshes live resource readings before download/load.
-- These heuristics do not replace real performance, thermal or memory-stability testing. No physical-phone install, GGUF inference or airplane-mode test has been completed.
-- Initial GGUF download still requires internet. After a complete model download, inference is intended to run locally without internet or an API key.
+- Native GGUF APK is built successfully from current branch head `9400716...`: [run 41580209560](https://github.com/babaprobado-bit/A-studio/actions/runs/41580209560), artifact `13205399062` (18,135,849 bytes). Use this native artifact, not the demo APK.
+- Demo run [41580209607](https://github.com/babaprobado-bit/A-studio/actions/runs/41580209607) also passed; artifact `13205386533` is only the regular demo build.
+- The device model manager offers Qwen2.5-Coder GGUF 0.5B, 1.5B and 3B variants with RAM/CPU/storage estimates and shows each model's license. 0.5B and 1.5B show Apache-2.0; 3B shows `qwen-research` plus a non-commercial research/evaluation notice.
+- Commit `6f10570` changed native downloads to temporary `.part` files; Kotlin promotes only a sufficiently sized file with a valid GGUF header after DownloadManager success. Failed/missing downloads are cleaned and reconciled when the model list refreshes, including after app restart. JS download IDs clear in `finally`.
+- Automated mock regression tests include failed-download cleanup state and retry. They do not test Android DownloadManager or the native runtime on a physical phone.
 
-## Latest project status — 2026-11-02
+## Latest project status — 2026-11-03
 
-- User-reported test phone: Redmi S12. Exact Android version, ABI and available RAM are not yet read from Android system information.
-- User reports no current internet access; initial GGUF download cannot be tested.
-- Latest demo run [41481715511](https://github.com/babaprobado-bit/A-studio/actions/runs/41481715511) succeeded on current app/test commit `389a8b8...`, artifact `13160940289`. This is not the native GGUF APK.
-- Latest native run [41481715201](https://github.com/babaprobado-bit/A-studio/actions/runs/41481715201) was preparing llama.cpp Android sources at last inspection. No latest native artifact yet.
-- Prior native artifact [13159701220](https://github.com/babaprobado-bit/A-studio/actions/runs/41477367956) predates the latest multi-file Skill import and API double-submit fix.
-- No physical installation, GGUF download, on-device inference or airplane-mode proof has passed. Do not infer device support from CI.
-- PR #2 remains draft; main unchanged.
-
+- User-reported test phone: Redmi S12. Exact Android version, supported ABI and available RAM remain unknown until read from the phone's device profile.
+- User previously reported no current internet. First model download cannot be tested without internet.
+- Latest feature branch head: `9400716fefaa41a96b6661b8f66370d57c3dd421`. PR #2 remains open/draft and unmerged; `main` unchanged at `aab010319b6500002844bd24b11da85dd9ca3b00`.
+- No physical installation, actual GGUF download, native model load/inference or airplane-mode proof has passed. Do not infer phone compatibility from CI success.
 
 ## Read first
 - docs/HANDOFF/README.md
@@ -54,7 +50,7 @@ Do not use the regular demo APK for this test; it does not contain the native GG
 - [ ] Verify model appears in installed list after restart.
 - [ ] Confirm files remain app-scoped.
 - [ ] Test low storage, failed network, duplicate download, interrupted download, app restart during download.
-- [ ] Check partial .gguf files after a failed download and whether safely resumable/cleanable.
+- [ ] Confirm failed/interrupted downloads leave no visible installed .gguf; latest code uses .part files and cleans failed/missing DownloadManager tasks. Verify this on-device.
 - [ ] Verify actual GGUF header is accepted.
 
 ### C. Load / inference
@@ -85,7 +81,7 @@ Do not use the regular demo APK for this test; it does not contain the native GG
 - [ ] Confirm errors are actionable and switching back to Ollama/API works.
 
 ## Known limitations to verify
-- No current cancel-download UI button; JS tracks activeDownloadId but may not expose real cancel.
+- No in-app cancel-download button yet. The latest JS clears activeDownloadId in finally; verify Android DownloadManager task and partial-file behavior after app restart.
 - RAM thresholds are approximate and can be wrong due to reserved/system memory.
 - GGUF files are stored in app-specific external files; uninstall removes them.
 - Larger 1.5B/3B may be impractical on low-memory devices even if download succeeds.
@@ -102,4 +98,4 @@ Do not use the regular demo APK for this test; it does not contain the native GG
 
 ## Copy-ready prompt for next conversation
 
-Continue AI Studio. Read docs/HANDOFF/README.md, PROJECT_STATE.md and SESSION_2_DEVICE_TESTING.md. First inspect latest native APK artifact and Session 1 build result. Test on a real Android 10+ arm64 device. Critical acceptance test: download Qwen2.5-Coder 0.5B once, switch to airplane mode, restart if possible, load it and run Local Coder entirely on-device. Distinguish JS mocks from real native-device results. Preserve API/Ollama/Skill/project functionality and write measurements/failures back to repo docs.
+Continue AI Studio Session 2. Read `docs/HANDOFF/README.md`, `PROJECT_STATE.md` and this checklist. Verify the live branch, PR #2 and latest native APK first. Current branch head at last checkpoint is `9400716fefaa41a96b6661b8f66370d57c3dd421`; native APK run [41580209560](https://github.com/babaprobado-bit/A-studio/actions/runs/41580209560), artifact `13205399062`. The next goal is physical Redmi S12 compatibility testing: inspect Android version/ABI/RAM, install native APK, test 0.5B download, load, short inference, unload/reload, failed download cleanup, restart persistence and airplane-mode inference after the model is downloaded. Do not call mocks or CI a device pass. User reported no internet, so state what cannot be tested until connectivity returns. Preserve all features; work only on `feature/android-offline-skills-v1`; keep PR #2 draft; never edit `main` or merge without explicit permission.
