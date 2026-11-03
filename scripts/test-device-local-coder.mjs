@@ -56,4 +56,37 @@ failDownload = false;
 await retryClient.download(DEVICE_MODEL_CATALOG[0]);
 assert.equal(retryClient.activeDownloadId, null, 'successful downloads must clear the active id');
 
+let cancelArgs = null;
+const cancelPlugin = {
+  getDeviceInfo: fake.getDeviceInfo,
+  listModels: async () => ({ models: [] }),
+  downloadModel: async () => ({ downloadId: 99 }),
+  downloadStatus: async () => ({ status: 'running', progress: 20 }),
+  cancelDownload: async args => { cancelArgs = args; return { cancelled: true, completed: false }; }
+};
+const cancelClient = new DeviceLocalCoder(true, cancelPlugin);
+const pendingDownload = cancelClient.download(DEVICE_MODEL_CATALOG[0], () => {}, { pollIntervalMs: 1, timeoutMs: 5000 });
+while (cancelClient.activeDownloadId === null) await new Promise(resolve => setTimeout(resolve, 0));
+await cancelClient.cancelDownload();
+await assert.rejects(pendingDownload, /iptal edildi/i);
+assert.deepEqual(cancelArgs, { downloadId: 99, fileName: DEVICE_MODEL_CATALOG[0].fileName });
+assert.equal(cancelClient.activeDownloadId, null, 'cancelled downloads must clear the active id');
+assert.equal(cancelClient.activeDownloadFileName, '', 'cancelled downloads must clear the active filename');
+
+let timeoutCancelCalled = false;
+const timeoutPlugin = {
+  getDeviceInfo: fake.getDeviceInfo,
+  listModels: async () => ({ models: [] }),
+  downloadModel: async () => ({ downloadId: 100 }),
+  downloadStatus: async () => ({ status: 'running', progress: 1 }),
+  cancelDownload: async () => { timeoutCancelCalled = true; return { cancelled: true, completed: false }; }
+};
+const timeoutClient = new DeviceLocalCoder(true, timeoutPlugin);
+await assert.rejects(
+  () => timeoutClient.download(DEVICE_MODEL_CATALOG[0], () => {}, { pollIntervalMs: 1, timeoutMs: 1 }),
+  /zaman aşımına uğradı/i
+);
+assert.equal(timeoutCancelCalled, true, 'timed-out downloads must cancel the native DownloadManager task');
+assert.equal(timeoutClient.activeDownloadId, null, 'timed-out downloads must clear the active id');
+
 console.log('Device Local Coder bridge tests passed.');

@@ -497,6 +497,7 @@ async function downloadSelectedDeviceModel(){
   const warning=assessment&&!assessment.fitsRecommended?'\n\nCihaz uyarısı: '+assessment.warnings.join('; ')+'. Modeli elle seçtin; indirmek yine de mümkün olabilir, ancak yükleme veya hız sorunları yaşanabilir.':'';
   if(!confirm(model.name+' indirilsin mi? Yaklaşık '+formatModelBytes(model.sizeBytes*1.15)+' boş alan bırak. İlk indirme internet ister; model indirildikten sonra çıkarım çevrimdışı yapılır. İndirme varsayılan olarak ücretli/mobil veri kullanmaz.'+warning))return;
   const button=$('downloadOnDeviceModel');button.disabled=true;
+  const cancelButton=$('cancelOnDeviceDownload');if(cancelButton){cancelButton.hidden=false;cancelButton.disabled=false;}
   if($('onDeviceModelStatus'))$('onDeviceModelStatus').textContent='İndirme başlatılıyor…';
   try{
     await deviceLocalCoder.download(model,status=>{
@@ -508,9 +509,21 @@ async function downloadSelectedDeviceModel(){
     if($('installedLocalModel'))$('installedLocalModel').value=fileName;
     showToast('Model indirildi. Şimdi belleğe yükleyebilirsin.');
   }catch(error){
-    if($('onDeviceModelStatus'))$('onDeviceModelStatus').textContent='İndirme tamamlanamadı: '+(error.message||'Wi-Fi bağlantısını ve depolama alanını kontrol et.');
-    showToast('Model indirilemedi.');
-  }finally{button.disabled=false;}
+    const cancelled=error.message==='İndirme kullanıcı tarafından iptal edildi.';
+    if($('onDeviceModelStatus'))$('onDeviceModelStatus').textContent=cancelled?'Model indirmesi iptal edildi. Yarım kalan dosya temizlendi.':'İndirme tamamlanamadı: '+(error.message||'Wi-Fi bağlantısını ve depolama alanını kontrol et.');
+    if(cancelled)await refreshDeviceLocalModels(true);
+    showToast(cancelled?'Model indirmesi iptal edildi.':'Model indirilemedi.');
+  }finally{button.disabled=false;if(cancelButton){cancelButton.hidden=true;cancelButton.disabled=true;}}
+}
+async function cancelSelectedDeviceModel(){
+  const button=$('cancelOnDeviceDownload');if(button)button.disabled=true;
+  try{
+    const result=await deviceLocalCoder.cancelDownload();
+    if($('onDeviceModelStatus'))$('onDeviceModelStatus').textContent=result.completed?'İndirme zaten tamamlanmış.':'İptal isteği gönderildi; yarım kalan dosya temizleniyor…';
+  }catch(error){
+    if($('onDeviceModelStatus'))$('onDeviceModelStatus').textContent='İndirme iptal edilemedi: '+(error.message||'Tekrar dene.');
+    if(button)button.disabled=false;
+  }
 }
 async function loadSelectedDeviceModel(){
   const fileName=$('installedLocalModel')?.value;
@@ -1178,6 +1191,7 @@ $('localCoderEngine').addEventListener('change',async e=>{settings.localCoderEng
 $('localCoderApiProvider').addEventListener('change',async e=>{settings.localCoderApiProvider=e.target.value;await setPref(DB.settings,settings);});
 $('onDeviceModelCatalog').addEventListener('change',renderDeviceModelDescription);
 $('downloadOnDeviceModel').addEventListener('click',downloadSelectedDeviceModel);
+$('cancelOnDeviceDownload').addEventListener('click',cancelSelectedDeviceModel);
 $('refreshDeviceLocalModels').addEventListener('click',()=>refreshDeviceLocalModels());
 $('loadOnDeviceModel').addEventListener('click',loadSelectedDeviceModel);
 $('unloadOnDeviceModel').addEventListener('click',unloadDeviceModel);

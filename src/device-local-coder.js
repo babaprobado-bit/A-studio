@@ -119,6 +119,8 @@ export class DeviceLocalCoder {
     this.models = [];
     this.loadedFileName = '';
     this.activeDownloadId = null;
+    this.activeDownloadFileName = '';
+    this.cancelRequested = false;
   }
 
   async refresh() {
@@ -142,22 +144,58 @@ export class DeviceLocalCoder {
     const downloadId = Number(started.downloadId);
     if (!Number.isFinite(downloadId)) throw new Error('Android indirme görevi başlatılamadı.');
     this.activeDownloadId = downloadId;
+    this.activeDownloadFileName = model.fileName;
+    this.cancelRequested = false;
     const startedAt = Date.now();
+    const timeoutMs = Math.max(1, Number(options.timeoutMs) || 6 * 60 * 60 * 1000);
+    const pollIntervalMs = Math.max(0, Number(options.pollIntervalMs) || 1000);
     try {
       while (true) {
-        if (Date.now() - startedAt > 6 * 60 * 60 * 1000) throw new Error('İndirme zaman aşımına uğradı; bağlantıyı kontrol et.');
-        const status = await this.plugin.downloadStatus({ downloadId, fileName: model.fileName });
+        if (this.cancelRequested) throw new Error('İndirme kullanıcı tarafından iptal edildi.');
+        if (Date.now() - startedAt > timeoutMs) {
+          try { await this.cancelDownload(); } catch (_) { /* Preserve timeout as the primary error. */ }
+          throw new Error('İndirme zaman aşımına uğradı; görev iptal edildi. Bağlantıyı kontrol et.');
+        }
+        let status;
+        try {
+          status = await this.plugin.downloadStatus({ downloadId, fileName: model.fileName });
+        } catch (error) {
+          if (this.cancelRequested) throw new Error('İndirme kullanıcı tarafından iptal edildi.');
+          throw error;
+        }
         onProgress(status);
+        if (this.cancelRequested) throw new Error('İndirme kullanıcı tarafından iptal edildi.');
         if (status.status === 'complete') break;
         if (status.status === 'failed') throw new Error(status.reason || 'Model indirmesi başarısız oldu.');
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
       }
     } finally {
-      // A failed/timed-out download must not leave the JS client locked to a stale id.
       this.activeDownloadId = null;
+      this.activeDownloadFileName = '';
+      this.cancelRequested = false;
     }
     await this.refresh();
     return this.models;
+  }
+
+  async cancelDownload() {
+    if (!this.native || !this.plugin || this.activeDownloadId === null || !this.activeDownloadFileName) {
+      return { cancelled: false, completed: false };
+    }
+    const downloadId = this.activeDownloadId;
+    const fileName = this.activeDownloadFileName;
+    this.cancelRequested = true;
+    try {
+      const result = await this.plugin.cancelDownload({ downloadId, fileName });
+      if (result?.completed) this.cancelRequested = false;
+      return result;
+    } catch (error) {
+      this.cancelRequested = false;
+      throw error;
+    } finally {
+      this.activeDownloadId = null;
+      this.activeDownloadFileName = '';
+    }
   }
 
   async load(fileName, contextSize = 2048, onProgress = () => {}) {

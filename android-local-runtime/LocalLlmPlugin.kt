@@ -198,6 +198,41 @@ class LocalLlmPlugin : Plugin() {
     }
 
     @PluginMethod
+    fun cancelDownload(call: PluginCall) {
+        try {
+            val id = call.getLong("downloadId") ?: throw IllegalArgumentException("İndirme kimliği eksik.")
+            val fileName = call.getString("fileName") ?: throw IllegalArgumentException("Model dosya adı eksik.")
+            val destination = safeModelFile(fileName)
+            val partial = partialModelFile(fileName)
+            val preferences = downloadPreferences()
+            if (preferences.getLong(fileName, -1L) != id) {
+                if (destination.isFile) {
+                    call.resolve(JSObject().apply { put("cancelled", false); put("completed", true) })
+                    return
+                }
+                throw IllegalStateException("İndirme kaydı bulunamadı.")
+            }
+            val manager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+            val removed = manager.remove(id)
+            preferences.edit().remove(fileName).apply()
+            if (removed > 0) {
+                if (partial.exists() && !partial.delete()) {
+                    throw IllegalStateException("Yarım kalan model dosyası temizlenemedi.")
+                }
+                call.resolve(JSObject().apply { put("cancelled", true); put("completed", false) })
+            } else if (destination.isFile) {
+                partial.delete()
+                call.resolve(JSObject().apply { put("cancelled", false); put("completed", true) })
+            } else {
+                partial.delete()
+                call.resolve(JSObject().apply { put("cancelled", false); put("completed", false) })
+            }
+        } catch (error: Exception) {
+            call.reject("Model indirmesi iptal edilemedi: ${error.message}", error)
+        }
+    }
+
+    @PluginMethod
     fun downloadStatus(call: PluginCall) {
         var cursor: Cursor? = null
         try {
