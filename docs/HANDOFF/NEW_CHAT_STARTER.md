@@ -1,16 +1,16 @@
 # AI Studio — latest new-chat handoff
 
 ## Resume code
-`AI-STUDIO-OFFLINE-DEVELOPMENT`
+`AI-STUDIO-SESSION2-SOFTWARE-CONTINUATION`
 
 ## Current source checkpoint — 2026-11-03
 - Product: **AI Studio**. Keep Android application ID `com.aistudio.alpha1`.
 - Repo: https://github.com/babaprobado-bit/A-studio
 - Branch: `feature/android-offline-skills-v1`
-- Latest app-code commit: `0a8083466792b14310bc5cb2dbf681552d8cfd81` (the latest handoff commit only changes documentation; recheck the live branch head before editing)
+- Latest source/test commit: `6afe4ccfde5f29085a3ad0f2079f0f6addbe5107` (RAM guardrails for imported GGUF models; check live branch head before editing)
 - `main` remains unchanged at `aab010319b6500002844bd24b11da85dd9ca3b00`.
 - PR #2 is open, draft and unmerged: https://github.com/babaprobado-bit/A-studio/pull/2
-- Current-source demo [41703474052](https://github.com/babaprobado-bit/A-studio/actions/runs/41703474052) succeeded and uploaded artifact `13264627023` (3,772,330 bytes). Native build [41703474174](https://github.com/babaprobado-bit/A-studio/actions/runs/41703474174) was still preparing pinned llama.kt/llama.cpp sources; recheck live before using it.
+- Native GGUF builds [41706818257](https://github.com/babaprobado-bit/A-studio/actions/runs/41706818257) and [41706759331](https://github.com/babaprobado-bit/A-studio/actions/runs/41706759331) target `6afe4cc...`; both were fetching pinned llama.kt after Android tool setup at last check. No artifact for this SHA yet. Previous native artifact from `77527995...` is not current.
 - Last successful APKs from older app-code SHA `9400716...`: native artifact `13205399062` [run 41580209560](https://github.com/babaprobado-bit/A-studio/actions/runs/41580209560); demo artifact `13205386533` [run 41580209607](https://github.com/babaprobado-bit/A-studio/actions/runs/41580209607). These do not include local import/cancel updates.
 
 ## Latest offline-first improvements
@@ -18,19 +18,19 @@
 - Import is app-scoped, stages as `.part`, has a sanitized filename and 8 GB cap, checks free storage, reports progress and validates GGUF magic before installed-model insertion.
 - Large local imports can be cancelled in-app; native code checks a cancellation flag while copying and cleans the partial file.
 - The in-app model manager includes DownloadManager cancel, local-import cancel and license controls in the real `index.html`.
-- Tests inspect the actual app HTML and JS button bindings; fake-plugin tests cover progress, cancellation and lock/listener cleanup.
+- Tests inspect the actual app HTML and JS button bindings; fake-plugin tests cover progress, cancellation, lock/listener cleanup and imported-GGUF RAM guardrails.
 - Skills Library and API Local Coder remain; no paid API calls are made by tests.
 
 ## User's current constraint and next task
-The user reports no internet. **Do not make phone proof the current goal and do not stop coding because of it.** Continue offline-first source work, native Kotlin review and mock/static tests. Local GGUF import is useful only when a model file is already available to copy; it does not create or download model weights.
+The user reports no internet and no phone/computer available for hands-on tests. **Do not ask for device testing or pause development.** Continue source review, regression coverage and GitHub-hosted native CI. Local GGUF import is useful only when a model file is already available to copy; it does not create or download model weights.
 
-First inspect the live branch, PR #2 and latest Actions. Current-source builds may still be pending; do not report older APK artifacts as latest. Review actual HTML controls, local import progress/cancellation, storage/partial cleanup and model lifecycle. Add tests and commit only to `feature/android-offline-skills-v1`.
+First inspect live branch/PR/Actions. Review RAM checks for both catalogue and imported GGUF files, lifecycle/unload behavior, cancellation cleanup and Android failure handling. Add tests and commit only to `feature/android-offline-skills-v1`.
 
-No physical APK install, model import, native inference or airplane-mode proof has been completed. Record this accurately, but defer it until internet/device access is available or the user asks to test. Preserve all features. Keep PR #2 draft; never modify `main` or merge without explicit permission.
+No physical APK install, model import, native inference or airplane-mode proof has been completed. The user has no phone/computer available for tests now. Preserve all features. Keep PR #2 open and draft; never modify `main` or merge without explicit permission.
 
 ## Links
-- Native build (current source): https://github.com/babaprobado-bit/A-studio/actions/runs/41703474174
-- Demo build (current source): https://github.com/babaprobado-bit/A-studio/actions/runs/41703474052
+- Native build (current source): https://github.com/babaprobado-bit/A-studio/actions/runs/41706818257
+- Demo build (current source): https://github.com/babaprobado-bit/A-studio/actions/runs/41706759331
 - PR #2: https://github.com/babaprobado-bit/A-studio/pull/2
 - Project state: https://github.com/babaprobado-bit/A-studio/blob/feature/android-offline-skills-v1/docs/HANDOFF/PROJECT_STATE.md
 - Device checklist: https://github.com/babaprobado-bit/A-studio/blob/feature/android-offline-skills-v1/docs/HANDOFF/SESSION_2_DEVICE_TESTING.md

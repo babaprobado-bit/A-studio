@@ -3,8 +3,9 @@
 ## Latest continuation status — 2026-11-03
 
 - Product is **AI Studio**; keep Android ID `com.aistudio.alpha1`.
-- Latest branch head: `0a8083466792b14310bc5cb2dbf681552d8cfd81`. Base `main` remains `aab010319b6500002844bd24b11da85dd9ca3b00`. PR #2 stays open/draft/unmerged.
-- Native build [41703474174](https://github.com/babaprobado-bit/A-studio/actions/runs/41703474174) for source `0a80834...` is still preparing the pinned llama.kt/llama.cpp source; no native artifact yet. Demo run [41703474052](https://github.com/babaprobado-bit/A-studio/actions/runs/41703474052) succeeded on the same source and uploaded demo artifact `13264627023` (3,772,330 bytes). Demo tests/build/upload passed, but this artifact does not include the native GGUF bridge.
+- Latest branch head: `6afe4ccfde5f29085a3ad0f2079f0f6addbe5107`. Base `main` remains `aab010319b6500002844bd24b11da85dd9ca3b00`. PR #2 stays open/draft/unmerged.
+- Native GGUF runs [41706818257](https://github.com/babaprobado-bit/A-studio/actions/runs/41706818257) (manual dispatch) and [41706759331](https://github.com/babaprobado-bit/A-studio/actions/runs/41706759331) (PR event) target this exact commit. Both had reached pinned llama.kt fetch after Android tool setup; no artifact was available at the last check.
+- Previous-source native artifact `13262651732` from [41696652109](https://github.com/babaprobado-bit/A-studio/actions/runs/41696652109) is built from `77527995...`, so it does not include the RAM-guard changes. Do not call it current-source.
 - Last successful APK pair is older source SHA `9400716...`: native [41580209560](https://github.com/babaprobado-bit/A-studio/actions/runs/41580209560), artifact `13205399062`; demo [41580209607](https://github.com/babaprobado-bit/A-studio/actions/runs/41580209607).
 - Offline GGUF transfer: Android `ACTION_OPEN_DOCUMENT` imports an existing `.gguf` file. The user can copy a model file to the phone by USB, SD card or file sharing; app import itself needs no internet. Model weights are not bundled or created by this flow.
 - Local import uses app-scoped `.part`, sanitized filenames, an 8 GB maximum, free-space checks, progress notifications ~8 MB, rechecks ~16 MB, source-size check and GGUF magic verification before installed-model insertion.
@@ -13,7 +14,7 @@
 - Skills Library: 38 original instructions, safe multi-file SKILL.md import/preview, duplicate flags, BOM/CRLF, metadata, caps, backups and regression tests.
 - API Local Coder: explicit consent, fixed Plan/Code/Review sequence, fake-provider tests, no retry/fallback and pre-await busy lock; no paid API request was made.
 - Model license information is visible: 0.5B/1.5B Apache-2.0, 3B Qwen Research/non-commercial warning.
-- User reports no internet. Continue local-first source improvements and mock/static tests; defer physical-phone validation. No phone install, actual GGUF load, inference or airplane-mode proof has passed.
+- User reports no internet and currently has no phone/computer available for hands-on testing. Continue source development and GitHub-hosted CI/mock tests; do not ask for device testing now. No phone install, actual GGUF import/load, inference or airplane-mode proof has passed.
 
 ## 1. Product goal
 
@@ -95,6 +96,7 @@ DownloadManager is Wi-Fi-only by default (allowMetered=false) and disallows roam
 ### Device capability detection and model recommendation
 
 The native Android `getDeviceInfo` bridge reports manufacturer/model label, Android SDK, supported ABI list, processor core count, total RAM, currently available RAM, Android low-memory pressure and free model-storage space. The UI keeps a manual model selector for Qwen2.5-Coder 0.5B, 1.5B and 3B GGUF variants, and marks the best estimated fit for the current phone.
+- Commit `6afe4cc` adds a conservative `estimateMinimumAvailableRamBytes()` guard in JavaScript: catalogue models retain their reviewed thresholds; imported/custom GGUF files use `max(1.5 GiB, file size × 1.4 + 750 MiB)`. The native Kotlin loader independently re-reads `ActivityManager.MemoryInfo`, blocks Android low-memory state and applies the same size-based guardrail immediately before calling llama.kt. The mock regression test rejects a 2 GiB imported file at 3 GiB available RAM and permits the mock bridge at 4 GiB. These are approximate safety guardrails, not measured model requirements or proof of device compatibility.
 
 Model recommendations use coarse guardrails (RAM, available RAM, CPU core count and approximately 15% storage headroom): 0.5B = 4 GB total RAM / 4 CPU cores / 1.5 GB available RAM; 1.5B = 8 GB / 6 cores / 2.3 GB available RAM; 3B = 12 GB / 8 cores / 3.8 GB available RAM. An Android low-memory warning blocks a new model load until memory pressure clears. The app refreshes memory/storage readings before download and load. These are conservative heuristics, not a CPU benchmark or a guarantee of speed, thermal behavior or stability. The smaller model remains manually selectable; a user override is warned about rather than silently changed.
 

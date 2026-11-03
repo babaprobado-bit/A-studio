@@ -6,7 +6,7 @@ This document separates implemented source, automated checks, CI APK builds and 
 
 - Repository: `babaprobado-bit/A-studio`
 - Active branch: `feature/android-offline-skills-v1`
-- Current source head: `0a8083466792b14310bc5cb2dbf681552d8cfd81`
+- Current source head: `6afe4ccfde5f29085a3ad0f2079f0f6addbe5107`
 - Review boundary: draft PR #2 — https://github.com/babaprobado-bit/A-studio/pull/2
 - `main` remains untouched. PR #2 stays draft until the user explicitly changes that decision.
 
@@ -23,10 +23,11 @@ This document separates implemented source, automated checks, CI APK builds and 
 
 ## Latest source and CI status
 
-- Current branch head: `0a8083466792b14310bc5cb2dbf681552d8cfd81`.
-- Demo workflow [41703474052](https://github.com/babaprobado-bit/A-studio/actions/runs/41703474052) succeeded for source `0a80834...` and uploaded artifact `13264627023` (3,772,330 bytes); all regression/build/upload steps passed. Native workflow [41703474174](https://github.com/babaprobado-bit/A-studio/actions/runs/41703474174) is still preparing pinned llama.kt/llama.cpp sources; check live state before claiming a native APK.
-- Last successful native/demo artifacts `13205399062` and `13205386533` are from older app-code SHA `9400716...`; they do not include these recent local import/cancellation UI changes.
-- Regression tests inspect the actual `index.html`, button IDs and event handlers; fake-plugin tests cover local import progress, cancellation and lock/listener cleanup. These are not physical device tests.
+- Current branch head: `6afe4ccfde5f29085a3ad0f2079f0f6addbe5107`.
+- Native GGUF runs [41706818257](https://github.com/babaprobado-bit/A-studio/actions/runs/41706818257) and [41706759331](https://github.com/babaprobado-bit/A-studio/actions/runs/41706759331) were still fetching pinned llama.kt for this SHA after Android tool setup; no current-source artifact was available at last check.
+- Previous native APK [41696652109](https://github.com/babaprobado-bit/A-studio/actions/runs/41696652109), artifact `13262651732`, is for older commit `77527995...` and does not include current RAM guard changes.
+- Commit `6afe4cc` adds an approximate size-based available-RAM guard for imported GGUFs in JS and a second live Android memory check in Kotlin; mock regression tests cover pass/fail thresholds.
+- Regression tests exercise the JS/native bridge through fakes and actual-screen HTML wiring. CI compilation does not prove real phone inference.
 
 ## Internet-unavailable development path
 
@@ -38,7 +39,7 @@ This document separates implemented source, automated checks, CI APK builds and 
 
 ## Deferred device acceptance
 
-No physical phone install, GGUF import, model load/inference, temperature/memory measurement or airplane-mode test has been completed. User reports no current internet, so physical checks are deferred. Do not call native inference proven; also do not stop source development while waiting for internet.
+No physical phone install, GGUF import, model load/inference, temperature/memory measurement or airplane-mode test has been completed. The user currently has no internet and no phone/computer for hands-on tests. Do not call native inference proven; continue source development and GitHub-hosted CI.
 
 ## Release guardrails
 

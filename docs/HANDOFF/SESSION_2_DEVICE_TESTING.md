@@ -7,9 +7,10 @@ Do not use the regular demo APK for this test; it does not contain the native GG
 
 ## Software-side progress — 2026-11-03 (source/CI work only, not a device-test pass)
 
-- Latest source head: `0a8083466792b14310bc5cb2dbf681552d8cfd81`.
-- Current-source demo [41703474052](https://github.com/babaprobado-bit/A-studio/actions/runs/41703474052) completed successfully and uploaded artifact `13264627023` (3,772,330 bytes). Regression tests, Android packaging and upload passed. Native run [41703474174](https://github.com/babaprobado-bit/A-studio/actions/runs/41703474174) is still preparing the pinned llama.kt/llama.cpp source; no native artifact for this commit yet.
-- Last successful artifacts `13205399062` and `13205386533` are from older app-code commit `9400716...`; they predate the actual-screen local-import and cancel controls.
+- Latest source/test commit: `6afe4ccfde5f29085a3ad0f2079f0f6addbe5107`.
+- The commit adds JS plus native Kotlin memory guardrails for imported GGUF files. The device bridge regression test covers the estimated-RAM rejection/acceptance path.
+- Native build [41706818257](https://github.com/babaprobado-bit/A-studio/actions/runs/41706818257) and duplicate PR run [41706759331](https://github.com/babaprobado-bit/A-studio/actions/runs/41706759331) target this SHA. Both were at pinned llama.kt engine retrieval after Android tool setup at the last check; no artifact was yet available for this SHA.
+- The prior successful native artifact `13262651732` from [41696652109](https://github.com/babaprobado-bit/A-studio/actions/runs/41696652109) belongs to older source `77527995...` and excludes this RAM guard change.
 - Native model management now includes DownloadManager cancellation and local GGUF import. A user can transfer an already-owned `.gguf` file to the phone by USB/SD/file sharing and import it without internet.
 - Import writes to app-scoped `.part`, enforces an 8 GB cap, sanitizes names, checks storage, reports progress every ~8 MB and rechecks free space every ~16 MB; GGUF magic is checked before final rename.
 - Large local imports can now be cancelled in-app. The native plugin checks a cancellation flag during copy, removes the incomplete `.part`, and resolves the import as cancelled. Mock tests cover the JavaScript cancellation request and state cleanup.
@@ -17,10 +18,10 @@ Do not use the regular demo APK for this test; it does not contain the native GG
 
 ## Latest project status — 2026-11-03
 
-- User reports no current internet. Do not pause coding for physical-device proof; continue offline-first source and tests.
+- User reports no internet and no phone/computer currently available for hands-on tests. Do not request physical testing now; continue source development and GitHub-hosted CI/mock tests.
 - The local import path is useful only when the `.gguf` file is already available locally or can be copied to the phone. The app does not bundle or create model weights.
-- Device remains user-reported Redmi S12; Android version, ABI and RAM are unverified.
-- No physical APK installation, GGUF import on Android, model load/inference or airplane-mode proof has passed. CI and JS mocks do not prove native runtime behavior or phone compatibility.
+- Device was previously described as Redmi S12, but the exact commercial model, Android version, ABI and RAM are unverified.
+- No physical APK installation, GGUF import on Android, model load/inference or airplane-mode proof has passed. GitHub Actions can prove source tests and APK compilation only; it cannot prove native runtime behavior or phone compatibility.
 - PR #2 remains open/draft; main unchanged at `aab010319b6500002844bd24b11da85dd9ca3b00`.
 
 ## Read first
@@ -105,4 +106,4 @@ Do not use the regular demo APK for this test; it does not contain the native GG
 
 ## Copy-ready prompt for next conversation
 
-Continue AI Studio's offline-first source development; do not make physical-device proof the current task because the user has no internet. Read `docs/HANDOFF/README.md`, `PROJECT_STATE.md`, this file and `NEW_CHAT_STARTER.md`. Latest app-code commit at this checkpoint: `0a8083466792b14310bc5cb2dbf681552d8cfd81` (the later documentation-only commit advances branch head). The new path imports an already-owned GGUF file through Android `ACTION_OPEN_DOCUMENT`, with .part staging, progress, storage checks, in-copy cancellation and GGUF header validation. Verify live branch/PR/Actions first. Continue static/mock tests and native source hardening. Keep PR #2 draft, never edit main or merge. Do not claim device import/inference works until a physical test happens, but do not wait for that test to continue coding.
+Continue AI Studio software development without relying on phone or computer testing; the user currently has no internet and no device available for hands-on validation. Read `docs/HANDOFF/README.md`, `PROJECT_STATE.md`, this file and `NEW_CHAT_STARTER.md`. Latest source/test commit at this checkpoint: `6afe4ccfde5f29085a3ad0f2079f0f6addbe5107`; inspect latest branch head and Actions first. Recent change: imported/custom GGUF files now receive size-based free-RAM guardrails in JavaScript and Kotlin, with mock regression tests. Continue code review, automated regression coverage and native CI; preserve all current features. Keep PR #2 open and Draft; never modify main or merge. No physical install/import/inference/offline test has been done.
