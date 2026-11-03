@@ -1,40 +1,36 @@
 # AI Studio — latest new-chat handoff
 
 ## Resume code
-`AI-STUDIO-SESSION2-DEVICE-TESTING`
+`AI-STUDIO-OFFLINE-DEVELOPMENT`
 
-## Current verified state — 2026-11-03
-- Product: **AI Studio**. Alpha 1 is only a milestone label. Keep Android application ID `com.aistudio.alpha1`.
+## Current source checkpoint — 2026-11-03
+- Product: **AI Studio**. Keep Android application ID `com.aistudio.alpha1`.
 - Repo: https://github.com/babaprobado-bit/A-studio
 - Branch: `feature/android-offline-skills-v1`
-- Latest app-code commit packaged in these APKs: `9400716fefaa41a96b6661b8f66370d57c3dd421` (handoff docs have a later docs-only commit; recheck live branch head before editing)
+- Latest source head: `985a53f844c661939e5f46ddb8be0fcc2eb1d4d3`
 - `main` remains unchanged at `aab010319b6500002844bd24b11da85dd9ca3b00`.
 - PR #2 is open, draft and unmerged: https://github.com/babaprobado-bit/A-studio/pull/2
-- Native GGUF APK workflow [41580209560](https://github.com/babaprobado-bit/A-studio/actions/runs/41580209560) succeeded on app-code commit `9400716...`; subsequent commits only changed handoff documentation. Artifact `AI-Studio-1.1-OnDevice-LocalCoder-APK`, ID `13205399062`, 18,135,849 bytes.
-- Demo workflow [41580209607](https://github.com/babaprobado-bit/A-studio/actions/runs/41580209607) succeeded on the same commit. Artifact `AI-Studio-Demo-APK`, ID `13205386533`, 3,769,925 bytes. This is not the native GGUF APK.
-- Commit `6f10570`: native GGUF downloads use temporary `.part` files, validate size and GGUF header before finalizing, clean failed/missing downloads, reconcile tracked tasks on refresh/restart, and clear JS active download ID in `finally`. Mock regression test covers failed-download reset and retry.
-- Commit `9400716`: model picker shows individual license names and links. 0.5B and 1.5B GGUF show Apache-2.0; 3B GGUF shows `qwen-research` with non-commercial research/evaluation warning.
-- Skill Library: 38 original starter instructions, profiles, preview-before-save SKILL.md imports, multi-file queue, validation, backup/restore and regression tests.
-- API Local Coder: explicit consent, three-stage Plan/Code/Review flow, provider selection, fake-provider tests, secret boundaries and double-submit lock. No real paid API calls.
+- Current-source native build [41702571644](https://github.com/babaprobado-bit/A-studio/actions/runs/41702571644) and demo build [41702571666](https://github.com/babaprobado-bit/A-studio/actions/runs/41702571666) were in progress at last check. Recheck live state and artifacts.
+- Last successful APKs from older app-code SHA `9400716...`: native artifact `13205399062` [run 41580209560](https://github.com/babaprobado-bit/A-studio/actions/runs/41580209560); demo artifact `13205386533` [run 41580209607](https://github.com/babaprobado-bit/A-studio/actions/runs/41580209607). These do not include the latest local-import/live-screen fixes.
 
-## Important device-test limitation
-The user reports a Redmi S12 and no current internet. Exact Android version, ABI and RAM have not been inspected from Android. No physical APK install, model download, native model inference or airplane-mode proof has passed. CI only proves successful compilation and automated regression checks. First GGUF model download needs internet; offline inference is intended after that download.
+## Latest offline-first improvements
+- Android can import an already-available `.gguf` file via `ACTION_OPEN_DOCUMENT`; copy it to the phone with USB/SD/file sharing first. The import action itself does not require internet.
+- Import is app-scoped, stages as `.part`, has a sanitized filename and 8 GB cap, checks free storage, reports progress and checks GGUF magic before adding to the installed-model list.
+- The in-app model manager includes a DownloadManager cancel action.
+- The license, cancel and local-import controls are now included in the real `index.html`; tests inspect the actual document, not just a detached HTML fragment.
+- Progress listener cleanup releases the import lock even if listener removal fails.
+- Skill Library and API Local Coder remain as previously implemented; no paid API calls are made by the tests.
 
-## Next task
-Complete Session 2 only when a supported Android phone and internet for the initial model download are available:
-1. Install the latest native APK, not the demo APK.
-2. Inspect Android version, ABI, RAM and free storage.
-3. Test Qwen2.5-Coder 0.5B download, persistence after app restart, load, short inference, unload/reload and delete.
-4. Test failed/interrupted download cleanup and the `.part` behavior on Android.
-5. Download model, switch to airplane mode, restart app and verify real on-device inference.
-6. Record exact results and measurements in `docs/HANDOFF/SESSION_2_DEVICE_TESTING.md`.
+## User's current constraint and next task
+The user reports no internet. **Do not make phone proof the current goal and do not stop coding because of it.** Continue offline-first source work, native Kotlin review and mock/static tests. The local GGUF import path is useful only when a model file is already available somewhere to copy; it does not create or download model weights.
 
-Do not claim offline inference until it is demonstrated on the phone. Preserve Ollama/API/Skills/projects and all existing features. Work only on `feature/android-offline-skills-v1`; keep PR #2 draft; never edit `main` or merge without explicit permission.
+First inspect the live branch, PR #2 and latest Actions. Current-source builds may still be pending; do not report older APK artifacts as the latest code. Review actual HTML/model-manager controls, import progress, storage/partial-file cleanup, cancellation and model lifecycle. Add tests, commit only to `feature/android-offline-skills-v1`.
+
+No physical APK install, model import, native inference or airplane-mode proof has been completed. Record this accurately, but defer it until internet/device access is available or the user asks to test. Preserve all existing features. Keep PR #2 draft; never modify `main` or merge without explicit permission.
 
 ## Links
-- Native APK workflow: https://github.com/babaprobado-bit/A-studio/actions/runs/41580209560
-- Demo APK workflow: https://github.com/babaprobado-bit/A-studio/actions/runs/41580209607
+- Native build (current source): https://github.com/babaprobado-bit/A-studio/actions/runs/41702571644
+- Demo build (current source): https://github.com/babaprobado-bit/A-studio/actions/runs/41702571666
 - PR #2: https://github.com/babaprobado-bit/A-studio/pull/2
-- README handoff: https://github.com/babaprobado-bit/A-studio/blob/feature/android-offline-skills-v1/docs/HANDOFF/README.md
 - Project state: https://github.com/babaprobado-bit/A-studio/blob/feature/android-offline-skills-v1/docs/HANDOFF/PROJECT_STATE.md
 - Device checklist: https://github.com/babaprobado-bit/A-studio/blob/feature/android-offline-skills-v1/docs/HANDOFF/SESSION_2_DEVICE_TESTING.md
