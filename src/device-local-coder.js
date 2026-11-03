@@ -123,6 +123,7 @@ export class DeviceLocalCoder {
     this.cancelRequested = false;
     this.downloadStarting = false;
     this.downloadLoopActive = false;
+    this.importStarting = false;
   }
 
   async refresh() {
@@ -136,8 +137,8 @@ export class DeviceLocalCoder {
 
   async download(model, onProgress = () => {}, options = {}) {
     if (!this.native) throw new Error('Model indirme yalnızca Android uygulamasında kullanılabilir.');
-    if (this.downloadStarting || this.activeDownloadId !== null) {
-      throw new Error('Zaten etkin bir model indirmesi var. Önce onu tamamla veya iptal et.');
+    if (this.importStarting || this.downloadStarting || this.activeDownloadId !== null) {
+      throw new Error('Başka bir model aktarımı sürüyor. Önce onu tamamla.');
     }
 
     this.downloadStarting = true;
@@ -233,6 +234,23 @@ export class DeviceLocalCoder {
     }
     return this.models;
   }
+  async importModel() {
+    if (!this.native || !this.plugin) {
+      throw new Error('GGUF dosyası içe aktarma Android APK gerektirir.');
+    }
+    if (this.importStarting || this.downloadStarting || this.activeDownloadId !== null) {
+      throw new Error('Başka bir model aktarımı sürüyor. Önce onu tamamla.');
+    }
+    this.importStarting = true;
+    try {
+      const result = await this.plugin.importModel();
+      if (result?.imported) await this.refresh();
+      return result || { cancelled: true };
+    } finally {
+      this.importStarting = false;
+    }
+  }
+
   async cancelDownload() {
     if (!this.native || !this.plugin || this.activeDownloadId === null || !this.activeDownloadFileName) {
       return { cancelled: false, completed: false };

@@ -466,6 +466,7 @@ function renderDeviceLocalModelManager(){
   }
   if($('onDeviceModelCatalog'))$('onDeviceModelCatalog').disabled=!Boolean(info?.supported);
   if($('downloadOnDeviceModel'))$('downloadOnDeviceModel').disabled=!Boolean(info?.supported);
+  if($('importOnDeviceModel'))$('importOnDeviceModel').disabled=!Boolean(info?.supported);
   if($('loadOnDeviceModel'))$('loadOnDeviceModel').disabled=!Boolean(info?.supported&&deviceLocalState?.models?.length);
   if($('deleteOnDeviceModel'))$('deleteOnDeviceModel').disabled=!Boolean(deviceLocalState?.models?.length);
   if($('unloadOnDeviceModel'))$('unloadOnDeviceModel').disabled=!Boolean(deviceLocalCoder.loadedFileName);
@@ -541,6 +542,28 @@ async function cancelSelectedDeviceModel(){
     if(button)button.disabled=false;
   }
 }
+async function importDeviceModelFile(){
+  const button=$('importOnDeviceModel');
+  if(button)button.disabled=true;
+  if($('onDeviceModelStatus'))$('onDeviceModelStatus').textContent='GGUF dosyasını seç…';
+  try{
+    const result=await deviceLocalCoder.importModel();
+    if(result.cancelled){
+      if($('onDeviceModelStatus'))$('onDeviceModelStatus').textContent='Dosya seçimi iptal edildi.';
+      return;
+    }
+    await refreshDeviceLocalModels(true);
+    if($('installedLocalModel'))$('installedLocalModel').value=result.fileName;
+    if($('onDeviceModelStatus'))$('onDeviceModelStatus').textContent=result.fileName+' içe aktarıldı ('+formatModelBytes(result.sizeBytes)+'). Belleğe yükleyebilirsin.';
+    showToast('GGUF modeli telefona aktarıldı.');
+  }catch(error){
+    if($('onDeviceModelStatus'))$('onDeviceModelStatus').textContent='Model içe aktarılamadı: '+(error.message||'Dosyanın GGUF biçimini ve boş depolamayı kontrol et.');
+    showToast('GGUF modeli içe aktarılamadı.');
+  }finally{
+    if(button)button.disabled=!Boolean(deviceLocalState?.device?.supported);
+  }
+}
+
 async function loadSelectedDeviceModel(){
   const fileName=$('installedLocalModel')?.value;
   if(!fileName){showToast('Önce bir GGUF modeli indir.');return;}
@@ -1208,6 +1231,7 @@ $('localCoderApiProvider').addEventListener('change',async e=>{settings.localCod
 $('onDeviceModelCatalog').addEventListener('change',renderDeviceModelDescription);
 $('downloadOnDeviceModel').addEventListener('click',downloadSelectedDeviceModel);
 $('cancelOnDeviceDownload').addEventListener('click',cancelSelectedDeviceModel);
+$('importOnDeviceModel').addEventListener('click',importDeviceModelFile);
 $('refreshDeviceLocalModels').addEventListener('click',()=>refreshDeviceLocalModels());
 $('loadOnDeviceModel').addEventListener('click',loadSelectedDeviceModel);
 $('unloadOnDeviceModel').addEventListener('click',unloadDeviceModel);

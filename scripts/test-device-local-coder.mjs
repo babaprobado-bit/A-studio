@@ -159,4 +159,34 @@ assert.equal(failedCleanupClient.activeDownloadId,null,'manual cancellation afte
 assert.equal(failedCleanupClient.activeDownloadFileName,'');
 assert.equal(failedCleanupClient.downloadLoopActive,false);
 
+let importedModels = [];
+const importPlugin = {
+  getDeviceInfo: fake.getDeviceInfo,
+  listModels: async () => ({ models: importedModels }),
+  importModel: async () => {
+    importedModels = [{ fileName: 'transferred-qwen.gguf', sizeBytes: 491 * 1024 ** 2, loaded: false }];
+    return { imported: true, fileName: 'transferred-qwen.gguf', sizeBytes: 491 * 1024 ** 2 };
+  }
+};
+const importClient = new DeviceLocalCoder(true, importPlugin);
+const importResult = await importClient.importModel();
+assert.equal(importResult.imported, true);
+assert.equal(importClient.models[0].fileName, 'transferred-qwen.gguf', 'imported GGUF should appear in the installed model list');
+assert.equal(importClient.importStarting, false, 'the import lock must release after success');
+const browserImportClient = new DeviceLocalCoder(false);
+await assert.rejects(() => browserImportClient.importModel(), /Android APK gerektirir/);
+
+const slowImportClient = new DeviceLocalCoder(true, {
+  getDeviceInfo: fake.getDeviceInfo,
+  listModels: async () => ({ models: [] }),
+  importModel: async () => new Promise(resolve => setTimeout(() => resolve({ imported: false, cancelled: true }), 5))
+});
+const importing = slowImportClient.importModel();
+await assert.rejects(
+  () => slowImportClient.download(DEVICE_MODEL_CATALOG[0]),
+  /Başka bir model aktarımı sürüyor/
+);
+await importing;
+assert.equal(slowImportClient.importStarting, false, 'the import lock must release after cancel');
+
 console.log('Device Local Coder bridge tests passed.');

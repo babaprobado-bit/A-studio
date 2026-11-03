@@ -1,17 +1,22 @@
 package com.aistudio.alpha1
 
+import android.app.Activity
 import android.app.ActivityManager
 import android.app.DownloadManager
 import android.content.Context
+import android.content.Intent
 import android.database.Cursor
 import android.net.Uri
 import android.os.Build
 import android.os.StatFs
+import android.provider.OpenableColumns
+import androidx.activity.result.ActivityResult
 import com.getcapacitor.JSArray
 import com.getcapacitor.JSObject
 import com.getcapacitor.Plugin
 import com.getcapacitor.PluginCall
 import com.getcapacitor.PluginMethod
+import com.getcapacitor.annotation.ActivityCallback
 import com.getcapacitor.annotation.CapacitorPlugin
 import com.tensai.llamakt.ChatMessage
 import com.tensai.llamakt.LlamaEngine
@@ -21,7 +26,9 @@ import com.tensai.llamakt.chat
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.runBlocking
 import java.io.File
+import java.io.FileOutputStream
 import java.io.RandomAccessFile
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 
 /** Private, on-device GGUF storage and llama.kt inference bridge. */
@@ -30,6 +37,8 @@ class LocalLlmPlugin : Plugin() {
     private val executor = Executors.newSingleThreadExecutor()
     @Volatile private var engine: LlamaEngine? = null
     @Volatile private var loadedFileName: String = ""
+    private val activeImportFileNames = ConcurrentHashMap.newKeySet<String>()
+    private val maxImportedModelBytes = 8L * 1024L * 1024L * 1024L
 
     private fun modelDirectory(): File {
         val base = context.getExternalFilesDir(null) ?: context.filesDir
@@ -111,6 +120,127 @@ class LocalLlmPlugin : Plugin() {
                 cursor?.close()
             }
         }
+        val trackedNames = preferences.all.filterValues { it is Long }.keys
+        modelDirectory().listFiles { file -> file.isFile && file.name.endsWith(".gguf.part", ignoreCase = true) }
+            ?.forEach { partial ->
+                val modelName = partial.name.removeSuffix(".part")
+                if (modelName !in trackedNames && !activeImportFileNames.contains(modelName)) {
+                    partial.delete()
+                }
+            }
+    }
+
+    private fun importModelFromUri(uri: Uri): JSObject {
+        val resolver = context.contentResolver
+        var displayName = ""
+        var declaredSize = -1L
+        resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE), null, null, null)?.use { cursor ->
+            if (cursor.moveToFirst()) {
+                val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
+                if (nameIndex >= 0) displayName = cursor.getString(nameIndex) ?: ""
+                if (sizeIndex >= 0 && !cursor.isNull(sizeIndex)) declaredSize = cursor.getLong(sizeIndex)
+            }
+        }
+        val leafName = displayName.substringAfterLast('/').substringAfterLast('\\').trim()
+        if (!leafName.endsWith(".gguf", ignoreCase = true)) {
+            throw IllegalArgumentException("Yalnızca .gguf model dosyaları içe aktarılabilir.")
+        }
+        val safeStem = leafName.dropLast(5)
+            .replace(Regex("[^A-Za-z0-9._-]"), "_")
+            .trim('_', '.', '-')
+            .take(100)
+        if (safeStem.isBlank()) throw IllegalArgumentException("Model dosyasının adı geçersiz.")
+        val fileName = "$safeStem.gguf"
+        val destination = safeModelFile(fileName)
+        val preferences = downloadPreferences()
+        if (preferences.contains(fileName)) throw IllegalStateException("Bu model şu anda indiriliyor.")
+        if (destination.exists()) throw IllegalStateException("Bu model zaten telefonda bulunuyor.")
+        if (!activeImportFileNames.add(fileName)) throw IllegalStateException("Bu model zaten içe aktarılıyor.")
+
+        val partial = partialModelFile(fileName)
+        try {
+            if (partial.exists() && !partial.delete()) {
+                throw IllegalStateException("Önceki yarım model dosyası temizlenemedi.")
+            }
+            if (declaredSize > maxImportedModelBytes) {
+                throw IllegalArgumentException("Model dosyası 8 GB sınırını aşıyor.")
+            }
+            val requiredBytes = if (declaredSize > 0) declaredSize + 32L * 1024L * 1024L else 0L
+            val freeBytes = StatFs(modelDirectory().absolutePath).availableBytes
+            if (requiredBytes > 0 && freeBytes < requiredBytes) {
+                throw IllegalStateException("Modeli içe aktarmak için telefonda yeterli boş alan yok.")
+            }
+            var copiedBytes = 0L
+            val source = resolver.openInputStream(uri)
+                ?: throw IllegalStateException("Seçilen dosya okunamadı.")
+            source.use { input ->
+                FileOutputStream(partial).use { output ->
+                    val buffer = ByteArray(1024 * 1024)
+                    while (true) {
+                        val count = input.read(buffer)
+                        if (count < 0) break
+                        if (count == 0) continue
+                        copiedBytes += count.toLong()
+                        if (copiedBytes > maxImportedModelBytes) {
+                            throw IllegalArgumentException("Model dosyası 8 GB sınırını aşıyor.")
+                        }
+                        output.write(buffer, 0, count)
+                    }
+                    output.fd.sync()
+                }
+            }
+            if (declaredSize > 0 && copiedBytes != declaredSize) {
+                throw IllegalStateException("Model dosyası tam kopyalanamadı; kaynak ve hedef boyutları eşleşmiyor.")
+            }
+            finalizeDownloadedModel(fileName)
+            return JSObject().apply {
+                put("imported", true)
+                put("fileName", fileName)
+                put("sizeBytes", copiedBytes)
+            }
+        } catch (error: Exception) {
+            if (partial.exists() && !partial.delete()) {
+                error.addSuppressed(IllegalStateException("Yarım içe aktarma dosyası temizlenemedi."))
+            }
+            throw error
+        } finally {
+            activeImportFileNames.remove(fileName)
+        }
+    }
+
+    @PluginMethod
+    fun importModel(call: PluginCall) {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "*/*"
+        }
+        startActivityForResult(call, intent, "importModelResult")
+    }
+
+    @ActivityCallback
+    private fun importModelResult(call: PluginCall?, result: ActivityResult) {
+        if (call == null) return
+        if (result.resultCode != Activity.RESULT_OK) {
+            call.resolve(JSObject().apply { put("cancelled", true) })
+            return
+        }
+        val uri = result.data?.data
+        if (uri == null) {
+            call.reject("Dosya seçilemedi.")
+            return
+        }
+        try {
+            executor.execute {
+                try {
+                    call.resolve(importModelFromUri(uri))
+                } catch (error: Exception) {
+                    call.reject("GGUF modeli içe aktarılamadı: ${error.message}", error)
+                }
+            }
+        } catch (error: Exception) {
+            call.reject("Model içe aktarma başlatılamadı: ${error.message}", error)
+        }
     }
 
     @PluginMethod
@@ -173,6 +303,9 @@ class LocalLlmPlugin : Plugin() {
             val fileName = call.getString("fileName") ?: throw IllegalArgumentException("Model dosya adı eksik.")
             val destination = safeModelFile(fileName)
             reconcileDownloads()
+            if (activeImportFileNames.contains(fileName)) {
+                throw IllegalStateException("Bu model şu anda içe aktarılıyor.")
+            }
             if (downloadPreferences().contains(fileName)) {
                 throw IllegalStateException("Bu model zaten indiriliyor.")
             }
