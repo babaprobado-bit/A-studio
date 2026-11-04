@@ -347,6 +347,10 @@ export class DeviceLocalCoder {
     const model = DEVICE_MODEL_CATALOG.find(item => item.fileName === fileName);
     const installedModel = this.models.find(item => item.fileName === fileName);
     if (!installedModel) throw new Error('GGUF dosyası telefonda bulunamadı. Önce indir.');
+    const safeContextSize = Math.max(1024, Math.min(Number(contextSize || 2048), 4096));
+    if (this.loadedFileName === fileName) {
+      return { loaded: true, fileName, contextSize: safeContextSize, alreadyLoaded: true };
+    }
     const total = Number(this.device?.totalMemoryBytes || 0);
     const available = Number(this.device?.availableMemoryBytes || 0);
     if (this.device?.lowMemory) throw new Error('Android şu anda düşük bellek bildiriyor. Diğer uygulamaları kapatıp yeniden dene.');
@@ -356,7 +360,7 @@ export class DeviceLocalCoder {
     if (available < minimumAvailable) throw new Error(`Yetersiz boş RAM. Bu model için yaklaşık ${formatModelBytes(minimumAvailable)} boş bellek gerekiyor.`);
     const listener = await this.plugin.addListener('localModelLoadProgress', event => onProgress(event));
     try {
-      const result = await this.plugin.loadModel({ fileName, contextSize: Math.max(1024, Math.min(Number(contextSize || 2048), 4096)) });
+      const result = await this.plugin.loadModel({ fileName, contextSize: safeContextSize });
       this.loadedFileName = fileName;
       return result;
     } finally {

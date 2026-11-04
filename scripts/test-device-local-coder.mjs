@@ -49,6 +49,21 @@ assert.equal(
   Math.ceil(2*1024**3*1.4+750*1024**2),
   'imported GGUF files should receive a conservative size-based RAM estimate'
 );
+let sameModelLoadCalls = 0;
+const alreadyLoadedPlugin = {
+  getDeviceInfo:async()=>({
+    supported:true,totalMemoryBytes:8*1024**3,availableMemoryBytes:512*1024**2,
+    freeStorageBytes:8*1024**3,processorCount:8,lowMemory:false,loadedFileName:'already-loaded.gguf'
+  }),
+  listModels:async()=>({models:[{fileName:'already-loaded.gguf',sizeBytes:500*1024**2,loaded:true}]}),
+  addListener:async()=>{throw new Error('already-loaded model must not create a load listener');},
+  loadModel:async()=>{sameModelLoadCalls++;throw new Error('already-loaded model must not be loaded again');}
+};
+const alreadyLoadedClient = new DeviceLocalCoder(true,alreadyLoadedPlugin);
+const alreadyLoadedResult = await alreadyLoadedClient.load('already-loaded.gguf',4096);
+assert.equal(alreadyLoadedResult.alreadyLoaded,true,'loading the currently active model should be idempotent');
+assert.equal(alreadyLoadedResult.contextSize,4096);
+assert.equal(sameModelLoadCalls,0,'already-loaded GGUF should not hit native load or need additional free RAM');
 assert.equal(new DeviceLocalCoder(false).native,false);
 let loaded=''; let models=[];
 const fake={
