@@ -1,11 +1,12 @@
 # AI Studio — Project state and technical handoff
 
-## Latest continuation status — 2026-11-03
+## Latest continuation status — 2026-11-04
 
 - Product is **AI Studio**; keep Android ID `com.aistudio.alpha1`.
-- Latest branch head (handoff-only): `b08b59b407e5310bf1f32ab19f3395aaf5a88f91`; latest app-code/test commit: `6afe4ccfde5f29085a3ad0f2079f0f6addbe5107`. Base `main` remains `aab010319b6500002844bd24b11da85dd9ca3b00`. PR #2 stays open/draft/unmerged.
-- PR-triggered native GGUF build [41706759331](https://github.com/babaprobado-bit/A-studio/actions/runs/41706759331) for `6afe4cc...` passed Android tool setup, pinned llama.kt retrieval and llama.cpp source preparation; dependency installation, web build, all five regression commands and Capacitor sync passed; Gradle debug APK assembly is running. Artifact upload is pending. Duplicate manual run [41706818257](https://github.com/babaprobado-bit/A-studio/actions/runs/41706818257) has an accepted cancellation request.
-- Previous-source native artifact `13262651732` from [41696652109](https://github.com/babaprobado-bit/A-studio/actions/runs/41696652109) is built from `77527995...`, so it does not include the RAM-guard changes. Do not call it current-source.
+- Latest app-code/test commit: `b9677813676c8138651848620fa1ef0ab5fc3b86`; it makes already-loaded GGUF load calls idempotent and adds a fake-plugin low-memory regression. The follow-up native build [41885349742](https://github.com/babaprobado-bit/A-studio/actions/runs/41885349742) was queued at last check.
+- Base `main` remains `aab010319b6500002844bd24b11da85dd9ca3b00`. PR #2 stays open, Draft and unmerged.
+- Current-source native build [41706759331](https://github.com/babaprobado-bit/A-studio/actions/runs/41706759331) succeeded for app SHA `6afe4cc...`; APK artifact `13266781713`, `AI-Studio-1.1-OnDevice-LocalCoder-APK`, 18,154,318 bytes. SHA-256 `d9ab6beafb65a6d570436fe1eeda959cdbbd55a608c5cde3f411b8e2c42583a7`. This artifact includes the GGUF engine and imported-model RAM guard but predates the `b967781` idempotent-load fix.
+- The successful run passed native source preparation, web build, all five regression commands, Capacitor setup/sync, Gradle `assembleDebug` and artifact upload. It proves APK compilation/packaging, not physical-device execution.
 - Last successful APK pair is older source SHA `9400716...`: native [41580209560](https://github.com/babaprobado-bit/A-studio/actions/runs/41580209560), artifact `13205399062`; demo [41580209607](https://github.com/babaprobado-bit/A-studio/actions/runs/41580209607).
 - Offline GGUF transfer: Android `ACTION_OPEN_DOCUMENT` imports an existing `.gguf` file. The user can copy a model file to the phone by USB, SD card or file sharing; app import itself needs no internet. Model weights are not bundled or created by this flow.
 - Local import uses app-scoped `.part`, sanitized filenames, an 8 GB maximum, free-space checks, progress notifications ~8 MB, rechecks ~16 MB, source-size check and GGUF magic verification before installed-model insertion.
@@ -14,7 +15,7 @@
 - Skills Library: 38 original instructions, safe multi-file SKILL.md import/preview, duplicate flags, BOM/CRLF, metadata, caps, backups and regression tests.
 - API Local Coder: explicit consent, fixed Plan/Code/Review sequence, fake-provider tests, no retry/fallback and pre-await busy lock; no paid API request was made.
 - Model license information is visible: 0.5B/1.5B Apache-2.0, 3B Qwen Research/non-commercial warning.
-- User reports no internet and currently has no phone/computer available for hands-on testing. Continue source development and GitHub-hosted CI/mock tests; do not ask for device testing now. No phone install, actual GGUF import/load, inference or airplane-mode proof has passed.
+- User currently has no phone/computer available for hands-on testing. Continue source development and GitHub-hosted CI/mock tests; do not ask for device testing now. No phone install, actual GGUF import/load, inference or airplane-mode proof has passed.
 
 ## 1. Product goal
 

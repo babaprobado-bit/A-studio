@@ -5,23 +5,18 @@ Once Session 1 produces the native GGUF APK, test installation, model management
 
 Do not use the regular demo APK for this test; it does not contain the native GGUF bridge. Use artifact from build-android-local-coder.yml.
 
-## Software-side progress — 2026-11-03 (source/CI work only, not a device-test pass)
+## Software-side progress — 2026-11-04 (source/CI work only, not a device-test pass)
 
-- Latest source/test commit: `6afe4ccfde5f29085a3ad0f2079f0f6addbe5107`.
-- The commit adds JS plus native Kotlin memory guardrails for imported GGUF files. The device bridge regression test covers the estimated-RAM rejection/acceptance path.
-- PR-triggered native build [41706759331](https://github.com/babaprobado-bit/A-studio/actions/runs/41706759331) targets this SHA. It passed Android tool setup, pinned llama.kt retrieval and llama.cpp source preparation; AI Studio dependencies, web build, all regression checks and Capacitor sync passed; Gradle debug APK assembly is in progress. No artifact is available yet. Duplicate manual run [41706818257](https://github.com/babaprobado-bit/A-studio/actions/runs/41706818257) has an accepted cancellation request.
-- The prior successful native artifact `13262651732` from [41696652109](https://github.com/babaprobado-bit/A-studio/actions/runs/41696652109) belongs to older source `77527995...` and excludes this RAM guard change.
-- Native model management now includes DownloadManager cancellation and local GGUF import. A user can transfer an already-owned `.gguf` file to the phone by USB/SD/file sharing and import it without internet.
-- Import writes to app-scoped `.part`, enforces an 8 GB cap, sanitizes names, checks storage, reports progress every ~8 MB and rechecks free space every ~16 MB; GGUF magic is checked before final rename.
-- Large local imports can now be cancelled in-app. The native plugin checks a cancellation flag during copy, removes the incomplete `.part`, and resolves the import as cancelled. Mock tests cover the JavaScript cancellation request and state cleanup.
-- Commit `5f2aca6` synchronized import/cancel/license controls into the real `index.html`; `985a53f` tests those controls and their event handlers; `0a80834` adds local-import cancellation.
+- Latest app-code/test commit: `b9677813676c8138651848620fa1ef0ab5fc3b86`; it makes load requests for an already-active GGUF idempotent. Its follow-up native workflow [41885349742](https://github.com/babaprobado-bit/A-studio/actions/runs/41885349742) was queued when this handoff was written.
+- The preceding native build [41706759331](https://github.com/babaprobado-bit/A-studio/actions/runs/41706759331) completed successfully for app commit `6afe4cc...`, producing artifact `13266781713` (18,154,318 bytes; SHA-256 `d9ab6beafb65a6d570436fe1eeda959cdbbd55a608c5cde3f411b8e2c42583a7`). Regression checks, Capacitor sync, Gradle APK build and upload all passed.
+- The `6afe4cc` source contains imported-GGUF size-based RAM guardrails in JS and Kotlin. This is a heuristic and not proof of phone compatibility.
 
-## Latest project status — 2026-11-03
+## Latest project status — 2026-11-04
 
-- User reports no internet and no phone/computer currently available for hands-on tests. Do not request physical testing now; continue source development and GitHub-hosted CI/mock tests.
+- User currently has no phone/computer available for hands-on tests. Do not request physical testing now; continue source development and GitHub-hosted CI/mock tests.
 - The local import path is useful only when the `.gguf` file is already available locally or can be copied to the phone. The app does not bundle or create model weights.
 - Device was previously described as Redmi S12, but the exact commercial model, Android version, ABI and RAM are unverified.
-- No physical APK installation, GGUF import on Android, model load/inference or airplane-mode proof has passed. GitHub Actions can prove source tests and APK compilation only; it cannot prove native runtime behavior or phone compatibility.
+- No physical APK installation, GGUF import on Android, model load/inference or airplane-mode proof has passed. The `6afe4cc` APK is a real native artifact, but GitHub Actions cannot prove native runtime behavior or phone compatibility.
 - PR #2 remains open/draft; main unchanged at `aab010319b6500002844bd24b11da85dd9ca3b00`.
 
 ## Read first

@@ -7,10 +7,10 @@
 - Product: **AI Studio**. Keep Android application ID `com.aistudio.alpha1`.
 - Repo: https://github.com/babaprobado-bit/A-studio
 - Branch: `feature/android-offline-skills-v1`
-- Latest source/test commit: `6afe4ccfde5f29085a3ad0f2079f0f6addbe5107` (RAM guardrails for imported GGUF models; check live branch head before editing)
+- Latest source/test commit: `b9677813676c8138651848620fa1ef0ab5fc3b86` (idempotent already-loaded GGUF behavior; native build [41885349742](https://github.com/babaprobado-bit/A-studio/actions/runs/41885349742) queued at last check)
 - `main` remains unchanged at `aab010319b6500002844bd24b11da85dd9ca3b00`.
 - PR #2 is open, draft and unmerged: https://github.com/babaprobado-bit/A-studio/pull/2
-- PR-triggered native GGUF build [41706759331](https://github.com/babaprobado-bit/A-studio/actions/runs/41706759331) targets `6afe4cc...`; Android tool setup, pinned llama.kt fetch and llama.cpp preparation passed, dependency installation, web build, regression checks and Capacitor sync passed; Gradle debug APK assembly is in progress. No artifact for this SHA yet. Duplicate manual run [41706818257](https://github.com/babaprobado-bit/A-studio/actions/runs/41706818257) has an accepted cancellation request. Previous native artifact from `77527995...` is not current.
+- Native GGUF build [41706759331](https://github.com/babaprobado-bit/A-studio/actions/runs/41706759331) succeeded for source `6afe4cc...` and uploaded artifact `13266781713` (18,154,318 bytes; SHA-256 `d9ab6beafb65a6d570436fe1eeda959cdbbd55a608c5cde3f411b8e2c42583a7`). Newer source `b967781...` adds idempotent load behavior; its native build [41885349742](https://github.com/babaprobado-bit/A-studio/actions/runs/41885349742) was queued at last check.
 - Last successful APKs from older app-code SHA `9400716...`: native artifact `13205399062` [run 41580209560](https://github.com/babaprobado-bit/A-studio/actions/runs/41580209560); demo artifact `13205386533` [run 41580209607](https://github.com/babaprobado-bit/A-studio/actions/runs/41580209607). These do not include local import/cancel updates.
 
 ## Latest offline-first improvements

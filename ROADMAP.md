@@ -23,10 +23,9 @@ This document separates implemented source, automated checks, CI APK builds and 
 
 ## Latest source and CI status
 
-- Current branch head: `6afe4ccfde5f29085a3ad0f2079f0f6addbe5107`.
-- PR-triggered native GGUF run [41706759331](https://github.com/babaprobado-bit/A-studio/actions/runs/41706759331) passed Android tool setup, pinned llama.kt fetch and llama.cpp preparation; dependency installation, Vite build, regression checks and Capacitor sync passed; Gradle debug APK assembly is running. No current-source artifact was available. Duplicate manual run [41706818257](https://github.com/babaprobado-bit/A-studio/actions/runs/41706818257) has a cancellation request accepted.
-- Previous native APK [41696652109](https://github.com/babaprobado-bit/A-studio/actions/runs/41696652109), artifact `13262651732`, is for older commit `77527995...` and does not include current RAM guard changes.
-- Commit `6afe4cc` adds an approximate size-based available-RAM guard for imported GGUFs in JS and a second live Android memory check in Kotlin; mock regression tests cover pass/fail thresholds.
+- Current app-code/test commit: `b9677813676c8138651848620fa1ef0ab5fc3b86`; follow-up native build [41885349742](https://github.com/babaprobado-bit/A-studio/actions/runs/41885349742) was queued at last check.
+- Native GGUF run [41706759331](https://github.com/babaprobado-bit/A-studio/actions/runs/41706759331) succeeded for source `6afe4cc...`: APK artifact `13266781713`, 18,154,318 bytes, SHA-256 `d9ab6beafb65a6d570436fe1eeda959cdbbd55a608c5cde3f411b8e2c42583a7`.
+- `6afe4cc` includes the imported-GGUF RAM estimate in JS and live-memory check in Kotlin; `b967781` adds idempotent same-model load behavior so a second tap does not need additional RAM or re-enter native load. A fake-plugin test covers the low-memory case.
 - Regression tests exercise the JS/native bridge through fakes and actual-screen HTML wiring. CI compilation does not prove real phone inference.
 
 ## Internet-unavailable development path
