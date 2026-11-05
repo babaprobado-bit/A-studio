@@ -19,11 +19,11 @@ assert.throws(()=>normalizeOpenAiEndpoint('javascript:alert(1)'),/HTTPS/);
 assert.equal(getTeamStageDetails(0,9).role,'Mimar / planlayıcı');
 assert.equal(getTeamStageDetails(3,9).role,'Testçi / son kontrol');
 assert.match(getTeamStageDetails(8,9).instruction,/yeni katkı sun/);
-assert.match(main,/settings\\.team=normalizeTeamSelection/);
-assert.doesNotMatch(main,/settings\\.team\\.slice\\(0,4\\)/);
+assert.match(main,/settings\.team=normalizeTeamSelection/);
+assert.doesNotMatch(main,/settings\.team\.slice\(0,4\)/);
 assert.match(html,/id="selectAllTeam"/);
-assert.match(main,/normalizeOpenAiEndpoint\\(settings\\.customEndpoint\\)/);
-assert.match(main,/huggingface: \\{ name:'Hugging Face Inference'/);
+assert.match(main,/normalizeOpenAiEndpoint\(settings\.customEndpoint\)/);
+assert.match(main,/huggingface: \{ name:'Hugging Face Inference'/);
 
 for(const id of ['localCoderTask','localCoderRun','localCoderOutput','localCoderReview','reuseCatalogGrid','snippetForm','snippetList','agentActivityList','savedCodeFileSelect','savedCodeFileName','newCodeFile','saveCodeFile','deleteCodeFile','exportCodeFiles','importCodeFilesBtn','importCodeFilesFile','projectContextStatus','shareReusableContext','nativeVaultPanel','nativeVaultBaseUrl','nativeVaultToken','nativeVaultConnect','nativeVaultForm','nativeVaultItems','nativeShareVaultContext']) assert.match(html,new RegExp('id="'+id+'"'),'Missing UI: '+id);
 assert.match(main,/buildLocalCoderStages/);assert.match(main,/callProvider\('ollama'/);assert.match(main,/DB\.snippets/);assert.match(main,/DB\.activity/);
