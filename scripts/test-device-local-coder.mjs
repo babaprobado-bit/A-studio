@@ -5,6 +5,7 @@ import { DEVICE_MODEL_CATALOG, DeviceLocalCoder, assessDeviceModel, chooseRecomm
 const devicePanelMarkup = await readFile(new URL('../src/device-local-coder-panel.html', import.meta.url), 'utf8');
 const indexMarkup = await readFile(new URL('../index.html', import.meta.url), 'utf8');
 const mainSource = await readFile(new URL('../src/main.js', import.meta.url), 'utf8');
+const nativeSource = await readFile(new URL('../android-local-runtime/LocalLlmPlugin.kt', import.meta.url), 'utf8');
 for (const markup of [devicePanelMarkup,indexMarkup]) {
   assert.match(markup, /id="onDeviceModelLicense"/);
   assert.match(markup, /id="cancelOnDeviceDownload"/);
@@ -19,6 +20,16 @@ assert.match(mainSource, /\$\('cancelOnDeviceImport'\)\.addEventListener\('click
 assert.match(mainSource, /\$\('cancelOnDeviceDownload'\)\.addEventListener\('click',cancelSelectedDeviceModel\)/);
 assert.equal((indexMarkup.match(/id="importOnDeviceModel"/g)||[]).length,1,'the actual app screen must contain one GGUF import button');
 assert.equal((indexMarkup.match(/id="cancelOnDeviceDownload"/g)||[]).length,1,'the actual app screen must contain one cancel button');
+
+const loadMethodStart=nativeSource.indexOf('fun loadModel(call: PluginCall)');
+const loadMethodEnd=nativeSource.indexOf('@PluginMethod',loadMethodStart+10);
+assert.ok(loadMethodStart>=0&&loadMethodEnd>loadMethodStart,'native GGUF loader must exist');
+const nativeLoadSource=nativeSource.slice(loadMethodStart,loadMethodEnd);
+assert.ok(
+  nativeLoadSource.indexOf('previous?.free()') < nativeLoadSource.indexOf('activityManager.getMemoryInfo(memoryInfo)'),
+  'replacing a loaded GGUF must free the old engine before measuring available RAM for the replacement'
+);
+
 assert.equal(DEVICE_MODEL_CATALOG.length, 3);
 assert.ok(DEVICE_MODEL_CATALOG.every(model => model.url.startsWith('https://huggingface.co/')));
 assert.ok(DEVICE_MODEL_CATALOG.every(model => model.licenseUrl.startsWith('https://huggingface.co/')));

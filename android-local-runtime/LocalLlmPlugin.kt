@@ -547,6 +547,9 @@ class LocalLlmPlugin : Plugin() {
                     val magic = ByteArray(4); input.readFully(magic)
                     if (String(magic, Charsets.US_ASCII) != "GGUF") throw IllegalStateException("GGUF başlığı geçersiz.")
                 }
+                // Replacing a model must not count the old model's resident RAM
+                // against the new model's preflight estimate.
+                val previous = engine; engine = null; loadedFileName = ""; previous?.free()
                 val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
                 val memoryInfo = ActivityManager.MemoryInfo()
                 activityManager.getMemoryInfo(memoryInfo)
@@ -559,7 +562,6 @@ class LocalLlmPlugin : Plugin() {
                 if (memoryInfo.availMem < minimumFreeRam) {
                     throw IllegalStateException("Yetersiz boş RAM; daha küçük bir GGUF modeli seç veya diğer uygulamaları kapat.")
                 }
-                val previous = engine; engine = null; loadedFileName = ""; previous?.free()
                 nextEngine = LlamaEngine()
                 nextEngine.load(path = file.absolutePath, nGpuLayers = 0, nCtx = contextSize, nThreads = 0,
                     onProgress = LoadProgressCallback { progress ->
