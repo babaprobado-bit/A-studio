@@ -272,7 +272,16 @@ let chatPersistTimer;
 function persistChat(){clearTimeout(chatPersistTimer);chatPersistTimer=setTimeout(()=>setPref(DB.chat,chatHistory).catch(()=>showToast('Sohbet kaydı başarısız oldu.')),250);}
 function chatContext(){return chatHistory.slice(-10).filter(m=>m.role==='user'||m.role==='assistant').map(m=>({role:m.role,content:m.content}));}
 function getActiveProject(){return projectList.find(p=>p&&p.id===activeProjectId)||null;}
-function getSharedProjectContext(){return buildSharedProjectContext({project:getActiveProject(),files:codeFiles,activeFileId:activeCodeFileId,includeReusable:settings.shareReusableContext===true,snippets:reusableSnippets});}
+function getSharedProjectContext(){
+  const liveFiles=codeFiles.map(file=>file.id===activeCodeFileId?{
+    ...file,
+    name:$('savedCodeFileName')?.value.trim()||file.name,
+    language:$('codeLanguage')?.value||file.language,
+    content:$('codePad')?.value??file.content,
+    updated:new Date().toISOString()
+  }:file);
+  return buildSharedProjectContext({project:getActiveProject(),files:liveFiles,activeFileId:activeCodeFileId,includeReusable:settings.shareReusableContext===true,snippets:reusableSnippets});
+}
 function renderProjectContextStatus(){
   const toggle=$('shareReusableContext');if(toggle)toggle.checked=settings.shareReusableContext===true;
   const status=$('projectContextStatus');if(!status)return;
@@ -282,7 +291,19 @@ function renderProjectContextStatus(){
   const snippetCount=settings.shareReusableContext===true?Math.min(2,reusableSnippets.length):0;
   status.textContent='Aktif bağlam: '+project.name+' · '+(settings.shareReusableContext===true?fileCount+' kod dosyası ve en fazla '+snippetCount+' kasa parçası paylaşılabilir.':'yalnızca proje notları paylaşılır.');
 }
-function systemFor(id,task=''){const context=getSharedProjectContext();const vaultContext=buildSharedVaultContext({items:sharedVaultItems,task,enabled:settings.shareVaultContext===true});return settings.systemPrompt+'\nSağlayıcı rolü: '+providers[id].name+'. Yanıtları Türkçe ve uygulanabilir yaz; var olmayan test sonuçlarını iddia etme.'+(context?'\n\n'+context:'')+(vaultContext?'\n\n'+vaultContext:'');}
+function currentGeneralSkillContext(maxChars=6000){
+  const generalSkills=getSelectedSkills().filter(skill=>skill.stage==='all');
+  return buildStageSkillContext(generalSkills,'all',{maxSkills:MAX_SELECTED_SKILLS,maxChars});
+}
+function systemFor(id,task='',options={}){
+  const context=getSharedProjectContext();
+  const vaultContext=buildSharedVaultContext({items:sharedVaultItems,task,enabled:settings.shareVaultContext===true});
+  const skillContext=options.includeGeneralSkills===false?'':currentGeneralSkillContext(6000).promptText;
+  return settings.systemPrompt+'\nSağlayıcı rolü: '+providers[id].name+'. Yanıtları Türkçe ve uygulanabilir yaz; var olmayan test sonuçlarını iddia etme.'
+    +(context?'\n\n'+context:'')
+    +(vaultContext?'\n\n'+vaultContext:'')
+    +(skillContext?'\n\n'+skillContext:'');
+}
 async function fetchJson(url,options,timeoutMs=50000){
   const controller=new AbortController(); const timer=setTimeout(()=>controller.abort(),timeoutMs);
   try{const response=await fetch(url,{...options,signal:controller.signal}); const text=await response.text(); let data={}; try{data=text?JSON.parse(text):{};}catch(_){data={message:text.slice(0,1000)};}
@@ -291,7 +312,7 @@ async function fetchJson(url,options,timeoutMs=50000){
   }catch(err){if(err?.name==='AbortError')throw new Error('İstek zaman aşımına uğradı. İnterneti, model adını ve sağlayıcı durumunu kontrol et.'); if(err instanceof TypeError)throw new Error('Ağa erişilemedi veya sağlayıcı isteği engelledi (CORS/bağlantı). İnterneti, uç noktayı ve API anahtarını kontrol et.'); throw err;}
   finally{clearTimeout(timer);}
 }
-async function callProvider(id,prompt,history){
+async function callProvider(id,prompt,history,options={}){
   if(id==='device'){
     if(!nativeApp)throw new Error('Telefon içi GGUF ajanı yalnızca native Android uygulamasında çalışır.');
     if(!deviceLocalCoder.loadedFileName)throw new Error('Önce Telefon içi GGUF modelini belleğe yükle.');
@@ -303,27 +324,28 @@ async function callProvider(id,prompt,history){
     if(!answer)throw new Error('Telefon içi GGUF modeli boş yanıt verdi. Modeli yeniden yüklemeyi dene.');
     return answer;
   }
+  const systemPrompt=systemFor(id,prompt,options);
   if(id==='ollama'){
     const url=(settings.ollamaUrl||'').trim().replace(/\/+$/,''); const model=(settings.ollamaModel||providerModel(id)).trim();
     if(!url||!model)throw new Error('Ollama adresi ve model adı eksik.'); let parsed; try{parsed=new URL(url);}catch(_){throw new Error('Ollama adresi geçerli bir URL olmalı.');}
     if(!['http:','https:'].includes(parsed.protocol))throw new Error('Ollama adresi http:// veya https:// ile başlamalı.');
-    const messages=[{role:'system',content:systemFor(id,prompt)}].concat(history.slice(-8).map(m=>({role:m.role,content:m.content}))).concat([{role:'user',content:prompt}]);
+    const messages=[{role:'system',content:systemPrompt}].concat(history.slice(-8).map(m=>({role:m.role,content:m.content}))).concat([{role:'user',content:prompt}]);
     const d=await fetchJson(url+'/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model,messages,stream:false,options:{temperature:0.4}})});
     const answer=d?.message?.content;if(!answer)throw new Error('Ollama yanıtında mesaj yok. Model adını ve sunucuyu kontrol et.');return answer;
   }
   const p=providers[id]; const key=await getSecret(id); if(!key)throw new Error(p.name+' için API anahtarı ayarlanmamış. Modeller ekranından ekle.');
   const msgs=history.slice(-8).filter(m=>m.role==='user'||m.role==='assistant').map(m=>({role:m.role,content:m.content})); msgs.push({role:'user',content:prompt});
   if(p.kind==='anthropic'){
-    const d=await fetchJson(p.endpoint,{method:'POST',headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:providerModel(id),max_tokens:2048,system:systemFor(id,prompt),messages:msgs.filter(m=>m.role==='user'||m.role==='assistant')})});
+    const d=await fetchJson(p.endpoint,{method:'POST',headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:providerModel(id),max_tokens:2048,system:systemPrompt,messages:msgs.filter(m=>m.role==='user'||m.role==='assistant')})});
     const text=(d.content||[]).filter(x=>x.type==='text').map(x=>x.text).join('\n');if(!text)throw new Error('Claude yanıtında metin bulunamadı.');return text;
   }
   if(p.kind==='gemini'){
     const contents=msgs.map(m=>({role:m.role==='assistant'?'model':'user',parts:[{text:m.content}]}));
     const url=p.endpoint+encodeURIComponent(providerModel(id))+':generateContent?key='+encodeURIComponent(key);
-    const d=await fetchJson(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({systemInstruction:{parts:[{text:systemFor(id,prompt)}]},contents,generationConfig:{temperature:0.4,maxOutputTokens:2048}})});
+    const d=await fetchJson(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({systemInstruction:{parts:[{text:systemPrompt}]},contents,generationConfig:{temperature:0.4,maxOutputTokens:2048}})});
     const text=(d.candidates?.[0]?.content?.parts||[]).map(x=>x.text||'').join('\n');if(!text)throw new Error(d.promptFeedback?.blockReason||'Gemini yanıtında metin bulunamadı.');return text;
   }
-  const openAiBody={model:providerModel(id),messages:[{role:'system',content:systemFor(id,prompt)},...msgs]};
+  const openAiBody={model:providerModel(id),messages:[{role:'system',content:systemPrompt},...msgs]};
   if(id==='openai'){openAiBody.max_completion_tokens=2048;}
   else {openAiBody.temperature=0.4;openAiBody.max_tokens=2048;}
   const endpoint=id==='custom'?normalizeOpenAiEndpoint(settings.customEndpoint):p.endpoint;
@@ -734,7 +756,7 @@ async function deleteSelectedDeviceModel(){
 async function generateWithDeviceModel(basePrompt,maxTokens,stageId='all'){
   const contextSize=Number($('onDeviceContextSize')?.value||2048);
   const totalCharBudget=Math.max(1200,Math.floor((contextSize-maxTokens-128)*3.1));
-  const systemFull=systemFor('device',basePrompt);
+  const systemFull=systemFor('device',basePrompt,{includeGeneralSkills:false});
   const systemBudget=Math.min(systemFull.length,Math.floor(totalCharBudget*0.25));
   const systemText=systemFull.slice(0,systemBudget);
   const userBudget=Math.max(500,totalCharBudget-systemText.length-80);
@@ -821,7 +843,7 @@ async function runApiLocalCoderWorkshop(){
         const skillContext=currentSkillContext(stage.id,MAX_STAGE_SKILL_CHARS);
         return basePrompt+(skillContext.promptText?'\n\n'+skillContext.promptText:'');
       },
-      callProvider,
+      callProvider:(id,prompt,history)=>callProvider(id,prompt,history,{includeGeneralSkills:false}),
       onStageStart:async stage=>{
         $('localCoderStatus').textContent=stage.title+' · '+providers[providerId].name+' çalışıyor…';
         await logAgentActivity('API '+stage.title,'Çalışıyor',providers[providerId].name);
@@ -862,7 +884,7 @@ async function runLocalCoderWorkshop(){
 async function runLocalCoderWorkshopOllama(){
  if(busy){showToast('Başka bir ajan zinciri çalışıyor.');return;}const task=$('localCoderTask').value.trim();if(!task){showToast('Önce Local Coder görevini yaz.');return;}if(!settings.ollamaUrl){showToast('Önce Modeller ekranından Ollama adresini ayarla.');go('models');return;}
  const sourceCode=$('localCoderUseCode').checked?$('codePad').value.slice(0,10000):'';const stages=buildLocalCoderStages({task,language:$('codeLanguage').value,sourceCode});let previous='';busy=true;$('localCoderRun').disabled=true;$('localCoderRun').textContent='Yerel ajan çalışıyor…';$('localCoderStatus').textContent='Ollama modeline bağlanılıyor; küçük bilgisayarda yanıt yavaş gelebilir.';$('localCoderReview').value='';$('localCoderOutput').value='';
- try{await logAgentActivity('Local Coder','Başladı',task);for(const stage of stages){$('localCoderStatus').textContent=stage.title+' çalışıyor…';await logAgentActivity(stage.title,'Çalışıyor',task);const basePrompt=stage.makePrompt?stage.makePrompt(previous):stage.prompt;const skillContext=currentSkillContext(stage.id);const prompt=basePrompt+(skillContext.promptText?'\n\n'+skillContext.promptText:'');const answer=await callProvider('ollama',prompt,[]);if(stage.id==='code')$('localCoderOutput').value=extractCodeArtifact(answer);if(stage.id==='review')$('localCoderReview').value=answer;previous=answer;await logAgentActivity(stage.title,'Tamamlandı',answer.slice(0,220));} $('localCoderStatus').textContent='Zincir bitti. Taslağı gözden geçir; otomatik test çalıştırılmadı.';await logAgentActivity('Local Coder','Tamamlandı','Kod taslağı ve inceleme notları hazır; dosyalar otomatik değiştirilmedi.');showToast('Local Coder tamamlandı. Taslağı inceleyip gerekirse Kod Alanı’na aktar.');}
+ try{await logAgentActivity('Local Coder','Başladı',task);for(const stage of stages){$('localCoderStatus').textContent=stage.title+' çalışıyor…';await logAgentActivity(stage.title,'Çalışıyor',task);const basePrompt=stage.makePrompt?stage.makePrompt(previous):stage.prompt;const skillContext=currentSkillContext(stage.id);const prompt=basePrompt+(skillContext.promptText?'\n\n'+skillContext.promptText:'');const answer=await callProvider('ollama',prompt,[],{includeGeneralSkills:false});if(stage.id==='code')$('localCoderOutput').value=extractCodeArtifact(answer);if(stage.id==='review')$('localCoderReview').value=answer;previous=answer;await logAgentActivity(stage.title,'Tamamlandı',answer.slice(0,220));} $('localCoderStatus').textContent='Zincir bitti. Taslağı gözden geçir; otomatik test çalıştırılmadı.';await logAgentActivity('Local Coder','Tamamlandı','Kod taslağı ve inceleme notları hazır; dosyalar otomatik değiştirilmedi.');showToast('Local Coder tamamlandı. Taslağı inceleyip gerekirse Kod Alanı’na aktar.');}
  catch(error){$('localCoderStatus').textContent='Zincir durdu; ayarları ve Ollama bağlantısını kontrol et.';await logAgentActivity('Local Coder','Hata',error.message||'Bilinmeyen yerel model hatası');showToast('Local Coder çalışamadı: '+(error.message||'Ollama bağlantısını kontrol et.'));}
  finally{busy=false;$('localCoderRun').disabled=false;$('localCoderRun').textContent='Yerel ajan zincirini çalıştır';}
 }
@@ -1092,7 +1114,7 @@ function renderSkillLibrary(){
   }).join('');
   const profile=$('skillProfileSelect'); if(profile)profile.value=skillProfileId;
   const count=$('skillSelectedCount');if(count)count.textContent=selectedSkillIds.length+'/'+MAX_SELECTED_SKILLS+' Skill seçili';
-  const status=$('skillLibraryStatus');if(status)status.textContent='Seçilen Skill’ler Local Coder aşamalarına metin talimatı olarak eklenir. Her aşama en fazla 36.000 karakter alır. İçe aktarılan içerik kod olarak çalıştırılmaz.';
+  const status=$('skillLibraryStatus');if(status)status.textContent='Tüm aşamalar Skill’leri gerçek sohbet, AI Team, sıralı zincir ve karşılaştırma çağrılarına; Plan/Kod/İnceleme Skill’leri Local Coder’ın ilgili aşamasına eklenir. İçe aktarılan içerik kod olarak çalıştırılmaz.';
 }
 async function applySkillProfile(profileId){
   if(!SKILL_PROFILES[profileId])return;

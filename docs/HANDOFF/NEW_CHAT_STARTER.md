@@ -59,3 +59,10 @@ No physical APK install, model import, native inference or airplane-mode proof h
 - PR #2: https://github.com/babaprobado-bit/A-studio/pull/2
 - Project state: https://github.com/babaprobado-bit/A-studio/blob/feature/android-offline-skills-v1/docs/HANDOFF/PROJECT_STATE.md
 - Device checklist: https://github.com/babaprobado-bit/A-studio/blob/feature/android-offline-skills-v1/docs/HANDOFF/SESSION_2_DEVICE_TESTING.md
+## Agent context wiring — 2026-11-05
+
+- The shared live-provider system context now carries the active project notes, opt-in code files/snippets, opt-in shared-vault references, and selected general (`all` stage) Skills.
+- This shared path applies to single-provider chat, parallel AI Team, sequential pipelines, model comparison, provider connection checks, Ollama, and cloud API adapters.
+- Local Coder keeps Plan/Code/Review-specific Skills in their own stage prompts; those calls explicitly skip the general Skill injection to avoid duplicate instructions.
+- The active editor buffer is snapshotted into the opt-in project context, so unsaved edits are not silently omitted when an agent request starts.
+- `npm run test:ai-team`, the broader smoke tests, Vite build, and Android packaging are the CI verification path. Physical-device inference/offline acceptance remains a separate gate.

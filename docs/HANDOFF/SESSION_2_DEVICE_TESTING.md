@@ -116,3 +116,10 @@ Do not use the regular demo APK for this test; it does not contain the native GG
 ## Copy-ready prompt for next conversation
 
 Continue AI Studio software development without relying on phone or computer testing; the user currently has no internet and no device available for hands-on validation. Read `docs/HANDOFF/README.md`, `PROJECT_STATE.md`, this file and `NEW_CHAT_STARTER.md`. Latest source/test commit at this checkpoint: `6afe4ccfde5f29085a3ad0f2079f0f6addbe5107`; inspect latest branch head and Actions first. Recent change: imported/custom GGUF files now receive size-based free-RAM guardrails in JavaScript and Kotlin, with mock regression tests. Continue code review, automated regression coverage and native CI; preserve all current features. Keep PR #2 open and Draft; never modify main or merge. No physical install/import/inference/offline test has been done.
+## Agent context wiring — 2026-11-05
+
+- The shared live-provider system context now carries the active project notes, opt-in code files/snippets, opt-in shared-vault references, and selected general (`all` stage) Skills.
+- This shared path applies to single-provider chat, parallel AI Team, sequential pipelines, model comparison, provider connection checks, Ollama, and cloud API adapters.
+- Local Coder keeps Plan/Code/Review-specific Skills in their own stage prompts; those calls explicitly skip the general Skill injection to avoid duplicate instructions.
+- The active editor buffer is snapshotted into the opt-in project context, so unsaved edits are not silently omitted when an agent request starts.
+- `npm run test:ai-team`, the broader smoke tests, Vite build, and Android packaging are the CI verification path. Physical-device inference/offline acceptance remains a separate gate.

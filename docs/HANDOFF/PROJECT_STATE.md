@@ -248,3 +248,10 @@ They do not prove Android Kotlin/NDK/Gradle compilation, successful APK artifact
 ## 12. Handoff rule
 
 These docs are canonical project memory. The user explicitly wants work split across four chats because a long conversation can lose useful context. Every new chat must read docs/HANDOFF/README.md, this file and its session brief before continuing. Each chat commits verified changes and notes to the same feature branch; the next chat must inspect the new branch head rather than assume an old SHA.
+## Agent context wiring — 2026-11-05
+
+- The shared live-provider system context now carries the active project notes, opt-in code files/snippets, opt-in shared-vault references, and selected general (`all` stage) Skills.
+- This shared path applies to single-provider chat, parallel AI Team, sequential pipelines, model comparison, provider connection checks, Ollama, and cloud API adapters.
+- Local Coder keeps Plan/Code/Review-specific Skills in their own stage prompts; those calls explicitly skip the general Skill injection to avoid duplicate instructions.
+- The active editor buffer is snapshotted into the opt-in project context, so unsaved edits are not silently omitted when an agent request starts.
+- `npm run test:ai-team`, the broader smoke tests, Vite build, and Android packaging are the CI verification path. Physical-device inference/offline acceptance remains a separate gate.

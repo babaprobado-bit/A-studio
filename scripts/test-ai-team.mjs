@@ -30,6 +30,22 @@ assert.equal(main.split('function renderCompareResults(').length-1,1,
   'model comparison renderer must be declared only once');
 assert.equal(main.split('async function runCompare(').length-1,1,
   'model comparison runner must be declared only once');
+assert.ok(main.includes('function currentGeneralSkillContext(maxChars=6000)'),
+  'general Skills must be composed into the shared live-provider system context');
+assert.ok(main.includes("const skillContext=options.includeGeneralSkills===false?'':currentGeneralSkillContext(6000).promptText"),
+  'normal provider paths must receive selected general Skills');
+assert.ok(main.includes('const systemPrompt=systemFor(id,prompt,options)'),
+  'provider adapters must share one system-context builder');
+assert.ok(main.includes("callProvider:(id,prompt,history)=>callProvider(id,prompt,history,{includeGeneralSkills:false})"),
+  'API Local Coder must avoid duplicating its stage-specific Skills');
+assert.ok(main.includes("callProvider('ollama',prompt,[],{includeGeneralSkills:false})"),
+  'Ollama Local Coder must avoid duplicating its stage-specific Skills');
+assert.ok(main.includes("systemFor('device',basePrompt,{includeGeneralSkills:false})"),
+  'device Local Coder must avoid duplicating its stage-specific Skills');
+assert.ok(main.includes("content:$('codePad')?.value??file.content"),
+  'the latest unsaved editor content must be included in opt-in shared project context');
+assert.ok(html.includes('gerçek tekli sohbet, paralel AI Team, sıralı zincir ve model karşılaştırma'),
+  'the Skills screen must explain the agent-wide binding');
 
 assert.equal(getTeamStageDetails(0,10).role,'Mimar / planlayıcı');
 assert.equal(getTeamStageDetails(3,10).role,'Testçi / son kontrol');
