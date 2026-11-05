@@ -62,3 +62,11 @@ assert.deepEqual(await decryptWorkspaceBackup(sealed,backupPassword,webcrypto),w
 await assert.rejects(decryptWorkspaceBackup(sealed,'wrong-backup-password-43',webcrypto),/Parola yanl[iı]ş veya yedek dosyas[ıi] de[gğ]i[sş]tirilmi[sş]/);
 await assert.rejects(encryptWorkspaceBackup(workspace,'short',webcrypto),/en az 12 karakter/);
 console.log('Workshop smoke test passed: Local Coder, shared project context, snippet validation, encrypted backup round-trip and wrong-password rejection.');
+
+const pipelineStart=main.indexOf('async function runPipeline(prompt){');
+const pipelineEnd=main.indexOf('function renderCompareResults(results)',pipelineStart);
+assert.ok(pipelineStart>=0&&pipelineEnd>pipelineStart,'AI Team pipeline must exist');
+const pipelineSource=main.slice(pipelineStart,pipelineEnd);
+assert.match(pipelineSource,/demoAnswer\(id,stagePrompt,stage\.role\)/,'pipeline demo must use the computed stage role');
+assert.doesNotMatch(pipelineSource,/stageRoles/,'pipeline must not depend on an undefined legacy stageRoles array');
+assert.match(main,/function providerIsReady\(id\)/,'live team execution must skip unconfigured providers');

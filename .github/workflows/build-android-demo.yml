@@ -61,7 +61,7 @@ jobs:
       - name: Test Skill Library
         run: |
           npm run test:skills
-          npm run test:api-local-coder
+          npm run test:api-local-coder\n          npm run test:ai-team
       - name: Test device Local Coder bridge
         run: npm run test:device-local-coder
       - name: Test private website login gate

@@ -14,7 +14,7 @@
     "test:workshop": "node server/workshop-smoke-test.js",
     "test:skills": "node scripts/test-skills.mjs",
     "test:device-local-coder": "node scripts/test-device-local-coder.mjs",
-    "test:api-local-coder": "node scripts/test-api-local-coder.mjs"
+    "test:api-local-coder": "node scripts/test-api-local-coder.mjs",\n    "test:ai-team": "node scripts/test-ai-team.mjs"
   },
   "dependencies": {
     "express": "^5.1.0",
