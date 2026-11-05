@@ -56,7 +56,7 @@
         <div class="chat-window" id="chatMessages" aria-live="polite"></div>
         <form id="chatForm" class="compose">
           <textarea id="chatInput" class="input compose-input" rows="3" maxlength="12000" placeholder="Görevi yaz... Örn. oyunum için modüler görev planı oluştur." required></textarea>
-          <div class="compose-actions"><button type="button" class="btn ghost small" id="exportChat">Sohbeti dışa aktar</button><span class="grow"></span><button type="button" class="btn secondary small" id="teamRun">Paralel takım (en fazla 4)</button><button type="button" class="btn ghost small" id="pipelineRun">Sıralı ajan zinciri</button><button type="submit" class="btn primary">Gönder ↗</button></div>
+          <div class="compose-actions"><button type="button" class="btn ghost small" id="exportChat">Sohbeti dışa aktar</button><span class="grow"></span><button type="button" class="btn secondary small" id="teamRun">Paralel takım</button><button type="button" class="btn ghost small" id="pipelineRun">Sıralı ajan zinciri</button><button type="submit" class="btn primary">Gönder ↗</button></div>
         </form>
         <div class="row-actions"><button class="btn ghost small" id="clearChat">Sohbeti temizle</button><span class="muted">Geçmiş bu cihazda saklanır.</span></div>
       </section>
@@ -76,8 +76,9 @@
         <div class="notice"><strong>Güvenlik:</strong> Android uygulamasında anahtarlar KeyStore tabanlı şifreli depoda saklanır. Yine de ele geçirilmiş/root erişimli bir cihaz veya uygulama incelemesi risktir. Kod depomuzda anahtarın yok; bu ekrana yalnızca kendi anahtarını gir. Gerçek kullanım ücretli olabilir.</div>
         <div class="panel">
           <div class="switch-row"><div><strong>Demo modu</strong><small>Varsayılan açık. Gerçek API çağrılarının önüne geçer.</small></div><label class="switch"><input type="checkbox" id="settingsDemoToggle" checked><span></span></label></div>
-          <div class="field-label spacer-label">Takım turuna katılacak ajanları seç (en fazla 4)</div>
+          <div class="field-label spacer-label">Takım turuna katılacak AI sağlayıcılarını seç</div>
           <div class="team-chips" id="teamChips"></div>
+          <div class="row-actions"><button class="btn secondary small" id="selectAllTeam" type="button">Tüm AI sağlayıcılarını takıma ekle</button><span class="muted">İstediğin kadarını aynı anda çalıştırabilirsin.</span></div>
         </div>
         <div id="providerGrid" class="stack"></div>
         <div class="panel">
