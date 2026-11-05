@@ -327,7 +327,7 @@ async function runPipeline(prompt){
   try{for(let i=0;i<selected.length;i++){const id=selected[i],title='Aşama '+(i+1)+' · '+providers[id].name;const stage=getTeamStageDetails(i,selected.length);
       await logAgentActivity('Sıralı zincir · '+title,'Çalışıyor',stage.role);
       const stagePrompt='İş akışı aşaması '+(i+1)+'/'+selected.length+'. Rolün: '+stage.role+'.\nAsıl görev: '+task+'\n'+(previous?'Önceki ajanın çıktısı:\n'+previous+'\n':'')+'Görev: '+stage.instruction+'\nBilmediğin şeyi uydurma, kodu gerçekten çalıştırmadıysan çalıştırdığını iddia etme.';
-      const answer=settings.demoMode?demoAnswer(id,stagePrompt,stageRoles[Math.min(i,stageRoles.length-1)]):await callProvider(id,stagePrompt,chatContext().slice(0,-1));previous=answer;
+      const answer=settings.demoMode?demoAnswer(id,stagePrompt,stage.role):await callProvider(id,stagePrompt,chatContext().slice(0,-1));previous=answer;
       pushMessage('assistant','AŞAMA '+(i+1)+'/'+selected.length+'\n'+answer,{provider:providers[id].name,mode:settings.demoMode?'demo':'live'});
       await logAgentActivity('Sıralı zincir · '+title,'Tamamlandı',answer.slice(0,180));loading.querySelector('p').textContent='Tamamlanan aşama: '+(i+1)+'/'+selected.length+' · '+providers[id].name;
     }
