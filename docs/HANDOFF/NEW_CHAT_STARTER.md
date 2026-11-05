@@ -1,5 +1,19 @@
 # AI Studio — latest new-chat handoff
 
+
+> **LATEST VERIFIED CHECKPOINT — 2026-11-05 (authoritative; older checkpoints below are history)**
+>
+> - Repo: https://github.com/babaprobado-bit/A-studio
+> - Branch: `feature/android-offline-skills-v1`. Latest app/source commit: `ff34a69578ea1fa332ac3d2e73414059566398b4`. Branch tip at audit start: `2d3010b76fadaf25e40512300cc4e9ff1506dfa7` (documentation-only commit after source).
+> - `main` remains `aab010319b6500002844bd24b11da85dd9ca3b00`; compare reports 84 commits ahead, 0 behind. PR #2 is open, Draft and unmerged: https://github.com/babaprobado-bit/A-studio/pull/2. Mergeability was not confirmed; do not merge or edit main.
+> - Native GGUF APK CI: [run 42078734707](https://github.com/babaprobado-bit/A-studio/actions/runs/42078734707), success for `ff34a69...`; artifact ID `13441610298`, 18,157,298 bytes, expires 2026-11-19 18:06 UTC.
+> - Demo APK CI: [run 42078734918](https://github.com/babaprobado-bit/A-studio/actions/runs/42078734918), success for `ff34a69...`; artifact ID `13438094755`, 3,775,289 bytes, expires 2026-11-19 17:53 UTC. Demo APK does not include native GGUF inference.
+> - Both workflows passed Vite, regression checks, Capacitor sync, Gradle debug APK build and artifact upload. These are debug APKs, not signed release builds.
+> - No physical phone installation, local GGUF import/load, actual inference or airplane-mode test has been completed. User says there is no internet; continue source/CI work and do not ask for device testing.
+> - AI Team has 10 engines (OpenAI, Claude, Gemini, DeepSeek, Groq, OpenRouter, Hugging Face, custom OpenAI-compatible API, PC Ollama, Android GGUF), no four-provider cap, parallel same-prompt fan-out, and a role-based sequential pipeline. Skills/context wiring, Local Coder draft persistence, model-import/download hardening and native GGUF model replacement safety are included.
+> - Full source audit and third-chat continuation: `docs/HANDOFF/SESSION_3_CODE_AUDIT.md`. It records feature inventory, limitations and next source-only work. REA/MCP is not integrated; it remains optional Session 4 work.
+
+
 ## Current verified checkpoint — 2026-11-05
 
 - Latest application/test commit: `794901f968aec39f6c5d1959a5e79d0ddc71db35`. Latest handoff-documentation commit before this update: `e5dc039738938900c615a07d717a7190c52e9077`.
