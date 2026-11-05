@@ -21,5 +21,5 @@ assert.equal(getTeamStageDetails(3,10).role,'Testçi / son kontrol');
 assert.match(getTeamStageDetails(9,10).instruction,/yeni katkı sun/);
 console.log('AI Team tests passed: unlimited selection, all 10 engines, on-device GGUF readiness and team routing.');
 
-assert.equal([...main.matchAll(/function renderCompareResults\\s*\\(/g)].length,1,'model comparison renderer must be declared only once');
-assert.equal([...main.matchAll(/async function runCompare\\s*\\(/g)].length,1,'model comparison runner must be declared only once');
+assert.equal(main.split('function renderCompareResults(').length - 1,1,'model comparison renderer must be declared only once');
+assert.equal(main.split('async function runCompare(').length - 1,1,'model comparison runner must be declared only once');
