@@ -73,7 +73,7 @@ assert.match(pipelineSource,/demoAnswer\(id,stagePrompt,stage\.role\)/,'pipeline
 assert.doesNotMatch(pipelineSource,/stageRoles/,'pipeline must not depend on an undefined legacy stageRoles array');
 assert.match(main,/function providerIsReady\(id\)/,'live team execution must skip unconfigured providers');
 
-assert.match(main,/device: \\{ name:'Telefon içi GGUF'/,'the on-device GGUF model must be a selectable AI Team provider');
-assert.match(main,/if\\(id==='device'\\)return Boolean\\(nativeApp&&deviceLocalCoder\\.loadedFileName\\)/,'device provider must be ready only when a native GGUF model is loaded');
-assert.match(main,/if\\(id==='device'\\)\\{/,'device provider must route through its own local inference path');
-assert.match(main,/generateWithDeviceModel\\(devicePrompt,384,'all'\\)/,'team calls must perform inference through the on-device model');
+assert.ok(main.includes("device: { name:'Telefon içi GGUF'"),'the on-device GGUF model must be a selectable AI Team provider');
+assert.ok(main.includes("if(id==='device')return Boolean(nativeApp&&deviceLocalCoder.loadedFileName)"),'device provider must be ready only when a native GGUF model is loaded');
+assert.ok(main.includes("if(id==='device'){"),'device provider must route through its own local inference path');
+assert.ok(main.includes("generateWithDeviceModel(devicePrompt,384,'all')"),'team calls must perform inference through the on-device model');
