@@ -446,19 +446,6 @@ async function runCompare(){
     $('compareRun').disabled=false;$('compareRun').textContent='Karşılaştırmayı başlat';busy=false;syncModeUI();
   }
 }
-function renderCompareResults(results){$('compareResults').innerHTML=results.map(r=>'<article class="result-card"><div class="result-label">'+esc(providers[r.id].name)+' · '+(r.error?'HATA':r.mode==='live'?'GERÇEK MODEL':'DEMO ŞABLONU')+'</div><p>'+esc(r.error||r.answer)+'</p></article>').join('');}
-async function runCompare(){
-  if(busy){showToast('Başka bir ajan işi çalışıyor.');return;}const prompt=$('comparePrompt').value.trim();if(!prompt){showToast('Önce karşılaştırılacak görevi yaz.');return;}
-  const selected=selectedTeam();if(selected.length<2){showToast('Karşılaştırmak için en az iki ajan seç.');go('models');return;}
-  if(!settings.demoMode&&!confirm('Karşılaştırma '+selected.length+' gerçek API isteği gönderebilir; ücret oluşabilir. Devam?'))return;
-  busy=true;$('compareRun').disabled=true;$('compareRun').textContent='Çalışıyor…';$('compareResults').innerHTML='<div class="panel"><p>Sonuçlar bekleniyor…</p></div>';
-  await logAgentActivity('Model karşılaştırma','Başladı',selected.map(id=>providers[id].name).join(', ')+': '+prompt);
-  try{const results=await Promise.all(selected.map(async id=>{try{return{id,answer:settings.demoMode?demoAnswer(id,prompt):await callProvider(id,prompt,[]),mode:settings.demoMode?'demo':'live'};}catch(e){return{id,error:e?.message||'Hata',mode:'error'};}}));
-    renderCompareResults(results);for(const r of results)await logAgentActivity('Karşılaştırma · '+providers[r.id].name,r.error?'Hata':'Tamamlandı',r.error||String(r.answer||'').slice(0,180));
-    await logAgentActivity('Model karşılaştırma',results.some(r=>r.error)?'Kısmi başarı':'Tamamlandı',results.filter(r=>!r.error).length+'/'+results.length+' yanıt başarılı.');
-  }catch(error){await logAgentActivity('Model karşılaştırma','Hata',error?.message||'Bilinmeyen hata');showToast('Karşılaştırma başarısız oldu.');}
-  finally{$('compareRun').disabled=false;$('compareRun').textContent='Karşılaştırmayı başlat';busy=false;syncModeUI();}
-}
 function renderProjects(){
   const out=$('projectList');$('projectCount').textContent=projectList.length;
   if(!projectList.length){out.innerHTML='<div class="panel"><p class="muted">Henüz proje yok. İlk fikrini yukarıdan kaydet.</p></div>';renderProjectContextStatus();return;}
