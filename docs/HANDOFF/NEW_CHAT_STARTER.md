@@ -72,3 +72,10 @@ No physical APK install, model import, native inference or airplane-mode proof h
 - The stale debounced editor-save timer is cancelled before persistence to avoid an older delayed save overwriting the accepted draft.
 - If persistence fails, the draft remains visible in the editor and the UI tells the user to retry the explicit Save action.
 - The draft is never executed automatically. The workshop smoke test asserts the persistence hand-off.
+## Latest full-wiring CI checkpoint — 2026-11-05
+
+- Latest application/test commit: `d75d75b496d6b2874ff9bba8fc484f321868e49b` (shared general Skills and project context across real providers, unsaved editor snapshot, and Local Coder draft persistence).
+- Demo workflow [42077081392](https://github.com/babaprobado-bit/A-studio/actions/runs/42077081392) passed for this commit. Artifact `AI-Studio-Demo-APK`, ID `13438697581`, 3,775,270 bytes, SHA-256 `b89c24a2135f74bfd329a5c466f7c874834b6ee35dfc3f44c323510f6320f11a`.
+- Native GGUF workflow [42077080777](https://github.com/babaprobado-bit/A-studio/actions/runs/42077080777) checked out this same application commit. Native toolchain, pinned llama.kt, llama.cpp source preparation, npm install, Vite build, all regression checks and Capacitor sync passed; Gradle `assembleDebug` remains in progress at the time of this checkpoint.
+- Older native build [42075502247](https://github.com/babaprobado-bit/A-studio/actions/runs/42075502247) targeted commit `48efa01...` and was superseded; its cancellation was requested to prioritize the latest build.
+- PR #2 is open and Draft. `main` base SHA remains `aab010319b6500002844bd24b11da85dd9ca3b00`. Do not merge; physical device acceptance is still outstanding.
