@@ -1,5 +1,21 @@
 # AI Studio — Project state and technical handoff
 
+## Current verified checkpoint — 2026-11-05 (AI Team expansion)
+
+- Latest feature-branch source head: `66daa33f56220a7257825106147d37c974b7398a`. PR #2 remains open, Draft and unmerged. `main` is unchanged at `aab010319b6500002844bd24b11da85dd9ca3b00`.
+- AI Team now has nine provider entries: OpenAI, Anthropic/Claude, Google Gemini, DeepSeek, Groq, OpenRouter, Hugging Face Inference Providers, a user-configurable OpenAI-compatible API endpoint, and PC Ollama.
+- The four-agent cap was removed from parallel team runs, sequential pipelines, model comparison, selection change handling, startup normalization and backup restoration. Fresh installs select all providers by default; existing saved preferences are preserved and the Models screen has a **Tüm AI sağlayıcılarını takıma ekle** action.
+- Sequential pipelines use Plan, Implement, Independent Review and Test roles for the first four selected providers; additional selected providers receive separate independent-expert review prompts.
+- Hugging Face uses its OpenAI-compatible Inference Providers route `https://router.huggingface.co/v1/chat/completions` and editable model ID. Official docs describe access to hundreds of models through one token. The custom provider supports OpenAI-compatible chat-completions APIs; it is not a universal adapter for arbitrary non-compatible APIs. Remote custom endpoints require HTTPS; HTTP is allowed only for localhost.
+- API keys continue to use the existing secure-storage path and are not added to workspace backups. Team calls with Demo mode enabled still produce demo templates, not real model inference. Live multi-provider operations can issue one request per selected provider and may incur provider charges; explicit confirmation remains.
+- Regression assertions were added for unlimited provider selection, de-duplication/unknown IDs, additional pipeline roles and custom endpoint URL validation. These tests have not yet been confirmed green by the newest Actions runs.
+- Latest manual CI runs for the complete source: Demo [42062569036](https://github.com/babaprobado-bit/A-studio/actions/runs/42062569036) and native GGUF [42062566776](https://github.com/babaprobado-bit/A-studio/actions/runs/42062566776). Both were still in progress at the last check; no APK artifact for the AI Team-expanded source is verified yet.
+- Earlier premature run [42062088282](https://github.com/babaprobado-bit/A-studio/actions/runs/42062088282) failed at Vite because it checked out commit `8a82f41...` after the import was added but before the new helper file `src/ai-team.js` was committed. The helper and UI/test changes are now on the branch; use the newer runs above to evaluate the complete source.
+- No physical install, real provider-key call, native GGUF inference or airplane-mode test has been performed. Do not claim those from a successful APK build or mock test.
+
+This AI Team checkpoint supersedes earlier source-head/queued-build snapshots below; historical APK details remain valid only for their recorded older commits.
+
+
 ## Current verified checkpoint — 2026-11-05
 
 - Latest app-code/test commit: `b9677813676c8138651848620fa1ef0ab5fc3b86`. Native workflow [41885349742](https://github.com/babaprobado-bit/A-studio/actions/runs/41885349742) completed successfully, including all regression checks, Capacitor generation/sync, Gradle `assembleDebug` and artifact upload.
