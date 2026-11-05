@@ -363,6 +363,16 @@ export class DeviceLocalCoder {
       const result = await this.plugin.loadModel({ fileName, contextSize: safeContextSize });
       this.loadedFileName = fileName;
       return result;
+    } catch (error) {
+      // The native engine may have freed the previous model before a new
+      // model failed to initialize. Re-read native state so AI Team readiness
+      // never points at a model that is no longer resident.
+      try {
+        await this.refresh();
+      } catch (_) {
+        this.loadedFileName = '';
+      }
+      throw error;
     } finally {
       await listener.remove();
     }
@@ -370,8 +380,18 @@ export class DeviceLocalCoder {
 
   async unload() {
     if (!this.native) return;
-    await this.plugin.unloadModel();
-    this.loadedFileName = '';
+    try {
+      await this.plugin.unloadModel();
+      this.loadedFileName = '';
+    } catch (error) {
+      // Native unload can clear the engine before reporting a cleanup error.
+      try {
+        await this.refresh();
+      } catch (_) {
+        this.loadedFileName = '';
+      }
+      throw error;
+    }
   }
 
   async generate(messages, options = {}) {

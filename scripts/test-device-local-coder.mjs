@@ -63,7 +63,37 @@ const alreadyLoadedClient = new DeviceLocalCoder(true,alreadyLoadedPlugin);
 const alreadyLoadedResult = await alreadyLoadedClient.load('already-loaded.gguf',4096);
 assert.equal(alreadyLoadedResult.alreadyLoaded,true,'loading the currently active model should be idempotent');
 assert.equal(alreadyLoadedResult.contextSize,4096);
+
 assert.equal(sameModelLoadCalls,0,'already-loaded GGUF should not hit native load or need additional free RAM');
+
+let nativeLoadedName = 'previous-model.gguf';
+const stateSyncPlugin = {
+  getDeviceInfo:async()=>({
+    supported:true,totalMemoryBytes:8*1024**3,availableMemoryBytes:4*1024**3,
+    freeStorageBytes:8*1024**3,processorCount:8,lowMemory:false,loadedFileName:nativeLoadedName
+  }),
+  listModels:async()=>({models:[
+    {fileName:'previous-model.gguf',sizeBytes:200*1024**2,loaded:nativeLoadedName==='previous-model.gguf'},
+    {fileName:'candidate-model.gguf',sizeBytes:200*1024**2,loaded:nativeLoadedName==='candidate-model.gguf'}
+  ]}),
+  addListener:async()=>({remove:async()=>{}}),
+  loadModel:async()=>{nativeLoadedName='';throw new Error('simulated native initialization failure after freeing previous engine');},
+  unloadModel:async()=>{nativeLoadedName='';throw new Error('simulated native cleanup failure after clearing engine');}
+};
+const stateSyncClient = new DeviceLocalCoder(true,stateSyncPlugin);
+await stateSyncClient.refresh();
+assert.equal(stateSyncClient.loadedFileName,'previous-model.gguf');
+await assert.rejects(
+  () => stateSyncClient.load('candidate-model.gguf',2048),
+  /simulated native initialization failure/
+);
+assert.equal(stateSyncClient.loadedFileName,'','failed replacement loads must clear stale JavaScript readiness');
+await stateSyncClient.refresh();
+nativeLoadedName='previous-model.gguf';
+await stateSyncClient.refresh();
+await assert.rejects(() => stateSyncClient.unload(),/simulated native cleanup failure/);
+assert.equal(stateSyncClient.loadedFileName,'','failed unloads must reconcile the native engine state');
+
 assert.equal(new DeviceLocalCoder(false).native,false);
 let loaded=''; let models=[];
 const fake={
