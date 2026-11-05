@@ -7,6 +7,7 @@ export const DEVICE_MODEL_CATALOG = Object.freeze([
     licenseName: 'Apache-2.0',
     licenseUrl: 'https://huggingface.co/Qwen/Qwen2.5-Coder-0.5B-Instruct-GGUF/blob/main/LICENSE',
     fileName: 'qwen2.5-coder-0.5b-instruct-q4_k_m.gguf',
+    sha256: '1d9614638d18024d0fbb36575a15f1302a3adf044df10345688ec4f6e1c4ff32',
     url: 'https://huggingface.co/Qwen/Qwen2.5-Coder-0.5B-Instruct-GGUF/resolve/main/qwen2.5-coder-0.5b-instruct-q4_k_m.gguf',
     sizeBytes: 491 * 1024 * 1024, minRamGb: 4, minCpuCores: 4, requiredFreeRamBytes: 1500 * 1024 ** 2,
     contextSize: 2048, summary: 'En küçük başlangıç modeli. 4–7 GB RAM sınıfında önce bunu dene.'
@@ -16,6 +17,7 @@ export const DEVICE_MODEL_CATALOG = Object.freeze([
     licenseName: 'Apache-2.0',
     licenseUrl: 'https://huggingface.co/Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF/blob/main/LICENSE',
     fileName: 'qwen2.5-coder-1.5b-instruct-q4_k_m.gguf',
+    sha256: 'cc324af070c2ecbfd324a30884d2f951a7ff756aba85cb811a6ec436933bb046',
     url: 'https://huggingface.co/Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF/resolve/main/qwen2.5-coder-1.5b-instruct-q4_k_m.gguf',
     sizeBytes: 1120 * 1024 ** 2, minRamGb: 8, minCpuCores: 6, requiredFreeRamBytes: 2300 * 1024 ** 2,
     contextSize: 2048, summary: 'Daha güçlü kodlama seçeneği. 8–11 GB RAM sınıfında değerlendir.'
@@ -26,6 +28,7 @@ export const DEVICE_MODEL_CATALOG = Object.freeze([
     licenseNotice: 'Yalnızca ticari olmayan araştırma/değerlendirme için; ticari kullanım için ayrı lisans gerekir.',
     licenseUrl: 'https://huggingface.co/Qwen/Qwen2.5-Coder-3B-Instruct-GGUF/blob/main/LICENSE',
     fileName: 'qwen2.5-coder-3b-instruct-q4_k_m.gguf',
+    sha256: '724fb256bec1ff062b2f65e4569e871ad2e95ab2a3989723d1769c54294730b7',
     url: 'https://huggingface.co/Qwen/Qwen2.5-Coder-3B-Instruct-GGUF/resolve/main/qwen2.5-coder-3b-instruct-q4_k_m.gguf',
     sizeBytes: 2100 * 1024 ** 2, minRamGb: 12, minCpuCores: 8, requiredFreeRamBytes: 3800 * 1024 ** 2,
     contextSize: 2048, summary: 'Büyük model. 12 GB ve üzeri RAM sınıfında; boş bellek yine de önemlidir.'
@@ -34,6 +37,12 @@ export const DEVICE_MODEL_CATALOG = Object.freeze([
 
 const GIB = 1024 ** 3;
 const MIB = 1024 ** 2;
+
+/** Return a normalized SHA-256 hex digest, or an empty string for an invalid pin. */
+export function normalizeModelSha256(value) {
+  const digest = String(value ?? '').trim().toLowerCase();
+  return /^[a-f0-9]{64}$/.test(digest) ? digest : '';
+}
 
 export function assessDeviceModel(model, deviceInfo = {}) {
   const total = Number(deviceInfo.totalMemoryBytes || 0);
@@ -170,6 +179,13 @@ export class DeviceLocalCoder {
       await this.refresh();
       if (!this.device?.supported) throw new Error('Bu telefon Android 10+ ve 64-bit ARM gereksinimini karşılamıyor.');
       if (!model?.url || !model?.fileName) throw new Error('Model kataloğu girdisi geçersiz.');
+      const catalogModel = DEVICE_MODEL_CATALOG.find(item =>
+        item.id === model.id && item.fileName === model.fileName && item.url === model.url
+      );
+      const expectedSha256 = normalizeModelSha256(catalogModel?.sha256);
+      if (!catalogModel || !expectedSha256) {
+        throw new Error('Yalnızca sabit SHA-256 özeti bulunan katalog modelleri indirilebilir.');
+      }
       if (this.models.some(item => item.fileName === model.fileName)) throw new Error('Bu model zaten telefonda bulunuyor. Listeden yükleyebilirsin.');
       const free = Number(this.device?.freeStorageBytes || 0);
       if (free && free < model.sizeBytes * 1.15) throw new Error(`Yeterli boş depolama yok. Yaklaşık ${formatModelBytes(model.sizeBytes * 1.15)} gerekiyor.`);
@@ -177,6 +193,7 @@ export class DeviceLocalCoder {
       const started = await this.plugin.downloadModel({
         url: model.url,
         fileName: model.fileName,
+        sha256: expectedSha256,
         allowMetered: Boolean(options.allowMetered)
       });
       downloadId = Number(started.downloadId);

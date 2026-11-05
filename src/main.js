@@ -1,6 +1,6 @@
 import { Capacitor } from '@capacitor/core';
 import { runApiLocalCoderSequence } from './local-coder-api.js';
-import { normalizeTeamSelection, normalizeOpenAiEndpoint, getTeamStageDetails } from './ai-team.js';
+import { normalizeTeamSelection, normalizeOpenAiEndpoint, selectConfiguredTeam, confirmTeamLiveCalls, runParallelTeamCalls, runSequentialTeamCalls } from './ai-team.js';
 import { DeviceLocalCoder, DEVICE_MODEL_CATALOG, assessDeviceModel, chooseRecommendedDeviceModel, formatModelBytes } from './device-local-coder.js';
 import { Preferences } from '@capacitor/preferences';
 import { SecureStoragePlugin } from 'capacitor-secure-storage-plugin';
@@ -210,7 +210,7 @@ function providerIsReady(id){
   if(id==='custom')return Boolean(String(settings.customEndpoint||'').trim()&&runtimeKeys[id]);
   return Boolean(runtimeKeys[id]);
 }
-function configuredTeam(){return selectedTeam().filter(providerIsReady);}
+function configuredTeam(){return selectConfiguredTeam(selectedTeam(),Object.keys(providers),providerIsReady).selected;}
 function syncModeUI(){
   $('demoToggle').checked=!!settings.demoMode;
   $('settingsDemoToggle').checked=!!settings.demoMode;
@@ -381,7 +381,7 @@ async function runTeam(prompt){
   const skipped=chosen.length-selected.length;
   if(!selected.length){showToast('Seçili sağlayıcılarda API anahtarı veya Ollama bağlantısı ayarlı değil. Modeller ekranını kontrol et.');return;}
   if(skipped)showToast(skipped+' ayarsız sağlayıcı atlandı; yalnızca bağlantısı hazır olanlar çağrılacak.');
-  if(!confirm('Seçili '+selected.length+' ayarlı AI sağlayıcısına paralel gerçek istek gönderilecek. Ücret veya kota kullanımı oluşabilir. Devam edilsin mi?'))return;
+  if(!confirmTeamLiveCalls(selected,count=>confirm('Seçili '+count+' ayarlı AI sağlayıcısına paralel gerçek istek gönderilecek. Ücret veya kota kullanımı oluşabilir. Devam edilsin mi?')))return;
   busy=true;
   await logAgentActivity('Paralel takım','Başladı',selected.map(id=>providers[id].name).join(', ')+': '+task);
   pushMessage('user',task,{mode:'live'});
@@ -389,10 +389,7 @@ async function runTeam(prompt){
   load.className='result-card';load.innerHTML='<div class="result-label">TAKIM TURU</div><p>Seçili ajanlar çalışıyor…</p>';out.append(load);
   const history=chatContext().slice(0,-1);
   try{
-    const results=await Promise.all(selected.map(async id=>{
-      try{return{id,answer:await callProvider(id,task,history)};}
-      catch(e){return{id,error:e?.message||'Hata'};}
-    }));
+    const results=await runParallelTeamCalls({providerIds:selected,task,history,callProvider});
     load.remove();
     results.forEach(r=>pushMessage('assistant',r.error?'Hata: '+r.error:r.answer,{provider:providers[r.id].name,mode:r.error?'error':'live'}));
     for(const r of results)await logAgentActivity('Paralel ajan · '+providers[r.id].name,r.error?'Hata':'Tamamlandı',r.error||String(r.answer||'').slice(0,180));
@@ -410,24 +407,29 @@ async function runPipeline(prompt){
   const skipped=chosen.length-selected.length;
   if(!settings.demoMode&&skipped)showToast(skipped+' ayarsız sağlayıcı sıralı zincirden atlandı.');
   if(selected.length<2){showToast('Sıralı zincir için en az iki seçili sağlayıcının anahtarı veya bağlantısı hazır olmalı.');go('models');return;}
-  if(!settings.demoMode&&!confirm('Sıralı ajan zinciri '+selected.length+' gerçek API isteği gönderebilir ve ücret/kota kullanabilir. Her ajan bir öncekinin çıktısını görür. Devam?'))return;
+  if(!settings.demoMode&&!confirmTeamLiveCalls(selected,count=>confirm('Sıralı ajan zinciri '+count+' gerçek API isteği gönderebilir ve ücret/kota kullanabilir. Her ajan bir öncekinin çıktısını görür. Devam?')))return;
   busy=true;$('chatInput').disabled=true;$('chatForm').querySelector('[type=submit]').disabled=true;$('teamRun').disabled=true;$('pipelineRun').disabled=true;
   await logAgentActivity('Sıralı ajan zinciri','Başladı',selected.length+' aşama: '+task);
   pushMessage('user',task,{mode:settings.demoMode?'demo':'live'});
   const out=$('chatMessages'),loading=document.createElement('article');
   loading.className='result-card';loading.innerHTML='<div class="result-label">SIRALI AJAN ZİNCİRİ</div><p>Planla → geliştir → eleştir → test et aşamaları çalışıyor…</p>';out.append(loading);
-  let previous='';
   try{
-    for(let i=0;i<selected.length;i++){
-      const id=selected[i],title='Aşama '+(i+1)+' · '+providers[id].name,stage=getTeamStageDetails(i,selected.length);
-      await logAgentActivity('Sıralı zincir · '+title,'Çalışıyor',stage.role);
-      const stagePrompt='İş akışı aşaması '+(i+1)+'/'+selected.length+'. Rolün: '+stage.role+'.\nAsıl görev: '+task+'\n'+(previous?'Önceki ajanın çıktısı:\n'+previous+'\n':'')+'Görev: '+stage.instruction+'\nBilmediğin şeyi uydurma, kodu gerçekten çalıştırmadıysan çalıştırdığını iddia etme.';
-      const answer=settings.demoMode?demoAnswer(id,stagePrompt,stage.role):await callProvider(id,stagePrompt,chatContext().slice(0,-1));
-      previous=answer;
-      pushMessage('assistant','AŞAMA '+(i+1)+'/'+selected.length+'\n'+answer,{provider:providers[id].name,mode:settings.demoMode?'demo':'live'});
-      await logAgentActivity('Sıralı zincir · '+title,'Tamamlandı',answer.slice(0,180));
-      loading.querySelector('p').textContent='Tamamlanan aşama: '+(i+1)+'/'+selected.length+' · '+providers[id].name;
-    }
+    await runSequentialTeamCalls({
+      providerIds:selected,
+      task,
+      getHistory:()=>chatContext().slice(0,-1),
+      runStage:({id,prompt,stage},history)=>settings.demoMode?demoAnswer(id,prompt,stage.role):callProvider(id,prompt,history),
+      onStageStart:async({id,index,stage})=>{
+        const title='Aşama '+(index+1)+' · '+providers[id].name;
+        await logAgentActivity('Sıralı zincir · '+title,'Çalışıyor',stage.role);
+      },
+      onStageComplete:async({id,index,total,answer})=>{
+        const title='Aşama '+(index+1)+' · '+providers[id].name;
+        pushMessage('assistant','AŞAMA '+(index+1)+'/'+total+'\n'+answer,{provider:providers[id].name,mode:settings.demoMode?'demo':'live'});
+        await logAgentActivity('Sıralı zincir · '+title,'Tamamlandı',answer.slice(0,180));
+        loading.querySelector('p').textContent='Tamamlanan aşama: '+(index+1)+'/'+total+' · '+providers[id].name;
+      }
+    });
     loading.remove();
     await logAgentActivity('Sıralı ajan zinciri','Tamamlandı',selected.length+' aşama tamamlandı. Testler otomatik çalıştırılmadı.');
     showToast('Sıralı ajan zinciri tamamlandı.');
@@ -450,15 +452,18 @@ async function runCompare(){
   const skipped=chosen.length-selected.length;
   if(!settings.demoMode&&skipped)showToast(skipped+' ayarsız sağlayıcı karşılaştırmadan atlandı.');
   if(selected.length<2){showToast('Karşılaştırmak için en az iki sağlayıcının anahtarı veya bağlantısı hazır olmalı.');go('models');return;}
-  if(!settings.demoMode&&!confirm('Karşılaştırma '+selected.length+' gerçek API isteği gönderebilir; ücret/kota kullanabilir. Devam?'))return;
+  if(!settings.demoMode&&!confirmTeamLiveCalls(selected,count=>confirm('Karşılaştırma '+count+' gerçek API isteği gönderebilir; ücret/kota kullanabilir. Devam?')))return;
   busy=true;$('compareRun').disabled=true;$('compareRun').textContent='Çalışıyor…';
   $('compareResults').innerHTML='<div class="panel"><p>Sonuçlar bekleniyor…</p></div>';
   await logAgentActivity('Model karşılaştırma','Başladı',selected.map(id=>providers[id].name).join(', ')+': '+prompt);
   try{
-    const results=await Promise.all(selected.map(async id=>{
-      try{return{id,answer:settings.demoMode?demoAnswer(id,prompt):await callProvider(id,prompt,[]),mode:settings.demoMode?'demo':'live'};}
-      catch(e){return{id,error:e?.message||'Hata',mode:'error'};}
-    }));
+    const rawResults=await runParallelTeamCalls({
+      providerIds:selected,task:prompt,history:[],
+      callProvider:(id,task,history)=>settings.demoMode?demoAnswer(id,task):callProvider(id,task,history)
+    });
+    const results=rawResults.map(result=>result.error
+      ? {...result,mode:'error'}
+      : {...result,mode:settings.demoMode?'demo':'live'});
     renderCompareResults(results);
     for(const r of results)await logAgentActivity('Karşılaştırma · '+providers[r.id].name,r.error?'Hata':'Tamamlandı',r.error||String(r.answer||'').slice(0,180));
     await logAgentActivity('Model karşılaştırma',results.some(r=>r.error)?'Kısmi başarı':'Tamamlandı',results.filter(r=>!r.error).length+'/'+results.length+' yanıt başarılı.');

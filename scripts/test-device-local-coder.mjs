@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { DEVICE_MODEL_CATALOG, DeviceLocalCoder, assessDeviceModel, chooseRecommendedDeviceModel, estimateMinimumAvailableRamBytes, formatModelBytes } from '../src/device-local-coder.js';
+import { DEVICE_MODEL_CATALOG, DeviceLocalCoder, assessDeviceModel, chooseRecommendedDeviceModel, estimateMinimumAvailableRamBytes, formatModelBytes, normalizeModelSha256 } from '../src/device-local-coder.js';
 
 const devicePanelMarkup = await readFile(new URL('../src/device-local-coder-panel.html', import.meta.url), 'utf8');
 const indexMarkup = await readFile(new URL('../index.html', import.meta.url), 'utf8');
@@ -31,6 +31,30 @@ assert.ok(
 );
 
 assert.equal(DEVICE_MODEL_CATALOG.length, 3);
+assert.deepEqual(DEVICE_MODEL_CATALOG.map(model => model.sha256), ["1d9614638d18024d0fbb36575a15f1302a3adf044df10345688ec4f6e1c4ff32","cc324af070c2ecbfd324a30884d2f951a7ff756aba85cb811a6ec436933bb046","724fb256bec1ff062b2f65e4569e871ad2e95ab2a3989723d1769c54294730b7"],
+  'all official Qwen2.5-Coder catalogue files must have pinned SHA-256 digests');
+assert.ok(DEVICE_MODEL_CATALOG.every(model => /^[a-f0-9]{64}$/.test(model.sha256)),
+  'each downloadable catalogue model must have a valid SHA-256 digest');
+assert.equal(normalizeModelSha256(DEVICE_MODEL_CATALOG[0].sha256.toUpperCase()), DEVICE_MODEL_CATALOG[0].sha256);
+assert.equal(normalizeModelSha256('not-a-sha256'), '');
+assert.equal(normalizeModelSha256(''), '');
+assert.match(nativeSource, /MessageDigest\.getInstance\("SHA-256"\)/,
+  'native Android download verification must use SHA-256');
+assert.match(nativeSource, /MessageDigest\.isEqual/,
+  'native SHA-256 comparison must use a constant-time digest comparison');
+assert.match(nativeSource, /putString\(sha256PreferenceKey\(fileName\), expectedSha256\)/,
+  'the expected digest must survive Android process restarts with the download record');
+const nativeFinalizerStart = nativeSource.indexOf('private fun finalizeCatalogueDownload(');
+const nativeFinalizerEnd = nativeSource.indexOf('private fun finalizeDownloadedModel(', nativeFinalizerStart);
+const nativeFinalizer = nativeSource.slice(nativeFinalizerStart, nativeFinalizerEnd);
+assert.ok(nativeFinalizer.indexOf('verifyDownloadedModelSha256') >= 0 &&
+  nativeFinalizer.indexOf('verifyDownloadedModelSha256') < nativeFinalizer.indexOf('finalizeDownloadedModel(fileName)'),
+  'native SHA-256 verification must finish before the .part file is promoted');
+const nativeImportStart = nativeSource.indexOf('private fun importModelFromUri(');
+const nativeImportEnd = nativeSource.indexOf('@PluginMethod', nativeImportStart);
+const nativeImportSource = nativeSource.slice(nativeImportStart, nativeImportEnd);
+assert.ok(!nativeImportSource.includes('verifyDownloadedModelSha256'),
+  'user-selected offline GGUF imports must not require a catalogue checksum');
 assert.ok(DEVICE_MODEL_CATALOG.every(model => model.url.startsWith('https://huggingface.co/')));
 assert.ok(DEVICE_MODEL_CATALOG.every(model => model.licenseUrl.startsWith('https://huggingface.co/')));
 assert.equal(DEVICE_MODEL_CATALOG[0].licenseName,'Apache-2.0');
@@ -106,11 +130,11 @@ await assert.rejects(() => stateSyncClient.unload(),/simulated native cleanup fa
 assert.equal(stateSyncClient.loadedFileName,'','failed unloads must reconcile the native engine state');
 
 assert.equal(new DeviceLocalCoder(false).native,false);
-let loaded=''; let models=[];
+let loaded=''; let models=[]; let firstDownloadArgs=null;
 const fake={
   getDeviceInfo:async()=>({supported:true,totalMemoryBytes:8*1024**3,availableMemoryBytes:4*1024**3,freeStorageBytes:10*1024**3,loadedFileName:loaded,abi:'arm64-v8a'}),
   listModels:async()=>({models}),
-  downloadModel:async()=>({downloadId:7}),
+  downloadModel:async(args)=>{firstDownloadArgs=args;return {downloadId:7};},
   downloadStatus:async()=>{models=[{fileName:DEVICE_MODEL_CATALOG[0].fileName,sizeBytes:DEVICE_MODEL_CATALOG[0].sizeBytes,loaded:false}];return {status:'complete',progress:100};},
   addListener:async()=>({remove:async()=>{}}),
   loadModel:async({fileName})=>{loaded=fileName;models=[{fileName,sizeBytes:1,loaded:true}];return {loaded:true,fileName};},
@@ -121,6 +145,8 @@ const fake={
 const local=new DeviceLocalCoder(true,fake);
 await local.refresh();
 await local.download(DEVICE_MODEL_CATALOG[0]);
+assert.equal(firstDownloadArgs.sha256, DEVICE_MODEL_CATALOG[0].sha256,
+  'the pinned catalogue digest must be forwarded to the Android plugin');
 await local.load(DEVICE_MODEL_CATALOG[0].fileName,2048);
 assert.equal((await local.generate([{role:'user',content:'test'}])).text,'offline result');
 await local.unload();
@@ -169,6 +195,19 @@ await replacementClient.load('candidate-model.gguf',2048);
 assert.equal(replacementLoadCalls,1,'a replacement model must reach native RAM preflight even when current free RAM is below its threshold');
 assert.equal(replacementClient.loadedFileName,'candidate-model.gguf','successful replacement loads must update the active model name');
 
+
+let rejectedUnpinnedDownloadCalls = 0;
+const unpinnedDownloadClient = new DeviceLocalCoder(true, {
+  getDeviceInfo: fake.getDeviceInfo,
+  listModels: async () => ({ models: [] }),
+  downloadModel: async () => { rejectedUnpinnedDownloadCalls += 1; return { downloadId: 500 }; }
+});
+await assert.rejects(
+  () => unpinnedDownloadClient.download({ ...DEVICE_MODEL_CATALOG[0], sha256: '' }),
+  /SHA-256/,
+  'catalogue downloads without a valid pinned checksum must be rejected before native transfer'
+);
+assert.equal(rejectedUnpinnedDownloadCalls, 0, 'an unpinned model must never reach Android DownloadManager');
 
 let failDownload = true;
 const retryPlugin = {

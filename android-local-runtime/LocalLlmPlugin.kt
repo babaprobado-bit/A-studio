@@ -27,7 +27,9 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.runBlocking
 import java.io.File
 import java.io.FileOutputStream
+import java.io.FileInputStream
 import java.io.RandomAccessFile
+import java.security.MessageDigest
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import java.util.concurrent.CancellationException
@@ -66,6 +68,57 @@ class LocalLlmPlugin : Plugin() {
     private fun downloadPreferences() =
         context.getSharedPreferences("aistudio_local_llm_downloads", Context.MODE_PRIVATE)
 
+    private fun sha256PreferenceKey(fileName: String) = "$fileName.sha256"
+
+    private fun clearDownloadRecord(fileName: String) {
+        downloadPreferences().edit()
+            .remove(fileName)
+            .remove(sha256PreferenceKey(fileName))
+            .apply()
+    }
+
+    private fun normalizeExpectedSha256(value: String?): String {
+        val digest = value?.trim()?.lowercase() ?: ""
+        if (!Regex("^[a-f0-9]{64}$").matches(digest)) {
+            throw IllegalStateException("Model indirmesi için geçerli bir sabit SHA-256 özeti bulunamadı.")
+        }
+        return digest
+    }
+
+    private fun verifyDownloadedModelSha256(file: File, expectedSha256: String?) {
+        val expected = normalizeExpectedSha256(expectedSha256)
+        val digest = MessageDigest.getInstance("SHA-256")
+        FileInputStream(file).use { input ->
+            val buffer = ByteArray(1024 * 1024)
+            while (true) {
+                val count = input.read(buffer)
+                if (count < 0) break
+                if (count > 0) digest.update(buffer, 0, count)
+            }
+        }
+        val hex = "0123456789abcdef"
+        val actual = digest.digest().joinToString("") { byte ->
+            val value = byte.toInt() and 0xff
+            hex[value ushr 4].toString() + hex[value and 0x0f].toString()
+        }
+        val matches = MessageDigest.isEqual(
+            actual.toByteArray(Charsets.US_ASCII),
+            expected.toByteArray(Charsets.US_ASCII)
+        )
+        if (!matches) {
+            throw IllegalStateException("İndirilen modelin SHA-256 özeti eşleşmiyor; dosya güvenlik için reddedildi.")
+        }
+    }
+
+    private fun finalizeCatalogueDownload(fileName: String, expectedSha256: String?) {
+        val partial = partialModelFile(fileName)
+        if (!partial.isFile || partial.length() < 1024 * 1024) {
+            throw IllegalStateException("İndirilen model dosyası eksik.")
+        }
+        verifyDownloadedModelSha256(partial, expectedSha256)
+        finalizeDownloadedModel(fileName)
+    }
+
     private fun finalizeDownloadedModel(fileName: String) {
         val partial = partialModelFile(fileName)
         val destination = safeModelFile(fileName)
@@ -101,16 +154,16 @@ class LocalLlmPlugin : Plugin() {
                 cursor = manager.query(DownloadManager.Query().setFilterById(id))
                 if (cursor == null || !cursor.moveToFirst()) {
                     partialModelFile(fileName).delete()
-                    preferences.edit().remove(fileName).apply()
+                    clearDownloadRecord(fileName)
                     continue
                 }
                 val index = cursor.getColumnIndex(DownloadManager.COLUMN_STATUS)
                 if (index < 0) continue
                 when (cursor.getInt(index)) {
                     DownloadManager.STATUS_SUCCESSFUL -> {
-                        try { finalizeDownloadedModel(fileName) }
+                        try { finalizeCatalogueDownload(fileName, preferences.getString(sha256PreferenceKey(fileName), null)) }
                         catch (_: Exception) { partialModelFile(fileName).delete() }
-                        preferences.edit().remove(fileName).apply()
+                        clearDownloadRecord(fileName)
                     }
                     DownloadManager.STATUS_FAILED -> {
                         partialModelFile(fileName).delete()
@@ -397,6 +450,7 @@ class LocalLlmPlugin : Plugin() {
         try {
             val url = call.getString("url") ?: throw IllegalArgumentException("İndirme adresi eksik.")
             val fileName = call.getString("fileName") ?: throw IllegalArgumentException("Model dosya adı eksik.")
+            val expectedSha256 = normalizeExpectedSha256(call.getString("sha256"))
             val destination = safeModelFile(fileName)
             reconcileDownloads()
             if (activeImportFileNames.contains(fileName)) {
@@ -421,7 +475,10 @@ class LocalLlmPlugin : Plugin() {
                 .setDestinationInExternalFilesDir(context, "models", partial.name)
             val manager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
             val downloadId = manager.enqueue(request)
-            downloadPreferences().edit().putLong(fileName, downloadId).apply()
+            downloadPreferences().edit()
+                .putLong(fileName, downloadId)
+                .putString(sha256PreferenceKey(fileName), expectedSha256)
+                .apply()
             call.resolve(JSObject().apply { put("downloadId", downloadId) })
         } catch (error: Exception) { call.reject("Model indirilemedi: ${error.message}", error) }
     }
@@ -508,8 +565,8 @@ class LocalLlmPlugin : Plugin() {
             }
             if (statusCode == DownloadManager.STATUS_SUCCESSFUL) {
                 try {
-                    finalizeDownloadedModel(fileName)
-                    preferences.edit().remove(fileName).apply()
+                    finalizeCatalogueDownload(fileName, preferences.getString(sha256PreferenceKey(fileName), null))
+                    clearDownloadRecord(fileName)
                 } catch (error: Exception) {
                     partialModelFile(fileName).delete()
                     preferences.edit().remove(fileName).apply()
