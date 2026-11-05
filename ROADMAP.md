@@ -80,3 +80,9 @@ No physical phone install, GGUF import, model load/inference, temperature/memory
 - Local Coder keeps Plan/Code/Review-specific Skills in their own stage prompts; those calls explicitly skip the general Skill injection to avoid duplicate instructions.
 - The active editor buffer is snapshotted into the opt-in project context, so unsaved edits are not silently omitted when an agent request starts.
 - `npm run test:ai-team`, the broader smoke tests, Vite build, and Android packaging are the CI verification path. Physical-device inference/offline acceptance remains a separate gate.
+## Local Coder draft persistence — 2026-11-05
+
+- Applying an approved Local Coder draft now awaits `saveCurrentCodeFile(false)` and persists it into the active workspace file rather than only changing the editor textarea.
+- The stale debounced editor-save timer is cancelled before persistence to avoid an older delayed save overwriting the accepted draft.
+- If persistence fails, the draft remains visible in the editor and the UI tells the user to retry the explicit Save action.
+- The draft is never executed automatically. The workshop smoke test asserts the persistence hand-off.

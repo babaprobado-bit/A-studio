@@ -77,3 +77,11 @@ assert.ok(main.includes("device: { name:'Telefon içi GGUF'"),'the on-device GGU
 assert.ok(main.includes("if(id==='device')return Boolean(nativeApp&&deviceLocalCoder.loadedFileName)"),'device provider must be ready only when a native GGUF model is loaded');
 assert.ok(main.includes("if(id==='device'){"),'device provider must route through its own local inference path');
 assert.ok(main.includes("generateWithDeviceModel(devicePrompt,384,'all')"),'team calls must perform inference through the on-device model');
+
+const applyDraftStart=main.indexOf('async function applyLocalCoderDraft(){');
+const applyDraftEnd=main.indexOf('function downloadLocalCoderDraft()',applyDraftStart);
+assert.ok(applyDraftStart>=0&&applyDraftEnd>applyDraftStart,'Local Coder apply action must be asynchronous and await persistence');
+const applyDraftSource=main.slice(applyDraftStart,applyDraftEnd);
+assert.match(applyDraftSource,/await saveCurrentCodeFile\(false\)/,'applying a Local Coder draft must persist the active workspace file');
+assert.match(applyDraftSource,/clearTimeout\(codeFileSaveTimer\)/,'applying a draft must cancel a stale delayed save before persisting');
+assert.match(applyDraftSource,/Kod otomatik çalıştırılmadı/,'the UI must keep generated code unexecuted after saving');

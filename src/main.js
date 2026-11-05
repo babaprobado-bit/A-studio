@@ -888,7 +888,21 @@ async function runLocalCoderWorkshopOllama(){
  catch(error){$('localCoderStatus').textContent='Zincir durdu; ayarları ve Ollama bağlantısını kontrol et.';await logAgentActivity('Local Coder','Hata',error.message||'Bilinmeyen yerel model hatası');showToast('Local Coder çalışamadı: '+(error.message||'Ollama bağlantısını kontrol et.'));}
  finally{busy=false;$('localCoderRun').disabled=false;$('localCoderRun').textContent='Yerel ajan zincirini çalıştır';}
 }
-function applyLocalCoderDraft(){const draft=$('localCoderOutput').value.trim();if(!draft){showToast('Aktarılacak bir kod taslağı yok.');return;}if($('codePad').value.trim()&&!confirm('Kod Alanı içeriği yeni taslakla değiştirilsin mi? Önce mevcut dosyanı dışa aktarabilirsin.'))return;$('codePad').value=draft;showToast('Taslak Kod Alanı’na aktarıldı; henüz çalıştırılmadı.');}
+async function applyLocalCoderDraft(){
+  const draft=$('localCoderOutput').value.trim();
+  if(!draft){showToast('Aktarılacak bir kod taslağı yok.');return;}
+  if($('codePad').value.trim()&&!confirm('Kod Alanı içeriği yeni taslakla değiştirilsin mi? Önce mevcut dosyanı dışa aktarabilirsin.'))return;
+  $('codePad').value=draft;
+  clearTimeout(codeFileSaveTimer);
+  try{
+    await saveCurrentCodeFile(false);
+    $('localCoderStatus').textContent='Taslak mevcut çalışma alanı dosyasına kaydedildi. Kod otomatik çalıştırılmadı.';
+    showToast('Taslak Kod Alanı’na aktarıldı ve dosyaya kaydedildi; henüz çalıştırılmadı.');
+  }catch(error){
+    $('localCoderStatus').textContent='Taslak editöre aktarıldı ancak dosyaya kaydedilemedi. Kaydet düğmesiyle tekrar dene.';
+    showToast('Taslak editörde kaldı fakat kaydedilemedi: '+(error.message||'Depolamayı kontrol et.'));
+  }
+}
 function downloadLocalCoderDraft(){const draft=$('localCoderOutput').value.trim();if(!draft){showToast('İndirilecek bir taslak yok.');return;}const ext=({javascript:'js',html:'html',css:'css',python:'py',json:'json',markdown:'md',text:'txt'})[$('codeLanguage').value]||'txt';downloadText('local-coder-draft.'+ext,draft);}
 async function saveLocalCoderDraft(){const code=$('localCoderOutput').value.trim();if(!code){showToast('Kasaya kaydedilecek bir taslak yok.');return;}try{await persistSnippetRecord({name:'LocalCoder - '+($('localCoderTask').value.trim()||'taslak').slice(0,70),language:$('codeLanguage').value,sourceUrl:'',license:'AI tarafından oluşturulmuş taslak; kullanmadan önce incele ve test et',code});}catch(error){showToast('Taslak kasaya kaydedilemedi: '+(error.message||'Hata'));}}
 
