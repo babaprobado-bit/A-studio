@@ -23,7 +23,7 @@ This document separates implemented source, automated checks, CI APK builds and 
 
 ## Current product capabilities in source
 
-- Multi-provider chat and comparison: OpenAI, Anthropic/Claude, Gemini, DeepSeek, Groq, OpenRouter and Ollama.
+- AI Team providers: OpenAI, Anthropic/Claude, Gemini, DeepSeek, Groq, OpenRouter, Hugging Face Inference Providers, configurable custom OpenAI-compatible API, and PC/Ollama. Parallel team, sequential pipeline and comparison use all selected providers with no four-provider cap; all nine are selected by default and a select-all control is available.
 - Local Coder engines: PC/Ollama, Android on-device GGUF and explicit-consent API mode.
 - Local GGUF download uses Android DownloadManager, temporary `.part` storage, GGUF header validation and a visible cancel action.
 - **No-internet GGUF import:** Android document picker can import a `.gguf` file already present on the phone. Copy it beforehand through USB, SD card or file sharing. Import itself does not need internet; it does not acquire model weights.

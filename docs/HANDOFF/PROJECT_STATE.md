@@ -52,14 +52,14 @@ It also needs a Skill instruction library, user-imported SKILL.md files, profile
 ## 3. Existing features to preserve
 
 ### Providers and chat
-The app has adapters for OpenAI, Anthropic/Claude, Google Gemini, DeepSeek, Groq, OpenRouter and Ollama. Provider endpoints/model IDs may change; keep them editable and reuse existing adapter code. Provider keys on Android use capacitor-secure-storage-plugin; browser preview stores keys in memory only. Provider keys are not included in workspace backups.
+The app has nine AI Team provider entries: OpenAI, Anthropic/Claude, Google Gemini, DeepSeek, Groq, OpenRouter, Hugging Face Inference Providers, a configurable custom OpenAI-compatible API, and PC/Ollama. Hugging Face uses its OpenAI-compatible router; the custom endpoint accepts HTTPS remote endpoints (HTTP is restricted to localhost). Model IDs and the custom endpoint are editable. OpenRouter and Hugging Face provide routes to multiple model catalogs. Provider keys on Android use capacitor-secure-storage-plugin; browser preview stores keys in memory only. Provider keys are not included in workspace backups.
 
 Demo mode is on by default. It returns example/template output, not real inference. The API Local Coder path asks for confirmation before switching out of Demo mode and sends three requests (Plan, Code, Review). The user must approve multi-request/billable operations.
 
 ### Agent workspace
 Existing workspace features include:
 - Multi-provider chat and model comparison.
-- Parallel team requests and sequential pipelines (team selection is limited to four providers).
+- Parallel team requests, model comparisons and sequential pipelines use every selected registered provider without a four-provider cap. New installs select all nine entries by default; the picker also has a select-all action. Sequential stages use planner, implementer, reviewer, tester and extra independent-expert roles for additional providers.
 - User-created/JSON-imported prompt plugins. These are text instructions, not executable plugins.
 - Local projects and active project context.
 - Code workspace with up to 100 named files, up to 100 KB per file.

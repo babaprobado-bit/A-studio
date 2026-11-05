@@ -26,6 +26,15 @@ Purpose: this is the durable project memory for continuing AI Studio across four
 - This is the Android/Capacitor AI Studio app plus its private web workspace. It is not the user's completed game project.
 - Latest app-code/test commit: `6afe4ccfde5f29085a3ad0f2079f0f6addbe5107`. It adds JavaScript and native Android RAM guardrails for imported GGUF files, with mock regression coverage. Current-source native builds are running; no artifact for this commit has been verified yet. Always inspect live Actions before using an APK.
 
+## AI Team update — 2026-11-05
+
+- Current app source includes nine selectable AI Team entries: OpenAI, Claude, Gemini, DeepSeek, Groq, OpenRouter, Hugging Face Inference Providers, custom OpenAI-compatible API and PC/Ollama.
+- All nine are selected by default on a fresh install. Parallel team, sequential pipeline and model comparison use the full selected list; there is no four-provider cap. The Modeller screen includes a select-all button.
+- Custom remote endpoints are HTTPS-only; HTTP is allowed only for localhost. Hugging Face uses its official OpenAI-compatible router. Model IDs can be changed to use the models made available by the connected provider.
+- Additional sequential stages are handled as independent expert reviews after planner, implementer, reviewer and tester.
+- Demo-mode pipeline was corrected to use the already-resolved stage role; the workshop regression test now guards against the stale variable reference.
+- The phone's on-device GGUF engine remains available through the Local Coder workflow; it is not currently one of the provider cards in the AI Team list. Do not describe device GGUF as a Team member until that integration is implemented and tested.
+
 ## Read order for every new conversation
 
 1. docs/HANDOFF/README.md — this index and the four-chat plan.

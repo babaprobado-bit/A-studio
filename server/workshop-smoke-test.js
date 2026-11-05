@@ -21,6 +21,8 @@ assert.equal(getTeamStageDetails(3,9).role,'Testçi / son kontrol');
 assert.match(getTeamStageDetails(8,9).instruction,/yeni katkı sun/);
 assert.match(main,/settings\.team=normalizeTeamSelection/);
 assert.doesNotMatch(main,/settings\.team\.slice\(0,4\)/);
+assert.match(main,/demoAnswer\(id,stagePrompt,stage\.role\)/,'demo pipeline must use the resolved stage role');
+assert.doesNotMatch(main,/stageRoles/,'no stale stageRoles reference may remain in the pipeline');
 assert.match(html,/id="selectAllTeam"/);
 assert.match(main,/normalizeOpenAiEndpoint\(settings\.customEndpoint\)/);
 assert.match(main,/huggingface: \{ name:'Hugging Face Inference'/);
