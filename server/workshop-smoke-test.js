@@ -9,7 +9,7 @@ import { buildSharedVaultContext } from '../src/shared-vault-context.js';
 const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
 const main=readFileSync(new URL('../src/main.js',import.meta.url),'utf8');
 
-const everyProvider = ['openai','anthropic','gemini','deepseek','groq','openrouter','huggingface','custom','ollama'];
+const everyProvider = ['openai','anthropic','gemini','deepseek','groq','openrouter','huggingface','custom','ollama','device'];
 assert.deepEqual(normalizeTeamSelection(everyProvider,everyProvider),everyProvider,'AI Team must preserve every selected provider, not cap at four');
 assert.deepEqual(normalizeTeamSelection(['openai','openai','unknown','ollama'],everyProvider),['openai','ollama'],'Team selection should de-duplicate and reject unknown IDs');
 assert.equal(normalizeOpenAiEndpoint('https://api.mistral.ai/v1'),'https://api.mistral.ai/v1/chat/completions');
@@ -72,3 +72,8 @@ const pipelineSource=main.slice(pipelineStart,pipelineEnd);
 assert.match(pipelineSource,/demoAnswer\(id,stagePrompt,stage\.role\)/,'pipeline demo must use the computed stage role');
 assert.doesNotMatch(pipelineSource,/stageRoles/,'pipeline must not depend on an undefined legacy stageRoles array');
 assert.match(main,/function providerIsReady\(id\)/,'live team execution must skip unconfigured providers');
+
+assert.match(main,/device: \\{ name:'Telefon içi GGUF'/,'the on-device GGUF model must be a selectable AI Team provider');
+assert.match(main,/if\\(id==='device'\\)return Boolean\\(nativeApp&&deviceLocalCoder\\.loadedFileName\\)/,'device provider must be ready only when a native GGUF model is loaded');
+assert.match(main,/if\\(id==='device'\\)\\{/,'device provider must route through its own local inference path');
+assert.match(main,/generateWithDeviceModel\\(devicePrompt,384,'all'\\)/,'team calls must perform inference through the on-device model');

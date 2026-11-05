@@ -11,6 +11,7 @@ on:
       - '.github/workflows/build-android-local-coder.yml'
       - 'src/main.js'
       - 'src/ai-team.js'
+      - 'scripts/test-ai-team.mjs'
       - 'server/workshop-smoke-test.js'
       - 'index.html'
       - 'src/skill-library.js'
@@ -69,7 +70,8 @@ jobs:
           npm run test:workshop
           npm run test:site
           npm run test:skills
-          npm run test:api-local-coder\n          npm run test:ai-team
+          npm run test:api-local-coder
+          npm run test:ai-team
           npm run test:device-local-coder
       - name: Generate Capacitor Android project
         run: npx cap add android

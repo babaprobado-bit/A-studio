@@ -35,7 +35,8 @@ const providers = {
   openrouter: { name:'OpenRouter', icon:'R', kind:'openai', endpoint:'https://openrouter.ai/api/v1/chat/completions', model:'openai/gpt-5-mini', keyUrl:'https://openrouter.ai/keys', desc:'Birçok sağlayıcı için tek uyumlu API' },
   huggingface: { name:'Hugging Face Inference', icon:'H', kind:'openai', endpoint:'https://router.huggingface.co/v1/chat/completions', model:'openai/gpt-oss-120b:fastest', keyUrl:'https://huggingface.co/settings/tokens', desc:'Inference Providers · yüzlerce model için tek API' },
   custom: { name:'Özel OpenAI uyumlu API', icon:'+', kind:'openai', endpoint:'', model:'', keyUrl:'', desc:'Kendi API adresin ve model kimliğin; OpenAI chat completions uyumlu servisler' },
-  ollama: { name:'LocalCoder / Ollama (PC)', icon:'⌘', kind:'ollama', endpoint:'', model:'qwen2.5-coder:1.5b', keyUrl:'https://ollama.com/', desc:'Ağdaki bilgisayarda çalışan yerel model; telefona gömülü değil' }
+  ollama: { name:'LocalCoder / Ollama (PC)', icon:'⌘', kind:'ollama', endpoint:'', model:'qwen2.5-coder:1.5b', keyUrl:'https://ollama.com/', desc:'Ağdaki bilgisayarda çalışan yerel model; telefona gömülü değil' },
+  device: { name:'Telefon içi GGUF', icon:'▣', kind:'device', endpoint:'', model:'', keyUrl:'', desc:'Android belleğine yüklenmiş GGUF modeli; API anahtarı ve internet gerekmez' }
 };
 const defaultSettings = {
   demoMode: true,
@@ -200,25 +201,41 @@ async function importCodeFileCollection(file){
   }catch(error){showToast('Dosya kasası içe aktarılamadı: '+(error.message||'JSON dosyasını kontrol et.'));}
 }
 
-function providerModel(id){return id==='ollama' ? (settings.ollamaModel||settings.models.ollama||providers.ollama.model) : (settings.models[id]||providers[id].model);}
+function providerModel(id){if(id==='device')return deviceLocalCoder.loadedFileName||'GGUF model';return id==='ollama' ? (settings.ollamaModel||settings.models.ollama||providers.ollama.model) : (settings.models[id]||providers[id].model);}
 function selectedTeam(){return normalizeTeamSelection(settings.team,Object.keys(providers));}
 function providerIsReady(id){
   if(!providers[id])return false;
+  if(id==='device')return Boolean(nativeApp&&deviceLocalCoder.loadedFileName);
   if(id==='ollama')return Boolean(String(settings.ollamaUrl||'').trim());
   if(id==='custom')return Boolean(String(settings.customEndpoint||'').trim()&&runtimeKeys[id]);
   return Boolean(runtimeKeys[id]);
 }
 function configuredTeam(){return selectedTeam().filter(providerIsReady);}
-function syncModeUI(){ $('demoToggle').checked=!!settings.demoMode; $('settingsDemoToggle').checked=!!settings.demoMode; $('modePill').textContent=settings.demoMode?'DEMO MODU':'GERÇEK MODEL'; $('modePill').className='pill '+(settings.demoMode?'safe':'live'); $('connectedCount').textContent=Object.keys(providers).filter(id=>id==='ollama'?!!settings.ollamaUrl:id==='custom'?(!!settings.customEndpoint&&!!runtimeKeys[id]):!!runtimeKeys[id]).length; $('providerState').textContent=settings.demoMode?'Demo yanıtı':(runtimeKeys[$('chatProvider').value]?'Anahtar hazır':($('chatProvider').value==='ollama'?'Yerel uç nokta':'Anahtar gerekli')); }
+function syncModeUI(){
+  $('demoToggle').checked=!!settings.demoMode;
+  $('settingsDemoToggle').checked=!!settings.demoMode;
+  $('modePill').textContent=settings.demoMode?'DEMO MODU':'GERÇEK MODEL';
+  $('modePill').className='pill '+(settings.demoMode?'safe':'live');
+  $('connectedCount').textContent=Object.keys(providers).filter(providerIsReady).length;
+  const current=$('chatProvider')?.value||'openai';
+  const status=current==='device'?(deviceLocalCoder.loadedFileName?'Telefon GGUF modeli hazır':'Telefon GGUF modeli yüklenmeli')
+    :current==='ollama'?(providerIsReady('ollama')?'Ollama bağlantısı ayarlı':'Ollama adresi gerekli')
+    :(providerIsReady(current)?'API anahtarı hazır':'API anahtarı gerekli');
+  $('providerState').textContent=settings.demoMode?'Demo yanıtı':status;
+}
 async function getSecret(id){ if(!nativeApp)return runtimeKeys[id]||''; try{const r=await SecureStoragePlugin.get({key:'ai-studio-provider-'+id}); return r?.value||'';}catch(_){return '';} }
 async function saveSecret(id,key){ if(!key.trim())return; if(!nativeApp){runtimeKeys[id]=key.trim(); showToast('Önizleme: anahtar yalnızca bu açık oturumda tutulur, güvenli şekilde kaydedilmez.');return;} await SecureStoragePlugin.set({key:'ai-studio-provider-'+id,value:key.trim()}); runtimeKeys[id]=key.trim(); }
 async function deleteSecret(id){ if(!nativeApp){delete runtimeKeys[id];return;} try{await SecureStoragePlugin.remove({key:'ai-studio-provider-'+id});}catch(_){} delete runtimeKeys[id]; }
-async function initKeys(){ for(const id of Object.keys(providers)){runtimeKeys[id]=nativeApp?await getSecret(id):'';} }
+async function initKeys(){ for(const id of Object.keys(providers)){runtimeKeys[id]=(id==='device'||id==='ollama')?'':(nativeApp?await getSecret(id):'');} }
 function renderProviderCards(){
+  const currentChatProvider=$('chatProvider')?.value||'openai';
   $('providerGrid').innerHTML=Object.entries(providers).map(([id,p])=>{
-    const configured=id==='ollama'?!!settings.ollamaUrl:id==='custom'?(!!settings.customEndpoint&&!!runtimeKeys[id]):!!runtimeKeys[id];
-    const isTeam=settings.team.includes(id);
-    const model=id==='ollama'?(settings.ollamaModel||p.model):providerModel(id);
+    const configured=providerIsReady(id),isTeam=settings.team.includes(id),model=providerModel(id);
+    if(id==='device'){
+      const loaded=Boolean(deviceLocalCoder.loadedFileName);
+      const detail=loaded?'Bellekte yüklü model: '+deviceLocalCoder.loadedFileName:(nativeApp?'Henüz GGUF modeli belleğe yüklenmedi.':'Telefon içi GGUF, native Android APK üzerinde kullanılabilir.');
+      return '<article class="provider-card" data-provider-card="device"><div class="provider-head"><span class="provider-icon">'+esc(p.icon)+'</span><div class="provider-title"><h3>'+esc(p.name)+'</h3><p>'+esc(p.desc)+'</p></div><span id="state-device" class="provider-state '+(loaded?'connected':'')+'">'+(loaded?'Hazır':(nativeApp?'Model yüklenmedi':'Android gerekli'))+'</span></div><p class="fineprint">'+esc(detail)+'</p><div class="provider-help"><label class="team-check"><input type="checkbox" data-team="device" '+(isTeam?'checked':'')+'> Takım turuna ekle</label><button class="btn ghost small" type="button" data-go="tools">GGUF model yöneticisini aç</button></div></article>';
+    }
     return '<article class="provider-card" data-provider-card="'+id+'"><div class="provider-head"><span class="provider-icon">'+esc(p.icon)+'</span><div class="provider-title"><h3>'+esc(p.name)+'</h3><p>'+esc(p.desc)+'</p></div><span id="state-'+id+'" class="provider-state '+(configured?'connected':'')+'">'+(configured?'Ayarlı':'Bağlı değil')+'</span></div>'+
       '<label class="field-label" for="model-'+id+'">Model kimliği</label><input class="input" id="model-'+id+'" value="'+esc(model)+'" maxlength="140" autocomplete="off">'+
       (id==='ollama'?'':'<label class="field-label" for="key-'+id+'">API anahtarı</label><input class="input provider-key" type="password" id="key-'+id+'" placeholder="'+(configured?'Kayıtlı anahtar gizli':'Anahtarı buraya yapıştır')+'" autocomplete="new-password" autocapitalize="off" spellcheck="false">'+
@@ -231,11 +248,12 @@ function renderProviderCards(){
   $('teamChips').innerHTML=Object.entries(providers).map(([id,p])=>'<label class="chip"><input type="checkbox" data-team="'+id+'" '+(settings.team.includes(id)?'checked':'')+'>'+esc(p.name)+'</label>').join('');
   $('ollamaUrl').value=settings.ollamaUrl||''; $('ollamaModel').value=settings.ollamaModel||providers.ollama.model;
   $('chatProvider').innerHTML=Object.entries(providers).map(([id,p])=>'<option value="'+id+'">'+esc(p.name)+'</option>').join('');
-  $('chatProvider').value='openai'; syncModeUI();
+  $('chatProvider').value=providers[currentChatProvider]?currentChatProvider:'openai';
+  syncModeUI();
 }
 function demoAnswer(providerId,prompt,roleOverride){
   const name=providers[providerId]?.name||'AI Studio';
-  const role=roleOverride || ({openai:'Planlayıcı',anthropic:'Kalite gözden geçirici',gemini:'Fikir üretici',deepseek:'Akıl yürütme',groq:'Hızlı yardımcı',openrouter:'Model yönlendirici',ollama:'LocalCoder taslağı'}[providerId]||'Yardımcı');
+  const role=roleOverride || ({openai:'Planlayıcı',anthropic:'Kalite gözden geçirici',gemini:'Fikir üretici',deepseek:'Akıl yürütme',groq:'Hızlı yardımcı',openrouter:'Model yönlendirici',ollama:'LocalCoder taslağı',device:'Telefon içi uzman'}[providerId]||'Yardımcı');
   const base={
     openai:'Önce hedefi ve başarı ölçütünü netleştir. Ardından en küçük çalışan sürümü oluştur, alt görevlere böl ve her parçayı test et.',
     anthropic:'Kapsamı sınırla, hata durumlarını düşün ve mevcut dosyalara dokunmadan önce yedek / değişiklik planı belirle.',
@@ -243,7 +261,8 @@ function demoAnswer(providerId,prompt,roleOverride){
     deepseek:'Girdi → işlem → çıktı akışını açıkça tanımla. Kritik varsayımları kontrol et ve tekrarlanabilir bir test ekle.',
     groq:'İlk sürüm için en gerekli özelliği seç. Çalıştığını gösteren tek test kur; sonra sıradaki özelliğe geç.',
     openrouter:'İş için hangi modelin gerektiğini belirle. Hız, maliyet ve kaliteyi karşılaştır; başarısız sağlayıcı için alternatif plan hazırla.',
-    ollama:'Yerel kod yardımcısı taslağı: 1) ilgili dosyaları oku, 2) küçük değişiklik öner, 3) test çalıştır, 4) farkları incele. Bu yanıt gerçek yerel model çıktısı değildir.'
+    ollama:'Yerel kod yardımcısı taslağı: 1) ilgili dosyaları oku, 2) küçük değişiklik öner, 3) test çalıştır, 4) farkları incele. Bu yanıt gerçek yerel model çıktısı değildir.',
+    device:'Telefon içi GGUF ajanı seçildi. Gerçek yanıt için Android cihazda bir GGUF modelini belleğe yükle.'
   };
   return '['+role+' · DEMO ŞABLONU]\n\n'+(base[providerId]||base.openai)+'\n\nGörev: '+prompt+'\n\nNot: Bu gerçek model çağrısı değildir; Demo modu açıktır.';
 }
@@ -273,6 +292,17 @@ async function fetchJson(url,options,timeoutMs=50000){
   finally{clearTimeout(timer);}
 }
 async function callProvider(id,prompt,history){
+  if(id==='device'){
+    if(!nativeApp)throw new Error('Telefon içi GGUF ajanı yalnızca native Android uygulamasında çalışır.');
+    if(!deviceLocalCoder.loadedFileName)throw new Error('Önce Telefon içi GGUF modelini belleğe yükle.');
+    const recent=(Array.isArray(history)?history:[]).slice(-4).filter(item=>item&&(item.role==='user'||item.role==='assistant'))
+      .map(item=>(item.role==='assistant'?'Asistan':'Kullanıcı')+': '+String(item.content||'').slice(0,500)).join('\n');
+    const devicePrompt='Yeni görev:\n'+String(prompt||'').slice(0,3500)+(recent?'\n\nYakın sohbet bağlamı:\n'+recent:'');
+    const generated=await generateWithDeviceModel(devicePrompt,384,'all');
+    const answer=String(generated.text||'').trim();
+    if(!answer)throw new Error('Telefon içi GGUF modeli boş yanıt verdi. Modeli yeniden yüklemeyi dene.');
+    return answer;
+  }
   if(id==='ollama'){
     const url=(settings.ollamaUrl||'').trim().replace(/\/+$/,''); const model=(settings.ollamaModel||providerModel(id)).trim();
     if(!url||!model)throw new Error('Ollama adresi ve model adı eksik.'); let parsed; try{parsed=new URL(url);}catch(_){throw new Error('Ollama adresi geçerli bir URL olmalı.');}
@@ -560,12 +590,16 @@ function renderDeviceLocalModelManager(){
   if($('unloadOnDeviceModel'))$('unloadOnDeviceModel').disabled=!Boolean(deviceLocalCoder.loadedFileName);
   renderDeviceModelDescription();syncLocalCoderEngineUI();
 }
+function syncAiTeamProviderUI(){
+  if($('providerGrid'))renderProviderCards();
+  if($('dashboard'))updateDashboard();
+}
 async function refreshDeviceLocalModels(quiet=false){
-  if(!nativeApp){deviceLocalState=null;if(settings.localCoderEngine==='device'){settings.localCoderEngine='ollama';await setPref(DB.settings,settings);}renderDeviceLocalModelManager();return null;}
+  if(!nativeApp){deviceLocalState=null;if(settings.localCoderEngine==='device'){settings.localCoderEngine='ollama';await setPref(DB.settings,settings);}renderDeviceLocalModelManager();syncAiTeamProviderUI();return null;}
   try{
     deviceLocalState=await deviceLocalCoder.refresh();
     if(!deviceLocalState.device?.supported&&settings.localCoderEngine==='device'){settings.localCoderEngine='ollama';await setPref(DB.settings,settings);}
-    renderDeviceLocalModelManager();
+    renderDeviceLocalModelManager();syncAiTeamProviderUI();
     const recommendation=deviceLocalState.recommendation;
     if($('onDeviceModelStatus'))$('onDeviceModelStatus').textContent=deviceLocalState.device?.supported
       ?(recommendation.isUnderpowered
@@ -576,7 +610,7 @@ async function refreshDeviceLocalModels(quiet=false){
   }catch(error){
     if($('onDeviceModelStatus'))$('onDeviceModelStatus').textContent='Telefon bilgileri okunamadı: '+(error.message||'Native LocalLlm köprüsünü kontrol et.');
     if(!quiet)showToast('Yerel model yöneticisi açılamadı. Android APK sürümünü ve cihaz uyumluluğunu kontrol et.');
-    deviceLocalState=null;renderDeviceLocalModelManager();return null;
+    deviceLocalState=null;renderDeviceLocalModelManager();syncAiTeamProviderUI();return null;
   }
 }
 async function downloadSelectedDeviceModel(){
@@ -713,7 +747,7 @@ async function deleteSelectedDeviceModel(){
 async function generateWithDeviceModel(basePrompt,maxTokens,stageId='all'){
   const contextSize=Number($('onDeviceContextSize')?.value||2048);
   const totalCharBudget=Math.max(1200,Math.floor((contextSize-maxTokens-128)*3.1));
-  const systemFull=systemFor('ollama',basePrompt).replace(providers.ollama.name,'Telefon içi GGUF Local Coder');
+  const systemFull=systemFor('device',basePrompt);
   const systemBudget=Math.min(systemFull.length,Math.floor(totalCharBudget*0.25));
   const systemText=systemFull.slice(0,systemBudget);
   const userBudget=Math.max(500,totalCharBudget-systemText.length-80);
@@ -1173,8 +1207,8 @@ function renderPlugins(){ const out=$('pluginList'); if(!userPlugins.length){out
 }
 async function addPlugin(e){e.preventDefault();const name=$('pluginName').value.trim(),prompt=$('pluginPrompt').value.trim();if(!name||!prompt)return;userPlugins.push({id:crypto.randomUUID?crypto.randomUUID():String(Date.now()),name,prompt,kind:'custom'});await setPref(DB.plugins,userPlugins);$('pluginForm').reset();renderPlugins();showToast('Prompt eklentisi kaydedildi.');}
 async function importPlugins(file){try{const data=JSON.parse(await file.text());const incoming=Array.isArray(data)?data:data.plugins;if(!Array.isArray(incoming))throw new Error('JSON içinde plugins dizisi bulunamadı.');let count=0;for(const p of incoming){if(typeof p?.name==='string'&&typeof p?.prompt==='string'&&p.name.trim()&&p.prompt.trim()){userPlugins.push({id:crypto.randomUUID?crypto.randomUUID():String(Date.now()+count),name:p.name.trim().slice(0,80),prompt:p.prompt.trim().slice(0,6000),kind:'custom'});count++;}}userPlugins=userPlugins.slice(-100);await setPref(DB.plugins,userPlugins);renderPlugins();showToast(count+' prompt eklentisi içe aktarıldı.');}catch(err){showToast('Eklenti içe aktarılamadı: '+(err.message||'JSON dosyasını kontrol et.'));}}
-function updateDashboard(){const connected=Object.keys(providers).filter(id=>id==='ollama'?!!settings.ollamaUrl:!!runtimeKeys[id]);$('connectedCount').textContent=connected.length;$('projectCount').textContent=projectList.length;
-  $('dashboard').innerHTML='<article class="panel"><div class="row-actions"><strong>API sağlayıcıları</strong><span class="grow"></span><span class="pill">'+connected.length+' ayar</span></div><p class="muted">'+esc(connected.map(id=>providers[id].name).join(', ')||'Henüz anahtar ayarlanmadı.')+'</p><button class="btn ghost small" data-go="models">Bağlantıları yönet</button></article><article class="panel"><div class="row-actions"><strong>Sohbet geçmişi</strong><span class="grow"></span><span class="pill">'+chatHistory.length+' mesaj</span></div><p class="muted">Bu cihazdaki yerel geçmiş. Gerçek model sohbetleri de dışa aktarılabilir.</p></article>';
+function updateDashboard(){const connected=Object.keys(providers).filter(providerIsReady);$('connectedCount').textContent=connected.length;$('projectCount').textContent=projectList.length;
+  $('dashboard').innerHTML='<article class="panel"><div class="row-actions"><strong>Bağlı AI motorları</strong><span class="grow"></span><span class="pill">'+connected.length+' hazır</span></div><p class="muted">'+esc(connected.map(id=>providers[id].name).join(', ')||'Henüz model/bağlantı hazır değil.')+'</p><button class="btn ghost small" data-go="models">Bağlantıları yönet</button></article><article class="panel"><div class="row-actions"><strong>Sohbet geçmişi</strong><span class="grow"></span><span class="pill">'+chatHistory.length+' mesaj</span></div><p class="muted">Bu cihazdaki yerel geçmiş. Gerçek model sohbetleri de dışa aktarılabilir.</p></article>';
 }
 async function exportProjects(){downloadText('ai-studio-projects.json',JSON.stringify({format:'ai-studio-projects-v2',exportedAt:new Date().toISOString(),projects:projectList},null,2),'application/json;charset=utf-8');}
 function buildWorkspaceSnapshot(){
@@ -1423,7 +1457,7 @@ async function prepareBrowserFeatures(){
   }catch(_){}
 }
 async function init(){
-  try{settings={...clone(defaultSettings),...(await getPref(DB.settings,{}))};settings.models={...clone(defaultSettings.models),...(settings.models||{})};settings.team=normalizeTeamSelection(settings.team||defaultSettings.team,Object.keys(providers));settings.customEndpoint=typeof settings.customEndpoint==='string'?settings.customEndpoint.slice(0,500):'';if(settings.customEndpoint){try{settings.customEndpoint=normalizeOpenAiEndpoint(settings.customEndpoint);}catch(_){settings.customEndpoint='';}}settings.vaultBaseUrl=typeof settings.vaultBaseUrl==='string'?settings.vaultBaseUrl.slice(0,500):'';settings.localCoderEngine=['device','api'].includes(settings.localCoderEngine)?settings.localCoderEngine:'ollama';settings.localCoderApiProvider=providers[settings.localCoderApiProvider]&&settings.localCoderApiProvider!=='ollama'?settings.localCoderApiProvider:'openai';if(settings.ollamaUrl==='http://192.168.1.100:11434')settings.ollamaUrl='';}catch(_){}
+  try{settings={...clone(defaultSettings),...(await getPref(DB.settings,{}))};settings.models={...clone(defaultSettings.models),...(settings.models||{})};const savedTeam=Array.isArray(settings.team)?settings.team:null;settings.team=normalizeTeamSelection(settings.team||defaultSettings.team,Object.keys(providers));if(savedTeam&&settings.team.includes('openai')&&settings.team.includes('anthropic')&&settings.team.includes('gemini')&&settings.team.includes('deepseek')&&settings.team.includes('groq')&&settings.team.includes('openrouter')&&settings.team.includes('huggingface')&&settings.team.includes('custom')&&settings.team.includes('ollama')&&!settings.team.includes('device'))settings.team.push('device');settings.customEndpoint=typeof settings.customEndpoint==='string'?settings.customEndpoint.slice(0,500):'';if(settings.customEndpoint){try{settings.customEndpoint=normalizeOpenAiEndpoint(settings.customEndpoint);}catch(_){settings.customEndpoint='';}}settings.vaultBaseUrl=typeof settings.vaultBaseUrl==='string'?settings.vaultBaseUrl.slice(0,500):'';settings.localCoderEngine=['device','api'].includes(settings.localCoderEngine)?settings.localCoderEngine:'ollama';settings.localCoderApiProvider=providers[settings.localCoderApiProvider]&&settings.localCoderApiProvider!=='ollama'?settings.localCoderApiProvider:'openai';if(settings.ollamaUrl==='http://192.168.1.100:11434')settings.ollamaUrl='';}catch(_){}
   if(!nativeApp){showToast('Tarayıcıda API anahtarları yalnızca açık oturumda tutulur.');}
   await initKeys(); projectList=await getPref(DB.projects,[]);activeProjectId=await getPref(DB.activeProject,'');chatHistory=await getPref(DB.chat,[]);userPlugins=await getPref(DB.plugins,[]);const storedSkills=await getPref(DB.skills,{});customSkills=(Array.isArray(storedSkills?.customSkills)?storedSkills.customSkills:[]).map(skill=>normalizeSkill(skill)).filter(Boolean).slice(-100);skillLibrary=[...SKILL_CATALOG,...customSkills];skillProfileId=storedSkills?.profileId==='custom'?'custom':(SKILL_PROFILES[storedSkills?.profileId]?storedSkills.profileId:'karpathy');const validSkillIds=new Set(skillLibrary.map(skill=>skill.id));selectedSkillIds=(Array.isArray(storedSkills?.selectedSkillIds)?storedSkills.selectedSkillIds:[]).filter(id=>validSkillIds.has(id)).slice(0,MAX_SELECTED_SKILLS);if(!selectedSkillIds.length)selectedSkillIds=getProfileSkillIds(skillProfileId);reusableSnippets=await getPref(DB.snippets,[]);agentActivity=await getPref(DB.activity,[]);codeFiles=normalizeCodeFileList(await getPref(DB.codeFiles,[]),true);if(!codeFiles.length)codeFiles=[makeCodeFile()];activeCodeFileId=codeFiles[0].id;await setPref(DB.codeFiles,codeFiles);
   if(!Array.isArray(projectList))projectList=[];if(!projectList.some(p=>p&&p.id===activeProjectId))activeProjectId=projectList[0]?.id||'';await setPref(DB.activeProject,activeProjectId);if(!Array.isArray(chatHistory))chatHistory=[];if(!Array.isArray(userPlugins))userPlugins=[];if(!Array.isArray(reusableSnippets))reusableSnippets=[];if(!Array.isArray(agentActivity))agentActivity=[];
