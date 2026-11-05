@@ -136,3 +136,12 @@ Continue AI Studio software development without relying on phone or computer tes
 - Native GGUF workflow [42077080777](https://github.com/babaprobado-bit/A-studio/actions/runs/42077080777) checked out this same application commit. Native toolchain, pinned llama.kt, llama.cpp source preparation, npm install, Vite build, all regression checks and Capacitor sync passed; Gradle `assembleDebug` remains in progress at the time of this checkpoint.
 - Older native build [42075502247](https://github.com/babaprobado-bit/A-studio/actions/runs/42075502247) targeted commit `48efa01...` and was superseded; its cancellation was requested to prioritize the latest build.
 - PR #2 is open and Draft. `main` base SHA remains `aab010319b6500002844bd24b11da85dd9ca3b00`. Do not merge; physical device acceptance is still outstanding.
+## GGUF runtime replacement and state-sync checkpoint — 2026-11-05
+
+- Native/JavaScript state reconciliation: commit `478adfd097c594735971694da13f2ef4828d5c48` refreshes device/model state after native load or unload failures, preventing stale `loadedFileName` from falsely marking the phone provider ready.
+- Native memory ordering: commit `b611ec73ffa273c08ecbe634f2a0e1a239f2f717` frees the previous engine before measuring free RAM for a replacement model.
+- JavaScript preflight: latest runtime commit `ff34a69578ea1fa332ac3d2e73414059566398b4` skips the stale free-RAM snapshot guard only when replacing an already-loaded model; the native loader then rechecks memory after releasing the old engine. First-load safety checks and the physical total-RAM guard remain.
+- Device regression tests cover failure after native engine cleanup, native unload cleanup failure, successful replacement while current free RAM is occupied by the previous model, and the native release-before-RAM-check order.
+- Latest demo workflow [42078734918](https://github.com/babaprobado-bit/A-studio/actions/runs/42078734918) passed for `ff34a69`. Artifact `AI-Studio-Demo-APK`, ID `13438094755`, 3,775,289 bytes, SHA-256 `e444077574209a1a6fba6e0e665482594370f8d6fa14358cb26dcbb44ad47fbb`.
+- Latest native GGUF workflow [42078734707](https://github.com/babaprobado-bit/A-studio/actions/runs/42078734707) is running for the same app commit. Android tools and pinned llama.kt are ready; llama.cpp Android source preparation is in progress at this checkpoint. No artifact yet.
+- PR #2 remains open and Draft. Main base SHA remains `aab010319b6500002844bd24b11da85dd9ca3b00`; do not merge before latest native CI, physical-device acceptance, and explicit user approval.
