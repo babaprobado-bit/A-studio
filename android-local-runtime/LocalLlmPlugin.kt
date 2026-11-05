@@ -167,7 +167,7 @@ class LocalLlmPlugin : Plugin() {
                     }
                     DownloadManager.STATUS_FAILED -> {
                         partialModelFile(fileName).delete()
-                        preferences.edit().remove(fileName).apply()
+                        clearDownloadRecord(fileName)
                     }
                 }
             } catch (_: Exception) {
@@ -504,19 +504,19 @@ class LocalLlmPlugin : Plugin() {
                 if (partial.exists() && !partial.delete()) {
                     throw IllegalStateException("Yarım kalan model dosyası temizlenemedi.")
                 }
-                preferences.edit().remove(fileName).apply()
+                clearDownloadRecord(fileName)
                 call.resolve(JSObject().apply { put("cancelled", true); put("completed", false) })
             } else if (destination.isFile) {
                 if (partial.exists() && !partial.delete()) {
                     throw IllegalStateException("Yarım kalan model dosyası temizlenemedi.")
                 }
-                preferences.edit().remove(fileName).apply()
+                clearDownloadRecord(fileName)
                 call.resolve(JSObject().apply { put("cancelled", false); put("completed", true) })
             } else {
                 if (partial.exists() && !partial.delete()) {
                     throw IllegalStateException("Yarım kalan model dosyası temizlenemedi.")
                 }
-                preferences.edit().remove(fileName).apply()
+                clearDownloadRecord(fileName)
                 call.resolve(JSObject().apply { put("cancelled", false); put("completed", false) })
             }
         } catch (error: Exception) {
@@ -545,7 +545,7 @@ class LocalLlmPlugin : Plugin() {
             cursor = manager.query(DownloadManager.Query().setFilterById(id))
             if (cursor == null || !cursor.moveToFirst()) {
                 partialModelFile(fileName).delete()
-                preferences.edit().remove(fileName).apply()
+                clearDownloadRecord(fileName)
                 call.resolve(JSObject().apply { put("status", "failed"); put("reason", "İndirme görevi bulunamadı.") })
                 return
             }
@@ -569,13 +569,13 @@ class LocalLlmPlugin : Plugin() {
                     clearDownloadRecord(fileName)
                 } catch (error: Exception) {
                     partialModelFile(fileName).delete()
-                    preferences.edit().remove(fileName).apply()
+                    clearDownloadRecord(fileName)
                     status = "failed"
                     reason = error.message ?: "İndirilen model doğrulanamadı."
                 }
             } else if (statusCode == DownloadManager.STATUS_FAILED) {
                 partialModelFile(fileName).delete()
-                preferences.edit().remove(fileName).apply()
+                clearDownloadRecord(fileName)
             }
             val progress = if (status == "complete") 100 else if (total > 0) {
                 (downloaded * 100.0 / total).toInt().coerceIn(0, 100)

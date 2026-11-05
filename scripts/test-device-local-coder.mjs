@@ -44,6 +44,10 @@ assert.match(nativeSource, /MessageDigest\.isEqual/,
   'native SHA-256 comparison must use a constant-time digest comparison');
 assert.match(nativeSource, /putString\(sha256PreferenceKey\(fileName\), expectedSha256\)/,
   'the expected digest must survive Android process restarts with the download record');
+assert.ok(!nativeSource.includes('preferences.edit().remove(fileName).apply()'),
+  'all native cancellation and terminal-failure paths must clear both the download ID and its pinned digest');
+assert.match(nativeSource, /\.remove\(sha256PreferenceKey\(fileName\)\)/,
+  'download cleanup must remove the persisted checksum sidecar');
 const nativeFinalizerStart = nativeSource.indexOf('private fun finalizeCatalogueDownload(');
 const nativeFinalizerEnd = nativeSource.indexOf('private fun finalizeDownloadedModel(', nativeFinalizerStart);
 const nativeFinalizer = nativeSource.slice(nativeFinalizerStart, nativeFinalizerEnd);
