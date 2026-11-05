@@ -196,18 +196,33 @@ assert.equal(replacementLoadCalls,1,'a replacement model must reach native RAM p
 assert.equal(replacementClient.loadedFileName,'candidate-model.gguf','successful replacement loads must update the active model name');
 
 
-let rejectedUnpinnedDownloadCalls = 0;
-const unpinnedDownloadClient = new DeviceLocalCoder(true, {
+let guardedDownloadCalls = 0;
+let guardedDownloadArgs = null;
+const guardedDownloadClient = new DeviceLocalCoder(true, {
   getDeviceInfo: fake.getDeviceInfo,
   listModels: async () => ({ models: [] }),
-  downloadModel: async () => { rejectedUnpinnedDownloadCalls += 1; return { downloadId: 500 }; }
+  downloadModel: async args => {
+    guardedDownloadCalls += 1;
+    guardedDownloadArgs = args;
+    return { downloadId: 501 };
+  },
+  downloadStatus: async () => ({ status: 'complete', progress: 100 })
 });
+await guardedDownloadClient.download({ ...DEVICE_MODEL_CATALOG[0], sha256: '' });
+assert.equal(guardedDownloadArgs.sha256, DEVICE_MODEL_CATALOG[0].sha256,
+  'a caller-supplied empty digest must never override the pinned catalogue checksum');
+assert.equal(guardedDownloadCalls, 1,
+  'a valid catalogue entry remains downloadable even if an untrusted caller omits its digest');
 await assert.rejects(
-  () => unpinnedDownloadClient.download({ ...DEVICE_MODEL_CATALOG[0], sha256: '' }),
-  /SHA-256/,
-  'catalogue downloads without a valid pinned checksum must be rejected before native transfer'
+  () => guardedDownloadClient.download({
+    ...DEVICE_MODEL_CATALOG[0],
+    url: DEVICE_MODEL_CATALOG[0].url + '?untrusted=1'
+  }),
+  /katalog/,
+  'a URL that does not exactly match a pinned catalogue entry must be rejected'
 );
-assert.equal(rejectedUnpinnedDownloadCalls, 0, 'an unpinned model must never reach Android DownloadManager');
+assert.equal(guardedDownloadCalls, 1,
+  'a modified catalogue URL must never reach Android DownloadManager');
 
 let failDownload = true;
 const retryPlugin = {
