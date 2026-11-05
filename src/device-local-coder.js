@@ -353,11 +353,17 @@ export class DeviceLocalCoder {
     }
     const total = Number(this.device?.totalMemoryBytes || 0);
     const available = Number(this.device?.availableMemoryBytes || 0);
-    if (this.device?.lowMemory) throw new Error('Android şu anda düşük bellek bildiriyor. Diğer uygulamaları kapatıp yeniden dene.');
-    if (!Number.isFinite(available) || available <= 0) throw new Error('Boş RAM bilgisi okunamadı; model güvenli biçimde değerlendirilemiyor.');
+    const replacingLoadedModel = Boolean(this.loadedFileName && this.loadedFileName !== fileName);
     if (model && total > 0 && total < model.minRamGb * GIB) throw new Error(`Bu model için yaklaşık ${model.minRamGb} GB toplam RAM öneriliyor; telefonda ${formatModelBytes(total)} var.`);
-    const minimumAvailable = estimateMinimumAvailableRamBytes(installedModel);
-    if (available < minimumAvailable) throw new Error(`Yetersiz boş RAM. Bu model için yaklaşık ${formatModelBytes(minimumAvailable)} boş bellek gerekiyor.`);
+    // The native loader releases the current engine before checking available RAM.
+    // Do not reject a replacement using a free-RAM snapshot that still includes
+    // the old model's resident memory.
+    if (!replacingLoadedModel) {
+      if (this.device?.lowMemory) throw new Error('Android şu anda düşük bellek bildiriyor. Diğer uygulamaları kapatıp yeniden dene.');
+      if (!Number.isFinite(available) || available <= 0) throw new Error('Boş RAM bilgisi okunamadı; model güvenli biçimde değerlendirilemiyor.');
+      const minimumAvailable = estimateMinimumAvailableRamBytes(installedModel);
+      if (available < minimumAvailable) throw new Error(`Yetersiz boş RAM. Bu model için yaklaşık ${formatModelBytes(minimumAvailable)} boş bellek gerekiyor.`);
+    }
     const listener = await this.plugin.addListener('localModelLoadProgress', event => onProgress(event));
     try {
       const result = await this.plugin.loadModel({ fileName, contextSize: safeContextSize });

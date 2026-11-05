@@ -145,7 +145,30 @@ await assert.rejects(
 assert.equal(customModelLoadCalls,0,'low-memory custom models must not reach the native loader');
 customAvailableRam = 4 * 1024**3;
 await customModelClient.load('imported-community-model.gguf',2048);
+
 assert.equal(customModelLoadCalls,1,'custom model should load through the bridge when the estimate is met');
+
+let replacementNativeName='previous-model.gguf';
+let replacementLoadCalls=0;
+const replacementPlugin={
+  getDeviceInfo:async()=>({
+    supported:true,totalMemoryBytes:8*1024**3,availableMemoryBytes:512*1024**2,
+    freeStorageBytes:8*1024**3,processorCount:8,lowMemory:false,loadedFileName:replacementNativeName
+  }),
+  listModels:async()=>({models:[
+    {fileName:'previous-model.gguf',sizeBytes:700*1024**2,loaded:replacementNativeName==='previous-model.gguf'},
+    {fileName:'candidate-model.gguf',sizeBytes:700*1024**2,loaded:replacementNativeName==='candidate-model.gguf'}
+  ]}),
+  addListener:async()=>({remove:async()=>{}}),
+  loadModel:async({fileName})=>{replacementLoadCalls++;replacementNativeName=fileName;return {loaded:true,fileName};}
+};
+const replacementClient=new DeviceLocalCoder(true,replacementPlugin);
+await replacementClient.refresh();
+assert.equal(replacementClient.loadedFileName,'previous-model.gguf');
+await replacementClient.load('candidate-model.gguf',2048);
+assert.equal(replacementLoadCalls,1,'a replacement model must reach native RAM preflight even when current free RAM is below its threshold');
+assert.equal(replacementClient.loadedFileName,'candidate-model.gguf','successful replacement loads must update the active model name');
+
 
 let failDownload = true;
 const retryPlugin = {
