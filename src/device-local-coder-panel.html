@@ -1,0 +1,18 @@
+<div class="panel device-local-model-panel hidden" id="deviceLocalModelsPanel">
+  <div class="section-head"><div><div class="eyebrow">ON-DEVICE GGUF</div><h3>Telefon içi model yöneticisi</h3></div><span class="pill">İnternetsiz çıkarım</span></div>
+  <p class="muted">Modeli ilk kez indirmek için internet gerekir. İndirme tamamlandıktan sonra model telefonda saklanır ve çıkarım sırasında API anahtarı veya internet kullanmaz.</p>
+  <div id="deviceLocalProfile" class="device-profile">Telefon bilgileri okunuyor…</div>
+  <label class="field-label" for="onDeviceModelCatalog">İndirilecek model</label>
+  <select id="onDeviceModelCatalog" class="input"></select>
+  <p id="onDeviceModelDescription" class="fineprint"></p>
+  <a id="onDeviceModelLicense" class="fineprint" target="_blank" rel="noopener noreferrer" hidden>Lisans koşullarını görüntüle</a>
+  <div class="row-actions"><button id="downloadOnDeviceModel" class="btn primary" type="button">Modeli indir</button><button id="cancelOnDeviceDownload" class="btn ghost small danger-text" type="button" hidden disabled>İndirmeyi iptal et</button><button id="refreshDeviceLocalModels" class="btn ghost small" type="button">Yenile</button></div>
+  <div class="row-actions"><button id="importOnDeviceModel" class="btn ghost small" type="button">Dosyadan GGUF içe aktar</button><button id="cancelOnDeviceImport" class="btn ghost small danger-text" type="button" hidden disabled>Aktarımı iptal et</button></div>
+  <p class="fineprint">İnternet gerekmez: önceden elinde bulunan .gguf dosyasını USB, hafıza kartı veya dosya paylaşımıyla telefona kopyalayıp seçebilirsin.</p>
+  <label class="field-label" for="installedLocalModel">Telefona indirilmiş modeller</label>
+  <select id="installedLocalModel" class="input"><option value="">Henüz model yok</option></select>
+  <label class="field-label" for="onDeviceContextSize">Bağlam boyutu</label>
+  <select id="onDeviceContextSize" class="input"><option value="1024">1024 · En az bellek</option><option value="2048" selected>2048 · Önerilen</option><option value="4096">4096 · Daha fazla bellek</option></select>
+  <div class="row-actions"><button id="loadOnDeviceModel" class="btn secondary" type="button">Belleğe yükle</button><button id="unloadOnDeviceModel" class="btn ghost small" type="button">Bellekten kapat</button><button id="deleteOnDeviceModel" class="btn ghost small danger-text" type="button">Modeli sil</button></div>
+  <p id="onDeviceModelStatus" class="fineprint" role="status">Cihaz bilgileri okunuyor…</p>
+</div>

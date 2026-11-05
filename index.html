@@ -4,19 +4,19 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#0b1020">
-  <meta name="description" content="AI Studio Alpha 1 - çoklu model ve oyun geliştirme çalışma alanı">
-  <meta name="application-name" content="AI Studio Alpha 1">
+  <meta name="description" content="AI Studio - çoklu model ve yazılım geliştirme çalışma alanı">
+  <meta name="application-name" content="AI Studio">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" href="./icon.svg" type="image/svg+xml">
-  <title>AI Studio Alpha 1</title>
+  <title>AI Studio</title>
 </head>
 <body>
   <div id="app">
     <header class="topbar">
       <a class="brand" href="#home" aria-label="AI Studio ana ekran">
-        <span class="brand-mark">✳</span><span><strong>AI Studio</strong><small>ALPHA 1 · MOBILE WORKSPACE</small></span>
+        <span class="brand-mark">✳</span><span><strong>AI Studio</strong><small>MOBILE WORKSPACE</small></span>
       </a>
       <div class="topbar-actions">
         <button id="installWebAppBtn" type="button" class="btn ghost small hidden">Uygulamayı yükle</button>
@@ -56,7 +56,7 @@
         <div class="chat-window" id="chatMessages" aria-live="polite"></div>
         <form id="chatForm" class="compose">
           <textarea id="chatInput" class="input compose-input" rows="3" maxlength="12000" placeholder="Görevi yaz... Örn. oyunum için modüler görev planı oluştur." required></textarea>
-          <div class="compose-actions"><button type="button" class="btn ghost small" id="exportChat">Sohbeti dışa aktar</button><span class="grow"></span><button type="button" class="btn secondary small" id="teamRun">Paralel takım (en fazla 4)</button><button type="button" class="btn ghost small" id="pipelineRun">Sıralı ajan zinciri</button><button type="submit" class="btn primary">Gönder ↗</button></div>
+          <div class="compose-actions"><button type="button" class="btn ghost small" id="exportChat">Sohbeti dışa aktar</button><span class="grow"></span><button type="button" class="btn secondary small" id="teamRun">Paralel takım</button><button type="button" class="btn ghost small" id="pipelineRun">Sıralı ajan zinciri</button><button type="submit" class="btn primary">Gönder ↗</button></div>
         </form>
         <div class="row-actions"><button class="btn ghost small" id="clearChat">Sohbeti temizle</button><span class="muted">Geçmiş bu cihazda saklanır.</span></div>
       </section>
@@ -76,8 +76,9 @@
         <div class="notice"><strong>Güvenlik:</strong> Android uygulamasında anahtarlar KeyStore tabanlı şifreli depoda saklanır. Yine de ele geçirilmiş/root erişimli bir cihaz veya uygulama incelemesi risktir. Kod depomuzda anahtarın yok; bu ekrana yalnızca kendi anahtarını gir. Gerçek kullanım ücretli olabilir.</div>
         <div class="panel">
           <div class="switch-row"><div><strong>Demo modu</strong><small>Varsayılan açık. Gerçek API çağrılarının önüne geçer.</small></div><label class="switch"><input type="checkbox" id="settingsDemoToggle" checked><span></span></label></div>
-          <div class="field-label spacer-label">Takım turuna katılacak ajanları seç (en fazla 4)</div>
+          <div class="field-label spacer-label">Takım turuna katılacak AI sağlayıcılarını seç</div>
           <div class="team-chips" id="teamChips"></div>
+          <div class="row-actions"><button class="btn secondary small" id="selectAllTeam" type="button">Tüm AI sağlayıcılarını takıma ekle</button><span class="muted">İstediğin kadarını aynı anda çalıştırabilirsin.</span></div>
         </div>
         <div id="providerGrid" class="stack"></div>
         <div class="panel">
@@ -103,7 +104,29 @@
 
       <section class="screen" id="tools">
         <div class="page-title"><div class="eyebrow">TOOLBOX / PROMPT PLUGINS</div><h1>Araçlar ve eklentiler</h1><p>Hazır görev şablonları kullan, kendi prompt eklentilerini oluştur veya kod parçalarını dışa aktar.</p></div>
-        <div class="section-head"><div><div class="eyebrow">LOCAL CODER / OFFLINE WORKFLOW</div><h2>Local Coder atölyesi</h2></div><span class="pill">Ollama</span></div>
+        <div class="section-head"><div><div class="eyebrow">LOCAL CODER / OFFLINE WORKFLOW</div><h2>Local Coder atölyesi</h2></div><span class="pill">PC + Telefon</span></div>
+        <label class="field-label" for="localCoderEngine">Çalışma motoru</label>
+        <select class="input" id="localCoderEngine"><option value="ollama">PC / Ollama · Mevcut bağlantı</option><option value="device">Telefon içi GGUF · Çevrimdışı</option><option value="api">API anahtarlı model · Çevrimiçi</option></select>
+        <div class="panel hidden" id="localCoderApiSettings"><label class="field-label" for="localCoderApiProvider">API sağlayıcısı</label><select class="input" id="localCoderApiProvider"></select><p class="fineprint">Seçtiğin sağlayıcının API anahtarı Modeller ekranında kayıtlı olmalı. Her Local Coder çalıştırması Plan, Kod ve İnceleme için 3 istek gönderir.</p></div>
+        <p class="fineprint">API anahtarlı sağlayıcılar Local Coder, Takım Sohbeti ve Karşılaştırma bölümlerinde kullanılabilir. Telefon içi model, ilk indirmeden sonra internet kullanmadan çıkarım yapar.</p>
+                <div class="panel device-local-model-panel hidden" id="deviceLocalModelsPanel">
+          <div class="section-head"><div><div class="eyebrow">ON-DEVICE GGUF</div><h3>Telefon içi model yöneticisi</h3></div><span class="pill">İnternetsiz çıkarım</span></div>
+          <p class="muted">Modeli ilk kez indirmek için internet gerekir. İndirme tamamlandıktan sonra model telefonda saklanır ve çıkarım sırasında API anahtarı veya internet kullanmaz.</p>
+          <div id="deviceLocalProfile" class="device-profile">Telefon bilgileri okunuyor…</div>
+          <label class="field-label" for="onDeviceModelCatalog">İndirilecek model</label>
+          <select id="onDeviceModelCatalog" class="input"></select>
+          <p id="onDeviceModelDescription" class="fineprint"></p>
+          <a id="onDeviceModelLicense" class="fineprint" target="_blank" rel="noopener noreferrer" hidden>Lisans koşullarını görüntüle</a>
+          <div class="row-actions"><button id="downloadOnDeviceModel" class="btn primary" type="button">Modeli indir</button><button id="cancelOnDeviceDownload" class="btn ghost small danger-text" type="button" hidden disabled>İndirmeyi iptal et</button><button id="refreshDeviceLocalModels" class="btn ghost small" type="button">Yenile</button></div>
+          <div class="row-actions"><button id="importOnDeviceModel" class="btn ghost small" type="button">Dosyadan GGUF içe aktar</button><button id="cancelOnDeviceImport" class="btn ghost small danger-text" type="button" hidden disabled>Aktarımı iptal et</button></div>
+  <p class="fineprint">İnternet gerekmez: önceden elinde bulunan .gguf dosyasını USB, hafıza kartı veya dosya paylaşımıyla telefona kopyalayıp seçebilirsin.</p>
+          <label class="field-label" for="installedLocalModel">Telefona indirilmiş modeller</label>
+          <select id="installedLocalModel" class="input"><option value="">Henüz model yok</option></select>
+          <label class="field-label" for="onDeviceContextSize">Bağlam boyutu</label>
+          <select id="onDeviceContextSize" class="input"><option value="1024">1024 · En az bellek</option><option value="2048" selected>2048 · Önerilen</option><option value="4096">4096 · Daha fazla bellek</option></select>
+          <div class="row-actions"><button id="loadOnDeviceModel" class="btn secondary" type="button">Belleğe yükle</button><button id="unloadOnDeviceModel" class="btn ghost small" type="button">Bellekten kapat</button><button id="deleteOnDeviceModel" class="btn ghost small danger-text" type="button">Modeli sil</button></div>
+          <p id="onDeviceModelStatus" class="fineprint" role="status">Cihaz bilgileri okunuyor…</p>
+        </div>
         <div class="panel">
           <p class="muted">Planla → kod taslağı üret → incele. Modelin Ollama ile bu cihazda veya güvendiğin yerel ağdaki bilgisayarda çalışıyor olmalı.</p>
           <div class="notice compact"><strong>Gerçek durum:</strong> Model APK’ya veya siteye gömülü değil. Bu araç dosyaları otomatik yazmaz, kodu çalıştırmaz; taslağı gösterir ve sen onaylayınca Kod Alanı’na aktarır. HTTPS web sitesi yerel HTTP Ollama bağlantısını tarayıcı güvenlik kuralları nedeniyle engelleyebilir.</div>
@@ -117,6 +140,30 @@
           <label class="field-label" for="localCoderReview">İnceleme ve test önerileri</label>
           <textarea id="localCoderReview" class="input" rows="5" readonly placeholder="Son aşamada inceleme ve test listesi gelecek."></textarea>
         </div>
+        <section class="panel skill-library-panel" id="skillLibraryPanel">
+          <div class="section-head"><div><div class="eyebrow">SKILL ENGINE</div><h2>Skill Kütüphanesi</h2></div><span class="pill">Offline · Text-only</span></div>
+          <p class="muted">Skill’ler Local Coder’ın plan, kod ve inceleme aşamalarına bağlam olarak eklenir. İçerik cihazda saklanır; internet gerekmez. İçe aktarılan SKILL.md dosyaları talimattır, kod çalıştırmaz.</p>
+          <label class="field-label" for="skillProfileSelect">Hazır profil</label>
+          <select id="skillProfileSelect" class="input"><option value="karpathy">Karpathy Guidelines</option><option value="superpowers">Superpowers</option><option value="superpowers-development">Superpowers Development</option><option value="planning">Planning</option><option value="review">Review</option><option value="caveman">Caveman</option><option value="caveman-short">Caveman Short Mode</option><option value="balanced">Dengeli Geliştirme</option><option value="custom">Özel seçim</option></select>
+          <div class="row-actions"><strong id="skillSelectedCount">1/8 Skill seçili</strong><span class="grow"></span><button class="btn ghost small" id="skillExportBtn" type="button">Skill ayarlarını dışa aktar</button></div>
+          <div id="skillLibraryList" class="skill-library-list"></div>
+          <div class="skill-import-row"><div><strong>Kendi Skill’ini ekle</strong><p class="fineprint">SKILL.md içe aktar · en fazla 12.000 karakter / Skill</p></div><span class="grow"></span><button class="btn secondary small" id="skillImportBtn" type="button">.md içe aktar</button><input id="skillImportFiles" type="file" accept=".md,text/markdown" multiple hidden></div>
+          <dialog id="skillImportDialog" class="skill-import-dialog" aria-labelledby="skillImportDialogTitle">
+            <div class="skill-import-preview">
+              <div class="section-head"><div><div class="eyebrow">SKILL IMPORT</div><h2 id="skillImportDialogTitle">Skill önizlemesi</h2></div><span class="pill">Kaydetmeden önce incele</span></div>
+              <p class="fineprint">Dosya: <strong id="skillImportPreviewFile"></strong></p>
+              <h3 id="skillImportPreviewName"></h3>
+              <p id="skillImportPreviewDescription" class="muted"></p>
+              <p class="fineprint">Aşama: <strong id="skillImportPreviewStage"></strong></p>
+              <pre id="skillImportPreviewContent" class="skill-import-preview-content"></pre>
+              <dl id="skillImportPreviewMetadata" class="skill-import-preview-metadata"></dl>
+              <p id="skillImportPreviewExtra" class="fineprint"></p>
+              <p id="skillImportPreviewWarning" class="fineprint" role="status"></p>
+              <div class="row-actions"><button class="btn ghost small" id="skillImportSkip" type="button">Bu dosyayı atla</button><span class="grow"></span><button class="btn primary small" id="skillImportAccept" type="button">Kaydet ve devam et</button></div>
+            </div>
+          </dialog>
+          <p id="skillLibraryStatus" class="fineprint" role="status"></p>
+        </section>
         <div class="panel hidden" id="nativeVaultPanel">
           <div class="section-head"><div><div class="eyebrow">MOBILE SHARED VAULT</div><h2>AI Studio’yu ortak kasaya bağla</h2></div><span class="pill">HTTPS + token</span></div>
           <p class="muted">Özel web sitesinde oluşturduğun agent tokenını buraya gir. Token Android’in güvenli anahtar deposunda saklanır; çalışma alanı yedeğine veya kaynak koduna eklenmez. Salt okunur token kayıtları okur; readwrite token kayıt ekleyip silebilir.</p>

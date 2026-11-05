@@ -4,9 +4,27 @@ import { encryptWorkspaceBackup, decryptWorkspaceBackup } from '../src/encrypted
 import { readFileSync } from 'node:fs';
 import { reuseCatalog, buildLocalCoderStages, extractCodeArtifact, normalizeSnippet } from '../src/workshop-data.js';
 import { buildSharedProjectContext } from '../src/project-context.js';
+import { normalizeTeamSelection, normalizeOpenAiEndpoint, getTeamStageDetails } from '../src/ai-team.js';
 import { buildSharedVaultContext } from '../src/shared-vault-context.js';
 const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
 const main=readFileSync(new URL('../src/main.js',import.meta.url),'utf8');
+
+const everyProvider = ['openai','anthropic','gemini','deepseek','groq','openrouter','huggingface','custom','ollama'];
+assert.deepEqual(normalizeTeamSelection(everyProvider,everyProvider),everyProvider,'AI Team must preserve every selected provider, not cap at four');
+assert.deepEqual(normalizeTeamSelection(['openai','openai','unknown','ollama'],everyProvider),['openai','ollama'],'Team selection should de-duplicate and reject unknown IDs');
+assert.equal(normalizeOpenAiEndpoint('https://api.mistral.ai/v1'),'https://api.mistral.ai/v1/chat/completions');
+assert.equal(normalizeOpenAiEndpoint('https://router.huggingface.co/v1/chat/completions'),'https://router.huggingface.co/v1/chat/completions');
+assert.throws(()=>normalizeOpenAiEndpoint('http://api.example.com/v1'),/HTTPS/);
+assert.throws(()=>normalizeOpenAiEndpoint('javascript:alert(1)'),/HTTPS/);
+assert.equal(getTeamStageDetails(0,9).role,'Mimar / planlayıcı');
+assert.equal(getTeamStageDetails(3,9).role,'Testçi / son kontrol');
+assert.match(getTeamStageDetails(8,9).instruction,/yeni katkı sun/);
+assert.match(main,/settings\\.team=normalizeTeamSelection/);
+assert.doesNotMatch(main,/settings\\.team\\.slice\\(0,4\\)/);
+assert.match(html,/id="selectAllTeam"/);
+assert.match(main,/normalizeOpenAiEndpoint\\(settings\\.customEndpoint\\)/);
+assert.match(main,/huggingface: \\{ name:'Hugging Face Inference'/);
+
 for(const id of ['localCoderTask','localCoderRun','localCoderOutput','localCoderReview','reuseCatalogGrid','snippetForm','snippetList','agentActivityList','savedCodeFileSelect','savedCodeFileName','newCodeFile','saveCodeFile','deleteCodeFile','exportCodeFiles','importCodeFilesBtn','importCodeFilesFile','projectContextStatus','shareReusableContext','nativeVaultPanel','nativeVaultBaseUrl','nativeVaultToken','nativeVaultConnect','nativeVaultForm','nativeVaultItems','nativeShareVaultContext']) assert.match(html,new RegExp('id="'+id+'"'),'Missing UI: '+id);
 assert.match(main,/buildLocalCoderStages/);assert.match(main,/callProvider\('ollama'/);assert.match(main,/DB\.snippets/);assert.match(main,/DB\.activity/);
 assert.match(main,/DB\.codeFiles/);

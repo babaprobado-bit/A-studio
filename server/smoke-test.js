@@ -141,7 +141,7 @@ try {
 
   const appPage = await request('/', { headers: { Cookie: cookie } });
   assert.equal(appPage.status, 200, 'Authenticated session should load app');
-  assert.match(await appPage.text(), /AI Studio Alpha 1/);
+  assert.match(await appPage.text(), /AI Studio/);
 
   const logout = await request('/api/logout', {
     method: 'POST',

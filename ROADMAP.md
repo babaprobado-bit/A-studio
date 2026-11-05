@@ -1,35 +1,60 @@
-# AI Studio Alpha 1 — Feature status and next steps
+# AI Studio — Current feature status and next steps
 
-This document separates implemented features from plans. A button or prompt template is not a working autonomous agent.
+## Current verified checkpoint — 2026-11-05
 
-## Working in the current workspace
+- Latest app-code/test commit: `b9677813676c8138651848620fa1ef0ab5fc3b86`. Native workflow [41885349742](https://github.com/babaprobado-bit/A-studio/actions/runs/41885349742) completed successfully, including all regression checks, Capacitor generation/sync, Gradle `assembleDebug` and artifact upload.
+- Latest native GGUF APK: `AI-Studio-1.1-OnDevice-LocalCoder-APK`, artifact ID `13351543088`, **18,154,391 bytes**. SHA-256: `65b16549595534ba9996223cb99c29e1cbf3cee79fcb25a76017bad8a75598ee`. Artifact was created 2026-11-04 18:29:28 UTC and expires 2026-11-18 18:29:26 UTC. [Open the successful native build and download its artifact](https://github.com/babaprobado-bit/A-studio/actions/runs/41885349742).
+- This APK is built from `b967781...` and includes the already-loaded-model idempotent-load fix plus the prior imported-GGUF RAM guardrails. It is the current native artifact; do not confuse it with the smaller demo APK.
+- GitHub Actions proves regression/build/package success only. No physical install, Android GGUF import/load, actual on-device inference or airplane-mode test has been performed. The user currently has no phone/computer available for hands-on validation; do not ask them to test right now.
+- PR #2 remains open, Draft and unmerged. Base `main` remains `aab010319b6500002844bd24b11da85dd9ca3b00`; do not modify `main` or merge.
 
-- Multi-provider chat and model comparison, with configured provider API keys.
-- Parallel team requests and a sequential text-passing agent pipeline. Runs are explicitly started by the user, not always-on computer control.
-- Prompt-only plugin creation/import/export. Imported plugins do not execute code.
-- Local project notes, chat history, and JSON workspace backup/restore.
-- Private web server gate with one shared site password and signed session cookie; hosting must still be configured.
-- Local Coder: user-started three-stage workflow using a model already running in Ollama.
-- Reuse Catalog: links to upstream engines and asset repositories, including license pages.
-- Snippet Vault: local reusable code/text records with source/license fields; JSON import/export.
-- Recent Local Coder stage log in local app/browser storage.
+This checkpoint supersedes older queued/in-progress status notes below. Older artifact records remain as build history.
 
-## Not implemented yet
 
-- A model binary shipped inside the APK or website. Install/download a model separately; a small quantized model can still be slow or inaccurate on low-memory hardware.
-- Agent writes directly into arbitrary PC folders, runs shell commands, launches game engines, installs dependencies, or executes test suites.
-- Long-running unattended agent loop that changes code without the user starting/approving each run.
-- Cloud database, individual accounts, end-to-end encrypted cloud vault, or cross-device synchronization.
-- Website deployment and a permanent public URL.
-- Automatic downloading/reuse of third-party repositories/assets. The catalog is a source directory, not an asset mirror.
+This document separates implemented source, automated checks, CI APK builds and physical-device results. A button, source patch or JavaScript fake does not prove that Android has run a feature. Product name: **AI Studio**; “Alpha 1” is an internal milestone only.
 
-## Next stages
+## Current development track
 
-1. Add a local desktop companion with a clear per-folder permission boundary, diff/approval screen, command allowlist, and captured test results.
-2. Add signed project exports and integrity checks to the local snippet vault.
-3. Add per-user login and server-side database before multi-device cloud sync.
-4. Add an optional opt-in scheduler only after these are tested; show activity, resource use, stop control, and explicit permissions.
+- Repository: `babaprobado-bit/A-studio`
+- Active branch: `feature/android-offline-skills-v1`
+- Current source head: `6afe4ccfde5f29085a3ad0f2079f0f6addbe5107`
+- Review boundary: draft PR #2 — https://github.com/babaprobado-bit/A-studio/pull/2
+- `main` remains untouched. PR #2 stays draft until the user explicitly changes that decision.
 
-## Reuse and licensing
+## Current product capabilities in source
 
-Catalog links are starting points only. Verify the actual version and license of every code, model, sound, texture, 3D asset, add-on and bundled dependency. Keep required attribution and license notices in the project.
+- Multi-provider chat and comparison: OpenAI, Anthropic/Claude, Gemini, DeepSeek, Groq, OpenRouter and Ollama.
+- Local Coder engines: PC/Ollama, Android on-device GGUF and explicit-consent API mode.
+- Local GGUF download uses Android DownloadManager, temporary `.part` storage, GGUF header validation and a visible cancel action.
+- **No-internet GGUF import:** Android document picker can import a `.gguf` file already present on the phone. Copy it beforehand through USB, SD card or file sharing. Import itself does not need internet; it does not acquire model weights.
+- Local import includes an 8 GB cap, sanitized filenames, app-scoped temporary files, free-storage checks, progress events, in-copy cancellation, partial-file cleanup and GGUF validation.
+- Model picker presents per-model license links and the 3B non-commercial research/evaluation notice.
+- Skill Library contains 38 original AI Studio starter instructions, profiles, safe text-only SKILL.md import/preview, multi-file queue, metadata/caps and backup/restore.
+- API Local Coder is an explicit-consent Plan → Code → Review workflow; provider credentials stay outside workspace backups.
+
+## Latest source and CI status
+
+- Current app-code/test commit: `b9677813676c8138651848620fa1ef0ab5fc3b86`; follow-up native build [41885349742](https://github.com/babaprobado-bit/A-studio/actions/runs/41885349742) was queued at last check.
+- Native GGUF run [41706759331](https://github.com/babaprobado-bit/A-studio/actions/runs/41706759331) succeeded for source `6afe4cc...`: APK artifact `13266781713`, 18,154,318 bytes, SHA-256 `d9ab6beafb65a6d570436fe1eeda959cdbbd55a608c5cde3f411b8e2c42583a7`.
+- `6afe4cc` includes the imported-GGUF RAM estimate in JS and live-memory check in Kotlin; `b967781` adds idempotent same-model load behavior so a second tap does not need additional RAM or re-enter native load. A fake-plugin test covers the low-memory case.
+- Regression tests exercise the JS/native bridge through fakes and actual-screen HTML wiring. CI compilation does not prove real phone inference.
+
+## Internet-unavailable development path
+
+1. Continue reviewing native import/download code, storage accounting, path safety, cancellation and model lifecycle.
+2. Add regression tests around Android bridge wrappers and live HTML/handler wiring.
+3. Keep the file-picker path for an already-present GGUF file; the model itself must already exist and be copied onto the phone.
+4. Finish current-source CI and inspect failures/artifacts. CI proves compilation and automated tests, not real device behavior.
+5. Keep REA/MCP optional and separate; do not install or connect remote services as part of offline work.
+
+## Deferred device acceptance
+
+No physical phone install, GGUF import, model load/inference, temperature/memory measurement or airplane-mode test has been completed. The user currently has no internet and no phone/computer for hands-on tests. Do not call native inference proven; continue source development and GitHub-hosted CI.
+
+## Release guardrails
+
+- Do not commit provider keys, vault credentials, signing keys or other secrets.
+- Keep imported Skill Markdown and model metadata as untrusted input; do not execute them.
+- Preserve existing chat, projects, Ollama, API, backups, Skills, snippets and shared vault.
+- Keep model weights separate from the APK and retain model/engine license notices.
+- Do not merge PR #2 or change `main` without explicit user permission.
