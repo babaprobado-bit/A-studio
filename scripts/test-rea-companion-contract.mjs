@@ -261,17 +261,17 @@ assert.equal(rateLimited.pair({
 }).scope, 'rea.read');
 
 const lifecycleAdapter = new FakeReadOnlyAdapter();
-assert.throws(
+await assert.rejects(
   () => lifecycleAdapter.analyze(normalized),
   error => error.code === 'USER_APPROVAL_REQUIRED'
 );
-assert.throws(
+await assert.rejects(
   () => lifecycleAdapter.analyze(normalized, { userApproved: true, forwardToProvider: true }),
   error => error.code === 'PROVIDER_FORWARDING_DISABLED'
 );
 const lifecycleResponse = await lifecycleAdapter.analyze(normalized, { userApproved: true });
 assert.equal(validateAnalysisResponse(lifecycleResponse, normalized).ok, true);
-assert.throws(
+await assert.rejects(
   () => lifecycleAdapter.analyze(normalized, { userApproved: true }),
   error => error.code === 'REQUEST_REPLAYED'
 );
