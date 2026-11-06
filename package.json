@@ -4,9 +4,7 @@
   "private": true,
   "type": "module",
   "description": "AI Studio with multi-provider workspace, Local Coder, encrypted shared AI vault, PostgreSQL persistence, and agent REST API",
-  "engines": {
-    "node": ">=20"
-  },
+  "engines": { "node": ">=20" },
   "scripts": {
     "build": "vite build",
     "start": "node server/server.js",
@@ -16,7 +14,7 @@
     "test:device-local-coder": "node scripts/test-device-local-coder.mjs",
     "test:api-local-coder": "node scripts/test-api-local-coder.mjs",
     "test:ai-team": "node scripts/test-ai-team.mjs",
-    "test:rea-contract": "node scripts/test-rea-companion-contract.mjs"
+    "test:rea-companion-contract": "node scripts/test-rea-companion-contract.mjs"
   },
   "dependencies": {
     "express": "^5.1.0",

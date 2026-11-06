@@ -1,184 +1,240 @@
-/**
- * Pure validation helpers for the proposed REA Companion protocol.
- * This module intentionally contains no HTTP, MCP, filesystem, process or socket code.
- * It does not connect to, launch, install or invoke REA.
- */
+export const REA_PROTOCOL_VERSION = '1';
+export const REA_READ_SCOPE = 'rea.read';
 
-export const REA_COMPANION_PROTOCOL_VERSION = '1';
-export const REA_COMPANION_READ_SCOPE = 'rea.read';
-export const REA_COMPANION_OPERATIONS = Object.freeze([
+export const REA_ALLOWED_OPERATIONS = Object.freeze([
   'project.overview',
   'files.inspect',
   'symbols.search'
 ]);
 
-export const REA_COMPANION_LIMITS = Object.freeze({
+export const REA_LIMITS = Object.freeze({
+  maxRequestBytes: 1024 * 1024,
   maxPaths: 50,
-  maxPathChars: 512,
-  maxQuestionChars: 4000,
-  maxSearchChars: 2000,
+  maxPathLength: 512,
+  maxQuestionLength: 4000,
+  maxQuestionBytes: 16000,
   maxResultBytes: 1024 * 1024,
-  defaultResultBytes: 1024 * 1024,
-  defaultTimeoutMs: 30_000,
-  maxTimeoutMs: 120_000
+  maxTimeoutMs: 120000,
+  defaultTimeoutMs: 30000
 });
 
-function isRecord(value) {
-  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
-  const prototype = Object.getPrototypeOf(value);
-  return prototype === Object.prototype || prototype === null;
-}
+const ERROR_CODES = new Set([
+  'PAIRING_REQUIRED', 'SESSION_EXPIRED', 'SCOPE_DENIED', 'ORIGIN_REJECTED',
+  'PROJECT_NOT_REGISTERED', 'PATH_REJECTED', 'OPERATION_NOT_ALLOWED',
+  'LIMIT_EXCEEDED', 'REA_UNAVAILABLE', 'TIMEOUT', 'INTERNAL_ERROR'
+]);
 
-function hasOnlyKeys(value, allowed) {
-  return Object.keys(value).every(key => allowed.includes(key));
-}
+const isRecord = value => value !== null && typeof value === 'object' &&
+  !Array.isArray(value) && (Object.getPrototypeOf(value) === Object.prototype ||
+    Object.getPrototypeOf(value) === null);
 
-function failure(code, message) {
-  return { ok: false, error: { code, message } };
-}
+const hasExactKeys = (value, allowed, required = allowed) => {
+  if (!isRecord(value)) return false;
+  const keys = Object.keys(value);
+  return keys.every(key => allowed.includes(key)) &&
+    required.every(key => Object.prototype.hasOwnProperty.call(value, key));
+};
 
-function success(value) {
-  return { ok: true, value };
-}
-
-function boundedString(value, { min = 1, max, trim = true, allowNewlines = false } = {}) {
-  if (typeof value !== 'string') return null;
-  const normalized = trim ? value.trim() : value;
-  if (normalized.length < min || normalized.length > max) return null;
-  const controls = allowNewlines
-    ? /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/
-    : /[\u0000-\u001F\u007F]/;
-  if (controls.test(normalized)) return null;
-  return normalized;
-}
+const utf8ByteLength = value => new TextEncoder().encode(value).byteLength;
+const isNonEmptyString = value => typeof value === 'string' && value.trim().length > 0;
+const isOpaqueId = value => typeof value === 'string' && /^[A-Za-z0-9_-]{8,128}$/.test(value);
+const isUuid = value => typeof value === 'string' &&
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 
 function validateRelativePath(value) {
-  const path = boundedString(value, { min: 1, max: REA_COMPANION_LIMITS.maxPathChars });
-  if (!path) return null;
-  if (path.startsWith('/') || path.startsWith('~')) return null;
-  if (path.includes('\\') || path.includes('%') || path.includes(':')) return null;
-  if (/^[A-Za-z]:/.test(path)) return null;
-  const segments = path.split('/');
-  if (segments.some(segment => !segment || segment === '.' || segment === '..')) return null;
-  return path;
+  if (typeof value !== 'string' || value.length === 0 ||
+      value.length > REA_LIMITS.maxPathLength) return false;
+  if (value.startsWith('/') || value.startsWith('\\') ||
+      value.includes('\\') || value.includes('%') || value.includes(':') ||
+      /[\u0000-\u001f\u007f]/.test(value)) return false;
+  const segments = value.split('/');
+  if (segments.some(segment => !segment || segment === '.' || segment === '..')) return false;
+  if (segments.some(segment => /[. ]$/.test(segment))) return false;
+  if (segments.some(segment => /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$/i.test(segment))) return false;
+  return true;
 }
 
-function validatePaths(value, { optional = false } = {}) {
-  if (value === undefined && optional) return success(undefined);
-  if (!Array.isArray(value) || value.length < 1 || value.length > REA_COMPANION_LIMITS.maxPaths) {
-    return failure('INVALID_PATHS', 'paths must contain between 1 and 50 selected relative paths.');
+function validatePathList(paths, selectedPaths, errors, label = 'target.paths') {
+  if (!Array.isArray(paths) || paths.length < 1 || paths.length > REA_LIMITS.maxPaths) {
+    errors.push(label + ' must contain between 1 and ' + REA_LIMITS.maxPaths + ' selected relative paths');
+    return;
   }
-  const paths = [];
+  const approved = new Set(Array.isArray(selectedPaths) ? selectedPaths : []);
   const seen = new Set();
-  for (const item of value) {
-    const path = validateRelativePath(item);
-    if (!path) return failure('PATH_REJECTED', 'Each path must be a safe, normalized relative path.');
-    if (seen.has(path)) return failure('DUPLICATE_PATH', 'Duplicate paths are not allowed.');
+  for (const path of paths) {
+    if (!validateRelativePath(path)) {
+      errors.push(label + ' contains an unsafe relative path');
+      continue;
+    }
+    if (seen.has(path)) errors.push(label + ' contains a duplicate path');
     seen.add(path);
-    paths.push(path);
+    if (!approved.has(path)) errors.push(label + ' contains a path not explicitly selected for this request');
   }
-  return success(paths);
 }
 
-/** Validate the JSON body for POST /v1/pair. Runtime pairing code checks remain host-side. */
-export function validatePairRequest(input) {
-  if (!isRecord(input) || !hasOnlyKeys(input, ['code', 'clientName', 'requestedScopes'])) {
-    return failure('INVALID_PAIR_REQUEST', 'Pair request must be a plain object with only supported fields.');
+export function validateAnalysisRequest(input, context = {}) {
+  const errors = [];
+  if (!isRecord(input)) return { ok: false, errors: ['request must be a JSON object'], value: null };
+  let encoded;
+  try {
+    encoded = JSON.stringify(input);
+  } catch {
+    return { ok: false, errors: ['request must be JSON-serializable'], value: null };
   }
-  if (typeof input.code !== 'string' || !/^\d{6}$/.test(input.code)) {
-    return failure('INVALID_PAIRING_CODE', 'Pairing code must be exactly six digits.');
+  if (utf8ByteLength(encoded) > REA_LIMITS.maxRequestBytes) {
+    return { ok: false, errors: ['request exceeds the maximum body size'], value: null };
   }
-  const clientName = boundedString(input.clientName, { min: 1, max: 64 });
-  if (!clientName) return failure('INVALID_CLIENT_NAME', 'Client name must contain 1–64 safe characters.');
-  if (!Array.isArray(input.requestedScopes) || input.requestedScopes.length !== 1 || input.requestedScopes[0] !== REA_COMPANION_READ_SCOPE) {
-    return failure('SCOPE_DENIED', 'V0 pairing may request only the rea.read scope.');
-  }
-  return success({
-    code: input.code,
-    clientName,
-    requestedScopes: [REA_COMPANION_READ_SCOPE]
-  });
-}
+  input = JSON.parse(encoded);
 
-/** Validate one allowlisted, read-only POST /v1/analysis request. */
-export function validateAnalysisRequest(input) {
-  const rootKeys = ['requestId', 'projectId', 'operation', 'target', 'question', 'limits'];
-  if (!isRecord(input) || !hasOnlyKeys(input, rootKeys)) {
-    return failure('INVALID_REQUEST', 'Analysis request must be a plain object with only supported fields.');
+  const required = ['requestId', 'projectId', 'operation', 'target', 'question'];
+  if (!hasExactKeys(input, ['requestId', 'projectId', 'operation', 'target', 'question', 'limits'], required)) {
+    errors.push('request contains missing or unknown fields');
+  }
+  if (!isUuid(input.requestId)) errors.push('requestId must be a UUID');
+  if (!isOpaqueId(input.projectId)) errors.push('projectId must be an opaque identifier');
+
+  const registered = context.registeredProjectIds instanceof Set
+    ? context.registeredProjectIds
+    : new Set(Array.isArray(context.registeredProjectIds) ? context.registeredProjectIds : []);
+  if (isOpaqueId(input.projectId) && !registered.has(input.projectId)) {
+    errors.push('projectId is not registered by the companion');
+  }
+  if (!REA_ALLOWED_OPERATIONS.includes(input.operation)) {
+    errors.push('operation is not in the read-only allowlist');
+  }
+  if (!isNonEmptyString(input.question) ||
+      input.question.length > REA_LIMITS.maxQuestionLength ||
+      utf8ByteLength(typeof input.question === 'string' ? input.question : '') > REA_LIMITS.maxQuestionBytes) {
+    errors.push('question must be non-empty and within the configured length limit');
   }
 
-  const requestId = boundedString(input.requestId, { min: 1, max: 128 });
-  if (!requestId || !/^[A-Za-z0-9][A-Za-z0-9._:-]*$/.test(requestId)) {
-    return failure('INVALID_REQUEST_ID', 'requestId contains unsupported characters or has an invalid length.');
-  }
-  const projectId = boundedString(input.projectId, { min: 16, max: 128 });
-  if (!projectId || !/^[A-Za-z0-9_-]+$/.test(projectId)) {
-    return failure('INVALID_PROJECT_ID', 'projectId must be an opaque identifier, not a filesystem path.');
-  }
-  if (!REA_COMPANION_OPERATIONS.includes(input.operation)) {
-    return failure('OPERATION_NOT_ALLOWED', 'Only the documented read-only operations are allowed.');
-  }
-  const question = boundedString(input.question, { min: 1, max: REA_COMPANION_LIMITS.maxQuestionChars, trim: false, allowNewlines: true });
-  if (!question || !question.trim()) {
-    return failure('INVALID_QUESTION', 'question must contain 1–4000 characters.');
-  }
-  if (!isRecord(input.target)) return failure('INVALID_TARGET', 'target must be an object.');
-
-  let target;
-  if (input.operation === 'project.overview') {
-    if (Object.keys(input.target).length !== 0) {
-      return failure('INVALID_TARGET', 'project.overview accepts an empty target only.');
-    }
-    target = {};
+  const target = input.target;
+  if (!isRecord(target)) {
+    errors.push('target must be a JSON object');
+  } else if (input.operation === 'project.overview') {
+    if (!hasExactKeys(target, [])) errors.push('project.overview target must be empty');
   } else if (input.operation === 'files.inspect') {
-    if (!hasOnlyKeys(input.target, ['paths'])) {
-      return failure('INVALID_TARGET', 'files.inspect accepts only selected paths.');
+    if (!hasExactKeys(target, ['paths'])) errors.push('files.inspect target accepts only paths');
+    else validatePathList(target.paths, context.explicitlySelectedPaths, errors);
+  } else if (input.operation === 'symbols.search') {
+    if (!hasExactKeys(target, ['query', 'paths'])) {
+      errors.push('symbols.search target requires query and paths only');
+    } else {
+      if (!isNonEmptyString(target.query) || target.query.length > 200) {
+        errors.push('symbols.search query must be 1 to 200 characters');
+      }
+      validatePathList(target.paths, context.explicitlySelectedPaths, errors, 'target.paths');
     }
-    const checked = validatePaths(input.target.paths);
-    if (!checked.ok) return checked;
-    target = { paths: checked.value };
-  } else {
-    if (!hasOnlyKeys(input.target, ['query', 'paths'])) {
-      return failure('INVALID_TARGET', 'symbols.search accepts only query and optional selected paths.');
-    }
-    const query = boundedString(input.target.query, { min: 1, max: REA_COMPANION_LIMITS.maxSearchChars });
-    if (!query) return failure('INVALID_SEARCH_QUERY', 'Search query must contain 1–2000 safe characters.');
-    const checked = validatePaths(input.target.paths, { optional: true });
-    if (!checked.ok) return checked;
-    target = { query, ...(checked.value ? { paths: checked.value } : {}) };
   }
 
-  let limits = {
-    maxResultBytes: REA_COMPANION_LIMITS.defaultResultBytes,
-    timeoutMs: REA_COMPANION_LIMITS.defaultTimeoutMs
+  let normalizedLimits = {
+    maxResultBytes: REA_LIMITS.maxResultBytes,
+    timeoutMs: REA_LIMITS.defaultTimeoutMs
   };
   if (input.limits !== undefined) {
-    if (!isRecord(input.limits) || !hasOnlyKeys(input.limits, ['maxResultBytes', 'timeoutMs'])) {
-      return failure('INVALID_LIMITS', 'limits may contain only maxResultBytes and timeoutMs.');
+    if (!hasExactKeys(input.limits, ['maxResultBytes', 'timeoutMs'])) {
+      errors.push('limits contains missing or unknown fields');
+    } else {
+      const { maxResultBytes, timeoutMs } = input.limits;
+      if (!Number.isInteger(maxResultBytes) || maxResultBytes < 1 ||
+          maxResultBytes > REA_LIMITS.maxResultBytes) {
+        errors.push('limits.maxResultBytes is outside the allowed range');
+      }
+      if (!Number.isInteger(timeoutMs) || timeoutMs < 1000 ||
+          timeoutMs > REA_LIMITS.maxTimeoutMs) {
+        errors.push('limits.timeoutMs is outside the allowed range');
+      }
+      normalizedLimits = { maxResultBytes, timeoutMs };
     }
-    const maxResultBytes = input.limits.maxResultBytes ?? limits.maxResultBytes;
-    const timeoutMs = input.limits.timeoutMs ?? Limits.timeoutMs;
-    if (!Number.isSafeInteger(maxResultBytes) || maxResultBytes < 1 || maxResultBytes > REA_COMPANION_LIMITS.maxResultBytes) {
-      return failure('LIMIT_EXCEEDED', 'maxResultBytes must be between 1 byte and 1 MiB.');
-    }
-    if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1000 || timeoutMs > REA_COMPANION_LIMITS.maxTimeoutMs) {
-      return failure('LIMIT_EXCEEDED', 'timeoutMs must be between 1000 and 120000.');
-    }
-    limits = { maxResultBytes, timeoutMs };
   }
+  if (errors.length) return { ok: false, errors, value: null };
 
-  return success({ requestId, projectId, operation: input.operation, target, question, limits });
+  return {
+    ok: true,
+    errors: [],
+    value: {
+      requestId: input.requestId,
+      projectId: input.projectId,
+      operation: input.operation,
+      target: input.target,
+      question: input.question,
+      limits: normalizedLimits
+    }
+  };
 }
 
-/** Exact Origin allowlist check. This is not a replacement for Host/CSRF/DNS-rebinding checks. */
-export function isAllowedCompanionOrigin(origin, allowlist) {
-  if (typeof origin !== 'string' || origin === 'null' || origin === '*' || !Array.isArray(allowlist)) return false;
-  let parsed;
+export function validateAnalysisResponse(input, request) {
+  const errors = [];
+  if (!isRecord(input)) return { ok: false, errors: ['response must be a JSON object'], value: null };
+  if (!hasExactKeys(input, [
+    'requestId', 'companionId', 'protocolVersion', 'operation',
+    'status', 'result', 'disclosure'
+  ])) errors.push('response contains missing or unknown fields');
+  if (input.requestId !== request?.requestId) errors.push('response requestId does not match the request');
+  if (!isOpaqueId(input.companionId)) errors.push('companionId must be an opaque identifier');
+  if (input.protocolVersion !== REA_PROTOCOL_VERSION) errors.push('unsupported protocol version');
+  if (input.operation !== request?.operation) errors.push('response operation does not match the request');
+  if (input.status !== 'completed') errors.push('response status must be completed');
+
+  if (!hasExactKeys(input.result, ['content']) || typeof input.result.content !== 'string') {
+    errors.push('response result must contain only text content');
+  } else {
+    const maxBytes = Number.isInteger(request?.limits?.maxResultBytes)
+      ? request.limits.maxResultBytes
+      : REA_LIMITS.maxResultBytes;
+    if (utf8ByteLength(input.result.content) > maxBytes) errors.push('response result exceeds the request byte limit');
+  }
+
+  if (!hasExactKeys(input.disclosure, ['projectId', 'paths', 'sentToModelProvider'])) {
+    errors.push('response disclosure is malformed');
+  } else {
+    if (input.disclosure.projectId !== request?.projectId) errors.push('response disclosure project does not match the request');
+    const expectedPaths = Array.isArray(request?.target?.paths) ? request.target.paths : [];
+    if (!Array.isArray(input.disclosure.paths) ||
+        JSON.stringify(input.disclosure.paths) !== JSON.stringify(expectedPaths)) {
+      errors.push('response disclosure paths do not match the request');
+    }
+    if (input.disclosure.sentToModelProvider !== false) {
+      errors.push('the companion must not forward results to a model provider');
+    }
+  }
+  return errors.length
+    ? { ok: false, errors, value: null }
+    : { ok: true, errors: [], value: input };
+}
+
+export function validateBridgeError(input) {
+  const errors = [];
+  if (!hasExactKeys(input, ['requestId', 'error']) ||
+      !hasExactKeys(input.error, ['code', 'message', 'retryable'])) {
+    return { ok: false, errors: ['error response is malformed'], value: null };
+  }
+  if (input.requestId !== null && input.requestId !== undefined && !isUuid(input.requestId)) {
+    errors.push('error requestId must be a UUID or null');
+  }
+  if (!ERROR_CODES.has(input.error.code)) errors.push('error code is not recognized');
+  if (!isNonEmptyString(input.error.message) || input.error.message.length > 240 ||
+      /[\r\n]/.test(input.error.message)) errors.push('error message is not sanitized');
+  if (typeof input.error.retryable !== 'boolean') errors.push('retryable must be boolean');
+  return errors.length
+    ? { ok: false, errors, value: null }
+    : { ok: true, errors: [], value: input };
+}
+
+export function validateBridgeOrigin({ origin, expectedOrigin, host, expectedHost } = {}) {
+  if (typeof origin !== 'string' || origin === 'null' ||
+      typeof expectedOrigin !== 'string' || origin !== expectedOrigin) return false;
+  if (typeof host !== 'string' || typeof expectedHost !== 'string' || host !== expectedHost) return false;
   try {
-    parsed = new URL(origin);
+    const parsed = new URL(origin);
+    const hostMatch = /^127\.0\.0\.1:(\d{1,5})$/.exec(host);
+    if (!hostMatch) return false;
+    const port = Number(hostMatch[1]);
+    return parsed.protocol === 'http:' && parsed.hostname === '127.0.0.1' &&
+      port >= 1 && port <= 65535 && String(port) === hostMatch[1] &&
+      parsed.port === String(port) && parsed.origin === expectedOrigin &&
+      parsed.username === '' && parsed.password === '';
   } catch {
     return false;
   }
-  if (!['http:', 'https:'].includes(parsed.protocol) || parsed.origin !== origin) return false;
-  return allowlist.some(allowed => typeof allowed === 'string' && allowed !== '*' && allowed !== 'null' && allowed === origin);
 }

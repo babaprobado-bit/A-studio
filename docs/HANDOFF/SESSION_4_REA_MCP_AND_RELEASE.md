@@ -1,3 +1,17 @@
+# REA Companion contract checkpoint — 2026-11-06
+
+## Mock-only implementation status
+
+- Added `src/rea-companion-contract.js` with pure validators for the versioned read-only bridge request/response/error shapes and exact loopback Origin/Host checks.
+- The only accepted analysis operations are `project.overview`, `files.inspect` and `symbols.search`. File/symbol paths must be relative, safe, registered-project scoped and explicitly selected for that request; unknown fields, generic MCP calls, shell commands, oversized payloads and overlong timeouts fail closed.
+- Added `scripts/test-rea-companion-contract.mjs` and `npm run test:rea-companion-contract`. The mock suite covers allowlists, invalid paths, request/result bounds, disclosure parity, provider-forwarding rejection, sanitized errors and exact `127.0.0.1` origin/host checks.
+- The test uses an in-process fake read-only adapter only. It does not install or launch REA, start a listener, open an MCP session, read user project files, call a provider or perform side effects.
+- Both Android CI workflows now run the contract test. AI Studio's Node engine remains `>=20`; no REA package or dependency was added.
+- Local verification: Node.js 22.16.0 `node --check` and `node scripts/test-rea-companion-contract.mjs` passed in an isolated fixture. Hosted CI for this repository commit still needs to complete.
+- **Not implemented:** pairing-code lifecycle, secure session-token storage, real companion transport, REA CLI/MCP process, Android-to-desktop networking and provider-forwarding UI. The validator is not wired into app UI or runtime calls. These require separate implementation review and the user's explicit approval before installing/connecting/executing anything.
+
+---
+
 # Verified REA integration research — 2026-11-06
 
 ## Current upstream facts

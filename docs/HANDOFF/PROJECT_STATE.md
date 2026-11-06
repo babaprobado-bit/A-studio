@@ -1,3 +1,14 @@
+# Latest working checkpoint — 2026-11-06 (REA contract mock tests added)
+
+- Feature branch: `feature/android-offline-skills-v1`. This change adds only the isolated REA bridge contract validator, mock-only tests, package script, CI wiring and handoff documentation; it does not connect REA or alter existing AI Studio runtime flows.
+- Local check: Node.js 22.16.0 `node --check` passed for the new module/test and `node scripts/test-rea-companion-contract.mjs` passed in an isolated fixture. This is not yet hosted CI evidence for the new commit.
+- The contract test covers three read-only operation schemas, selected relative-path enforcement, project registration, request/result caps, exact disclosure, no automatic model-provider forwarding, sanitized error envelopes and exact loopback origin/Host validation.
+- No `rea-agents` dependency, listener, network request, MCP connection, REA process, project-file access, app UI wiring or external side effect was added. Pairing/session-token lifecycle and a real companion remain unimplemented.
+- Existing AI Team 10-provider paths, provider connections, Skills/context routes, Ollama and GGUF Local Coder remain untouched. No physical-device or offline inference test was performed.
+- `main` must remain unchanged; PR #2 stays open, Draft and unmerged. Do not merge or mark ready without explicit approval.
+
+---
+
 # Latest verified checkpoint — 2026-11-06 (Native GGUF CI completed)
 
 - Latest application/source commit tested: [c9b3d4c8ac2335a37afe054a49fccb672774314c](https://github.com/babaprobado-bit/A-studio/commit/c9b3d4c8ac2335a37afe054a49fccb672774314c). Subsequent branch commits are handoff-document-only; re-fetch the branch head before continuing.

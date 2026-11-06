@@ -6,14 +6,14 @@ on:
     branches: [main]
     paths:
       - 'src/device-local-coder.js'
+      - 'src/rea-companion-contract.js'
+      - 'scripts/test-rea-companion-contract.mjs'
       - 'android-local-runtime/**'
       - 'scripts/patch-android-local-runtime.py'
       - '.github/workflows/build-android-local-coder.yml'
       - 'src/main.js'
       - 'src/ai-team.js'
       - 'scripts/test-ai-team.mjs'
-      - 'src/rea-companion-contract.js'
-      - 'scripts/test-rea-companion-contract.mjs'
       - 'server/workshop-smoke-test.js'
       - 'index.html'
       - 'src/skill-library.js'
@@ -41,7 +41,7 @@ jobs:
           java-version: '21'
       - name: Configure preinstalled Android SDK
         run: |
-          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          SDK_ROOT=" ${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
           echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
           echo "ANDROID_SDK_ROOT=$SDK_ROOT" >> "$GITHUB_ENV"
           echo "$SDK_ROOT/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
@@ -74,8 +74,8 @@ jobs:
           npm run test:skills
           npm run test:api-local-coder
           npm run test:ai-team
-          npm run test:rea-contract
           npm run test:device-local-coder
+          npm run test:rea-companion-contract
       - name: Generate Capacitor Android project
         run: npx cap add android
       - name: Preserve trusted-LAN Ollama HTTP and set native bridge
