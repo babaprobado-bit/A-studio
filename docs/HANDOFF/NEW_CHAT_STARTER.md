@@ -1,18 +1,18 @@
 # AI Studio — latest new-chat handoff
 
-
-> **LATEST VERIFIED CHECKPOINT — 2026-11-05 (authoritative; older checkpoints below are history)**
+> **LATEST VERIFIED CHECKPOINT — 2026-11-06**
 >
 > - Repo: https://github.com/babaprobado-bit/A-studio
-> - Branch: `feature/android-offline-skills-v1`. Latest app/source commit: `ff34a69578ea1fa332ac3d2e73414059566398b4`. Branch tip at audit start: `2d3010b76fadaf25e40512300cc4e9ff1506dfa7` (documentation-only commit after source).
-> - `main` remains `aab010319b6500002844bd24b11da85dd9ca3b00`; compare reports 84 commits ahead, 0 behind. PR #2 is open, Draft and unmerged: https://github.com/babaprobado-bit/A-studio/pull/2. Mergeability was not confirmed; do not merge or edit main.
-> - Native GGUF APK CI: [run 42078734707](https://github.com/babaprobado-bit/A-studio/actions/runs/42078734707), success for `ff34a69...`; artifact ID `13441610298`, 18,157,298 bytes, expires 2026-11-19 18:06 UTC.
-> - Demo APK CI: [run 42078734918](https://github.com/babaprobado-bit/A-studio/actions/runs/42078734918), success for `ff34a69...`; artifact ID `13438094755`, 3,775,289 bytes, expires 2026-11-19 17:53 UTC. Demo APK does not include native GGUF inference.
-> - Both workflows passed Vite, regression checks, Capacitor sync, Gradle debug APK build and artifact upload. These are debug APKs, not signed release builds.
-> - No physical phone installation, local GGUF import/load, actual inference or airplane-mode test has been completed. User says there is no internet; continue source/CI work and do not ask for device testing.
-> - AI Team has 10 engines (OpenAI, Claude, Gemini, DeepSeek, Groq, OpenRouter, Hugging Face, custom OpenAI-compatible API, PC Ollama, Android GGUF), no four-provider cap, parallel same-prompt fan-out, and a role-based sequential pipeline. Skills/context wiring, Local Coder draft persistence, model-import/download hardening and native GGUF model replacement safety are included.
-> - Full source audit and third-chat continuation: `docs/HANDOFF/SESSION_3_CODE_AUDIT.md`. It records feature inventory, limitations and next source-only work. REA/MCP is not integrated; it remains optional Session 4 work.
-
+> - Branch: `feature/android-offline-skills-v1`. Latest source/test commit: `c9b3d4c8ac2335a37afe054a49fccb672774314c`.
+> - `main` remains `aab010319b6500002844bd24b11da85dd9ca3b00`. PR #2 remains open, Draft and unmerged: https://github.com/babaprobado-bit/A-studio/pull/2. Do not edit main, merge, or mark the PR ready.
+> - Latest Demo workflow [42262971664](https://github.com/babaprobado-bit/A-studio/actions/runs/42262971664) is for `c9b3d4c). Source/regression checks, Vite, Android generation and sync passed; Gradle debug APK was still running at last check.
+> - Latest Native GGUF workflow [42262972234](https://github.com/babaprobado-bit/A-studio/actions/runs/42262972234) is for `c9b3d4c). Native toolchain and pinned llama.kt passed; llama.cpp source preparation was in progress. Later regression/Gradle steps were pending.
+> - Earlier Demo and Native GGUF workflows [42090697495](https://github.com/babaprobado-bit/A-studio/actions/runs/42090697495) and [42090697496](https://github.com/babaprobado-bit/A-studio/actions/runs/42090697496) succeeded for `cfd5468`, with artifacts. Those artifacts are not built from current `c9b3d4c`.
+> - Three Qwen GGUF model catalogue files have verified SHA-256 pins. Android checks the staged download before installing it; imported local GGUF files remain a separate no-catalogue-hash path.
+> - AI Team has 10 engines, no four-provider cap, tested parallel and sequential flows, explicit live-call consent, and shared Skills/project/vault context wiring.
+> - Newest runtime hardening: listener cleanup cannot mask native model-load results/errors; GGUF file imports stop immediately if actual bytes exceed declared source size, and retain the 8 GB cap/final-size validation.
+> - No physical phone installation, GGUF inference or airplane-mode test has been performed. CI is not evidence of device compatibility or actual offline inference. User says there is no internet; continue source/CI work and do not ask for device testing.
+> - Full source continuation: `docs/HANDOFF/SESSION_3_CODE_AUDIT.md`. Skills/API details: `docs/HANDOFF/SESSION_3_SKILLS_AND_API.md`. Project inventory: `docs/HANDOFF/PROJECT_STATE.md`.
 
 ## Current verified checkpoint — 2026-11-05
 

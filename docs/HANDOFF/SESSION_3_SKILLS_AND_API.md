@@ -1,5 +1,26 @@
 # Session 3 of 4 — Skills and Local Coder modes
 
+## Latest verified checkpoint — 2026-11-06
+
+- Repository: https://github.com/babaprobado-bit/A-studio
+- Active branch: `feature/android-offline-skills-v1`
+- Latest source/test commit: [c9b3d4c](https://github.com/babaprobado-bit/A-studio/commit/c9b3d4c8ac2335a37afe054a49fccb672774314c).
+- `main` remains unchanged at `aab010319b6500002844bd24b11da85dd9ca3b00`.
+- PR #2 remains **open, Draft and unmerged**: https://github.com/babaprobado-bit/A-studio/pull/2. Do not merge or mark ready without explicit user approval.
+- Both latest workflows were dispatched for `c9b3d4c` on 2026-11-06:
+  - Demo run [42262971664](https://github.com/babaprobado-bit/A-studio/actions/runs/42262971664): Vite build, workshop/Local Coder, Skill Library, device Local Coder bridge, site login gate, Android generation and Capacitor sync passed. Gradle debug APK step was still running at the last check; no artifact was yet reported for this commit.
+  - Native GGUF run [42262972234](https://github.com/babaprobado-bit/A-studio/actions/runs/42262972234): Android SDK/native tool setup and pinned llama.kt fetch passed; llama.cpp source preparation was in progress. Regression and Gradle steps were pending at the last check.
+- Previous source commit `cfd5468` has successful Demo and Native GGUF APK runs [Demo 42090697495](https://github.com/babaprobado-bit/A-studio/actions/runs/42090697495) and [Native 42090697496](https://github.com/babaprobado-bit/A-studio/actions/runs/42090697496). Their artifacts are historical evidence for `cfd5468`, not for `c9b3d4c`.
+- GGUF catalogue SHA-256 pins were checked against the matching Hugging Face file metadata:
+  - Qwen2.5-Coder 0.5B Q4_K_M: `1d9614638d18024d0fbb36575a15f1302a3adf044df10345688ec4f6e1c4ff32`
+  - Qwen2.5-Coder 1.5B Q4_K_M: `cc324af070c2ecbfd324a30884d2f951a7ff756aba85cb811a6ec436933bb046`
+  - Qwen2.5-Coder 3B Q4_K_M: `724fb256bec1ff062b2f65e4569e871ad2e95ab2a3989723d1769c54294730b7`
+- SHA verification runs on Android against the staged `.part` file before it can be promoted to an installed catalogue `.gguf`. The expected digest persists with DownloadManager state and is cleared with terminal download records. User-selected local GGUF imports intentionally do not require a catalogue hash.
+- AI Team tests cover all 10 providers, uncapped selection, provider readiness, explicit live-call consent, parallel fan-out/error isolation, sequential role/prompt/history hand-off, and preservation of completed stages on failure. Shared project/vault/general Skills context remains wired into supported provider routes; Local Coder keeps stage-specific Skills.
+- Additional runtime hardening: load-progress listener cleanup cannot mask native load success or the primary load error; imported GGUF copies stop before writing bytes beyond declared source size, while the absolute 8 GB and final-size checks remain.
+- Important acceptance boundary: CI verifies source tests and APK build/package steps only. No physical-device install, native GGUF inference, or airplane-mode operation has been tested. Do not present CI as proof of offline operation. The user has no internet for local/device testing; continue with source and hosted CI work.
+
+
 ## Current verified checkpoint — 2026-11-05 (AI Team expansion)
 
 - Latest feature-branch source head: `66daa33f56220a7257825106147d37c974b7398a`. PR #2 remains open, Draft and unmerged. `main` is unchanged at `aab010319b6500002844bd24b11da85dd9ca3b00`.
