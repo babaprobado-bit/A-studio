@@ -211,7 +211,7 @@ const lifecycle = new FakePairingSessionStore({
   now: () => fakeNow,
   pairingTtlMs: 120000,
   sessionTtlMs: 900000,
-  maxAttempts: 5,
+  maxAttempts: 10,
   lockoutMs: 60000,
   makeToken: () => 'mock-session-token-' + String(++tokenCounter).padStart(32, '0')
 });
