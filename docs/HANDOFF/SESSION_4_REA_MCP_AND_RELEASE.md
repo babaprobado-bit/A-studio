@@ -119,9 +119,16 @@ Errors use `{ "error": { "code": "...", "message": "...", "retryable": false }, 
 
 No side-effecting operation is part of this contract. In particular, do not expose file edits, generated patches, command execution, package installation, code launch, project writes or remote tasks as hidden capabilities. A future version would require a separate design review and a distinct approval flow with a human-readable preview, a one-time approval token bound to the exact operation and argument digest, short expiry, replay protection and explicit host-side confirmation. Do not implement that future flow as part of V0.
 
-### Mock-only contract test plan
+### Contract validator delivered (pure / local tests)
 
-These tests can be implemented using an in-process fake bridge and fake REA adapter; they must not install or launch REA, open a real listener, access user project files or execute commands.
+- `src/rea-companion-contract.js` validates the proposed pairing-request and analysis-request JSON shapes, the three-operation read-only allowlist, path syntax, duplicate paths, text/size/time limits and exact Origin allowlist matching.
+- `scripts/test-rea-companion-contract.mjs` tests valid/invalid payloads, traversal-like paths, scope escalation, unsupported operations, unknown fields, limits and origin mismatches.
+- This is only a pure validation layer. It does **not** implement a bridge server, pairing-code lifecycle, host approval, session tokens, Host/CSRF/DNS-rebinding defenses or filesystem/symlink resolution. The companion must enforce those controls independently.
+- The validator contains no HTTP, MCP, filesystem, process or socket implementation. The test uses only local mock data and must never connect to REA.
+
+### Remaining mock-only companion test plan
+
+The next isolated test layer may use an in-process fake bridge and fake REA adapter; it must not install or launch REA, open a real listener, access user project files or execute commands.
 
 - **Pairing:** missing, expired, reused and brute-forced codes fail; host approval is mandatory; successful pairing grants only `rea.read`; revoke invalidates the token immediately.
 - **Session:** missing, malformed, expired and revoked tokens fail closed; no token appears in logs, exports or backups.
@@ -134,9 +141,13 @@ These tests can be implemented using an in-process fake bridge and fake REA adap
 - **Untrusted output:** returned strings are displayed as inert text; they cannot trigger tools, change permissions or override system/app instructions.
 - **No side effects:** fake adapter records zero writes, shell executions, installs, launches or remote tasks across every V0 test.
 
-### Implementation gate after this draft
+### Current implementation boundary
 
-Only after this contract is reviewed should isolated schema validation and fake-adapter tests be added to the repository. A real companion, listener, pairing secret, REA package install, MCP process or external data transfer still requires the user's explicit approval. V0 should remain documentation/mock-only until then.
+The pure schema/origin validator and its local regression test are now in the repository and wired into both Android CI workflows. The feature is not a companion connection and does not make REA available in AI Studio.
+
+Pairing-code expiry/reuse/rate limiting, host-side approval, secure session-token storage/revocation, Host and DNS-rebinding defenses, symlink-aware canonical path containment, streaming byte limits, provider-disclosure UI and fake-adapter lifecycle tests remain unimplemented. They must be addressed before any real companion service is exposed.
+
+A real companion, network listener, pairing secret, REA package installation, MCP process, user project-file access or external data transfer still requires the user's explicit approval. Do not describe the current validator tests as proof of a running or secure companion.
 
 ---
 
@@ -205,7 +216,7 @@ Do not assume REA is installed, connected or available inside Android APK.
 - [ ] Backup restores preserve old formats and do not overwrite provider credentials.
 
 ### Release
-- [ ] All six current package test scripts (`test:site`, `test:workshop`, `test:skills`, `test:device-local-coder`, `test:api-local-coder`, `test:ai-team`) and Vite build pass.
+- [ ] All seven current package test scripts (`test:site`, `test:workshop`, `test:skills`, `test:device-local-coder`, `test:api-local-coder`, `test:ai-team`, `test:rea-contract`) and Vite build pass.
 - [ ] Regular Android debug workflow passes.
 - [ ] Native GGUF debug workflow passes and artifact exists.
 - [ ] Actual phone install, GGUF inference and airplane-mode test report exists. **No physical-device test has been performed yet.**
