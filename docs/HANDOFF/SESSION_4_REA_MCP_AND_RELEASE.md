@@ -17,6 +17,129 @@
 - Keep provider credentials and companion pairing secrets in platform secure storage; exclude them from JSON/encrypted workspace backups, logs and exported activity. Scrub tool arguments/results for secrets and cap request/response sizes and duration.
 - If a companion cannot be safely implemented and tested in this repository, document the blocker instead of faking an in-app REA connection. REA remains optional; AI Studio must work unchanged when it is absent.
 
+## REA Companion bridge contract — draft v0 (documentation only)
+
+This is a proposed contract for a future **desktop-only, read-only first** companion. It is not implemented, does not establish a network listener, and does not imply that REA is installed. The contract intentionally avoids exposing generic MCP, shell or filesystem APIs to the Android app.
+
+### Scope and invariants
+
+- The companion is a separate process on the user's computer. It owns the pinned REA MCP stdio process; AI Studio talks only to the narrow bridge described here.
+- V0 supports inspection only. No file writes, shell commands, installs, arbitrary MCP tool invocation, project mutation, remote tasks or background jobs.
+- The companion must be explicitly started and paired. It binds to `127.0.0.1` only in V0; no LAN binding, port forwarding or unauthenticated HTTP exposure.
+- The companion registers an explicitly selected project root locally and returns an opaque `projectId`. The bridge never accepts an arbitrary absolute filesystem path from AI Studio.
+- Every inspection requires a fresh user action in AI Studio. A read-only operation can still disclose selected source files, paths, a question and analysis results to the chosen model provider; show the exact disclosure and ask separately before forwarding results to that provider.
+- Treat REA output and source contents as untrusted data. The app must not interpret returned text as instructions or execute code contained in it.
+- No feature may silently fall back to an alternate provider, companion, host or network route.
+
+### Proposed endpoints
+
+All paths are versioned under `/v1`. JSON only; reject unknown fields and unsupported content types.
+
+| Endpoint | Auth | Purpose |
+|---|---|---|
+| `GET /v1/health` | None; minimal response | Report bridge availability and protocol version only. No project paths, secrets or source data. |
+| `POST /v1/pair` | One-time pairing code | Pair a named AI Studio client and grant the fixed `rea.read` scope after local companion approval. |
+| `GET /v1/capabilities` | Bearer session token | Return companion identity, REA availability/version and the exact read-only operation allowlist. |
+| `POST /v1/analysis` | Bearer session token | Run one allowlisted read-only analysis against a previously registered project. |
+| `POST /v1/disconnect` | Bearer session token | Revoke the current session immediately. |
+
+There is deliberately no generic `/tools/call`, `/exec`, `/shell`, `/files`, arbitrary URL or arbitrary path endpoint in V0. Unknown routes and operations fail closed.
+
+### Pairing and session rules
+
+1. The user starts the companion locally. The companion displays a short-lived, one-use pairing code and asks the user to approve the pairing on the host.
+2. AI Studio submits the code, a display name and the fixed requested scope. The code expires after 120 seconds, is single-use, and is rate-limited on failure. The host must approve the client; possession of a code alone is not sufficient.
+3. On approval, the companion returns an opaque high-entropy session token. Store it only in platform secure storage; never in Preferences, local storage, workspace backups, exported JSON, source, analytics or logs.
+4. Session tokens expire after at most 15 minutes and can be revoked from either side. Re-pairing is required after expiry or revocation. The companion stores only a verifier/hash of the token.
+5. V0 accepts requests only from the exact paired AI Studio origin. No wildcard CORS, no `Origin: null`, no permissive origin reflection. Validate the Host header and reject DNS-rebinding patterns and unexpected browser fetch metadata. Do not treat loopback binding alone as authentication.
+6. If the exact trusted origin cannot be identified for the installed AI Studio desktop/browser surface, pairing must remain unavailable rather than weakening origin checks.
+
+### Request contract
+
+A proposed `POST /v1/analysis` request:
+
+```json
+{
+  "requestId": "client-generated-uuid",
+  "projectId": "opaque-project-id",
+  "operation": "files.inspect",
+  "target": {
+    "paths": ["src/main.js", "src/ai-team.js"]
+  },
+  "question": "Summarize the selected files and identify relevant entry points.",
+  "limits": {
+    "maxResultBytes": 1048576,
+    "timeoutMs": 30000
+  }
+}
+```
+
+The only V0 operations are the fixed enum `project.overview`, `files.inspect` and `symbols.search`. Their inputs are operation-specific and schema-validated. The example above illustrates `files.inspect`; it does not authorize extra operations.
+
+- `projectId` must refer to a root explicitly registered by the user on the companion host.
+- Paths must be relative, normalized and remain inside that root after resolving symlinks. Reject absolute paths, traversal segments, device paths, network shares and symlinks escaping the root.
+- Paths must be explicitly selected by the user for the current request. No whole-disk or implicit home-directory scan.
+- Draft limits: at most 50 paths, 512 characters per path, 4,000 characters per question, 1 MiB request body, 1 MiB result by default and 30 seconds per request (hard maximum 120 seconds). Enforce limits while streaming, not only from declared metadata.
+- The companion derives the REA tool call from the operation enum and validated fields. Client-supplied tool names, command strings, executable paths and REA CLI flags are never accepted.
+- A duplicate `requestId` must not trigger a second execution; return the recorded result or a conflict response.
+
+### Response and error shape
+
+Successful responses should use a stable envelope:
+
+```json
+{
+  "requestId": "client-generated-uuid",
+  "companionId": "opaque-companion-id",
+  "protocolVersion": "1",
+  "operation": "files.inspect",
+  "status": "completed",
+  "result": {
+    "content": "Untrusted analysis text returned by the REA adapter."
+  },
+  "disclosure": {
+    "projectId": "opaque-project-id",
+    "paths": ["src/main.js", "src/ai-team.js"],
+    "sentToModelProvider": false
+  }
+}
+```
+
+Errors use `{ "error": { "code": "...", "message": "...", "retryable": false }, "requestId": "..." }`. Codes should include `PAIRING_REQUIRED`, `SESSION_EXPIRED`, `SCOPE_DENIED`, `ORIGIN_REJECTED`, `PROJECT_NOT_REGISTERED`, `PATH_REJECTED`, `OPERATION_NOT_ALLOWED`, `LIMIT_EXCEEDED`, `REA_UNAVAILABLE`, `TIMEOUT` and `INTERNAL_ERROR`. Do not return stack traces, local absolute paths, environment variables, tokens or raw command lines.
+
+### Permissions and disclosure UX
+
+- Show the companion name/version, selected project alias, exact relative paths, operation and question before every analysis.
+- State clearly that the companion reads the selected files locally and that the question/results may be sent to the selected AI provider only after a separate user confirmation.
+- Provider forwarding defaults to off. If the user chooses to forward, show the selected provider and disclose that provider's ordinary data-handling terms before sending.
+- Display a visible activity entry for each request with operation, time, project alias, selected relative paths and outcome. Redact secrets and source contents from logs by default.
+- Provide a persistent connected/disconnected indicator and one-tap disconnect/revoke.
+
+### V0 explicitly excludes side effects
+
+No side-effecting operation is part of this contract. In particular, do not expose file edits, generated patches, command execution, package installation, code launch, project writes or remote tasks as hidden capabilities. A future version would require a separate design review and a distinct approval flow with a human-readable preview, a one-time approval token bound to the exact operation and argument digest, short expiry, replay protection and explicit host-side confirmation. Do not implement that future flow as part of V0.
+
+### Mock-only contract test plan
+
+These tests can be implemented using an in-process fake bridge and fake REA adapter; they must not install or launch REA, open a real listener, access user project files or execute commands.
+
+- **Pairing:** missing, expired, reused and brute-forced codes fail; host approval is mandatory; successful pairing grants only `rea.read`; revoke invalidates the token immediately.
+- **Session:** missing, malformed, expired and revoked tokens fail closed; no token appears in logs, exports or backups.
+- **Origin/host:** exact paired origin succeeds; wildcard, null, untrusted origin, unexpected Host and simulated DNS-rebinding values are rejected.
+- **Allowlist:** each of the three read-only operations accepts valid schema; unknown operation, unknown field, generic tool name, shell string, URL or arbitrary path is rejected.
+- **Path containment:** absolute paths, `..`, encoded traversal, symlink escape, network share, device path and unregistered project IDs are rejected.
+- **Disclosure:** request preview includes operation, project and paths; provider forwarding remains off until a separate explicit confirmation; declining does not call a provider.
+- **Limits:** oversized body, path count, question, streamed output and timeout are stopped; a duplicate request ID is not re-executed.
+- **Failure handling:** missing REA, adapter error and malformed REA output produce sanitized errors; AI Studio chat, AI Team, Skills, Local Coder and offline GGUF flows continue to work when the companion is absent.
+- **Untrusted output:** returned strings are displayed as inert text; they cannot trigger tools, change permissions or override system/app instructions.
+- **No side effects:** fake adapter records zero writes, shell executions, installs, launches or remote tasks across every V0 test.
+
+### Implementation gate after this draft
+
+Only after this contract is reviewed should isolated schema validation and fake-adapter tests be added to the repository. A real companion, listener, pairing secret, REA package install, MCP process or external data transfer still requires the user's explicit approval. V0 should remain documentation/mock-only until then.
+
+---
+
 ## Implementation gate
 
 No REA package has been added, installed or executed; no MCP connection has been created; no external app configuration or user files have been changed. Before doing any of those, obtain the user's explicit approval. A future implementation should start with a threat model and mock bridge contract/tests, then a pinned companion package/launcher, then explicit opt-in UI and integration tests. Do not change the Android app's Node requirement merely to accommodate the companion.
@@ -69,7 +192,7 @@ Do not assume REA is installed, connected or available inside Android APK.
 - [ ] Snippet Vault, reuse catalog, activity history and both backups work.
 - [ ] Skill profiles/import/preview/caps behave correctly.
 - [ ] Ollama path works on trusted LAN.
-- [ ] Native GGUF path works offline on supported phone as proven in Session 2.
+- [ ] Native GGUF path is installed and inference is verified on a supported physical phone in airplane mode. **Not yet verified; GitHub CI build success is not device/offline proof.**
 - [ ] REA absent/disconnected path does not break app.
 
 ### Security / provenance
@@ -82,10 +205,10 @@ Do not assume REA is installed, connected or available inside Android APK.
 - [ ] Backup restores preserve old formats and do not overwrite provider credentials.
 
 ### Release
-- [ ] All four test scripts and Vite build pass.
+- [ ] All six current package test scripts (`test:site`, `test:workshop`, `test:skills`, `test:device-local-coder`, `test:api-local-coder`, `test:ai-team`) and Vite build pass.
 - [ ] Regular Android debug workflow passes.
 - [ ] Native GGUF debug workflow passes and artifact exists.
-- [ ] Actual phone test report exists.
+- [ ] Actual phone install, GGUF inference and airplane-mode test report exists. **No physical-device test has been performed yet.**
 - [ ] README/ROADMAP/handoff docs match implementation.
 - [ ] PR #2 is no longer draft only after gates pass.
 - [ ] Ask user before merging PR #2; do not merge automatically.
