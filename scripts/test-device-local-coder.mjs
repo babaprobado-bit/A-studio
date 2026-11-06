@@ -59,6 +59,16 @@ const nativeImportEnd = nativeSource.indexOf('@PluginMethod', nativeImportStart)
 const nativeImportSource = nativeSource.slice(nativeImportStart, nativeImportEnd);
 assert.ok(!nativeImportSource.includes('verifyDownloadedModelSha256'),
   'user-selected offline GGUF imports must not require a catalogue checksum');
+assert.match(nativeImportSource, /declaredSize > maxImportedModelBytes/,
+  'the declared imported-file size must be rejected above the native 8 GB cap');
+assert.match(nativeImportSource, /copiedBytes > maxImportedModelBytes/,
+  'the streaming import must enforce the native 8 GB cap even when size metadata is absent or inaccurate');
+const declaredSizeOverrunIndex = nativeImportSource.indexOf('copiedBytes > declaredSize');
+const writeImportedBufferIndex = nativeImportSource.indexOf('output.write(buffer, 0, count)');
+assert.ok(declaredSizeOverrunIndex >= 0 && declaredSizeOverrunIndex < writeImportedBufferIndex,
+  'actual imported bytes must not exceed the provider-reported file size before the next write');
+assert.match(nativeImportSource, /copiedBytes != declaredSize/,
+  'the final imported byte count must still exactly match known source metadata');
 assert.ok(DEVICE_MODEL_CATALOG.every(model => model.url.startsWith('https://huggingface.co/')));
 assert.ok(DEVICE_MODEL_CATALOG.every(model => model.licenseUrl.startsWith('https://huggingface.co/')));
 assert.equal(DEVICE_MODEL_CATALOG[0].licenseName,'Apache-2.0');

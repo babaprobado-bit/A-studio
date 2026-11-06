@@ -246,6 +246,9 @@ class LocalLlmPlugin : Plugin() {
                         if (cancelFlag.get()) throw CancellationException("GGUF içe aktarma iptal edildi.")
                         if (count == 0) continue
                         copiedBytes += count.toLong()
+                        if (declaredSize > 0 && copiedBytes > declaredSize) {
+                            throw IllegalStateException("Kaynağın bildirilen dosya boyutu aşıldı; içe aktarma durduruldu.")
+                        }
                         if (copiedBytes > maxImportedModelBytes) {
                             throw IllegalArgumentException("Model dosyası 8 GB sınırını aşıyor.")
                         }
