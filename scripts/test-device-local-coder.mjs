@@ -199,6 +199,41 @@ await replacementClient.load('candidate-model.gguf',2048);
 assert.equal(replacementLoadCalls,1,'a replacement model must reach native RAM preflight even when current free RAM is below its threshold');
 assert.equal(replacementClient.loadedFileName,'candidate-model.gguf','successful replacement loads must update the active model name');
 
+let listenerCleanupLoadedName='';
+const listenerCleanupPlugin={
+  getDeviceInfo:async()=>({
+    supported:true,totalMemoryBytes:8*1024**3,availableMemoryBytes:4*1024**3,
+    freeStorageBytes:8*1024**3,processorCount:8,lowMemory:false,loadedFileName:listenerCleanupLoadedName
+  }),
+  listModels:async()=>({models:[{fileName:'listener-cleanup-model.gguf',sizeBytes:256*1024**2,loaded:!!listenerCleanupLoadedName}]}),
+  addListener:async()=>({remove:async()=>{throw new Error('progress listener cleanup failed');}}),
+  loadModel:async({fileName})=>{listenerCleanupLoadedName=fileName;return {loaded:true,fileName};}
+};
+const listenerCleanupClient=new DeviceLocalCoder(true,listenerCleanupPlugin);
+const listenerCleanupResult=await listenerCleanupClient.load('listener-cleanup-model.gguf',2048);
+assert.equal(listenerCleanupResult.loaded,true,
+  'a progress-listener removal error must not turn a successful native model load into a reported failure');
+assert.equal(listenerCleanupClient.loadedFileName,'listener-cleanup-model.gguf',
+  'a successful native model must remain ready after progress-listener cleanup fails');
+
+const listenerCleanupFailureClient=new DeviceLocalCoder(true,{
+  getDeviceInfo:async()=>({
+    supported:true,totalMemoryBytes:8*1024**3,availableMemoryBytes:4*1024**3,
+    freeStorageBytes:8*1024**3,processorCount:8,lowMemory:false,loadedFileName:''
+  }),
+  listModels:async()=>({models:[{fileName:'listener-cleanup-model.gguf',sizeBytes:256*1024**2,loaded:false}]}),
+  addListener:async()=>({remove:async()=>{throw new Error('secondary listener cleanup failure');}}),
+  loadModel:async()=>{throw new Error('primary native model load failure');}
+});
+await assert.rejects(
+  () => listenerCleanupFailureClient.load('listener-cleanup-model.gguf',2048),
+  /primary native model load failure/,
+  'progress-listener cleanup must not mask the original native load error'
+);
+assert.equal(listenerCleanupFailureClient.loadedFileName,'',
+  'a failed native model load must keep JavaScript readiness cleared even if listener cleanup also fails');
+
+
 
 let guardedDownloadCalls = 0;
 let guardedDownloadArgs = null;

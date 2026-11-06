@@ -397,7 +397,12 @@ export class DeviceLocalCoder {
       }
       throw error;
     } finally {
-      await listener.remove();
+      try {
+        await listener.remove();
+      } catch (_) {
+        // Progress-listener cleanup must not turn a successful model load into a failure
+        // or hide the original native loader error.
+      }
     }
   }
 
