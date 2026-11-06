@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { FakePairingSessionStore, FakeReadOnlyAdapter } from './rea-companion-fakes.mjs';
 import { readFile } from 'node:fs/promises';
 import {
   REA_ALLOWED_OPERATIONS,
@@ -171,8 +172,121 @@ const fakeResult = await fakeAdapter.analyze(approved.value);
 assert.equal(validateAnalysisResponse(fakeResult, approved.value).ok, true);
 assert.match(fakeResult.result.content, /run a shell command/);
 assert.deepEqual(fakeCalls, ['files.inspect']);
+const fakeSource = await readFile(new URL('./rea-companion-fakes.mjs', import.meta.url), 'utf8');
+assert.doesNotMatch(fakeSource, /node:http|node:child_process|createServer|WebSocket|fetch\\s*\\(/i);
+assert.doesNotMatch(fakeSource, /rea-agents|spawn\\s*\\(|execFile\\s*\\(/i);
+assert.ok(fakeSource.includes('not cryptographic'));
 for (const method of ['write', 'execute', 'install', 'invokeTool']) {
   assert.equal(typeof fakeAdapter[method], 'undefined');
+}
+
+// Deterministic pairing/session lifecycle simulation. This is not production auth.
+let fakeNow = 5000;
+let tokenCounter = 0;
+const lifecycle = new FakePairingSessionStore({
+  now: () => fakeNow,
+  pairingTtlMs: 120000,
+  sessionTtlMs: 900000,
+  maxAttempts: 5,
+  lockoutMs: 60000,
+  makeToken: () => 'mock-session-token-' + String(++tokenCounter).padStart(32, '0')
+});
+
+lifecycle.issueCode({ code: 'DENIED-PAIR-01', clientId: 'desktop-client' });
+assert.throws(
+  () => lifecycle.pair({ code: 'DENIED-PAIR-01', clientId: 'desktop-client', hostApproved: false }),
+  error => error.code === 'HOST_APPROVAL_REQUIRED'
+);
+assert.throws(
+  () => lifecycle.pair({ code: 'DENIED-PAIR-01', clientId: 'desktop-client', hostApproved: true }),
+  error => error.code === 'PAIRING_CODE_USED',
+  'a denied one-time code must not be reusable'
+);
+
+lifecycle.issueCode({ code: 'APPROVED-PAIR-02', clientId: 'desktop-client', displayName: 'AI Studio desktop' });
+const paired = lifecycle.pair({
+  code: 'APPROVED-PAIR-02',
+  clientId: 'desktop-client',
+  scope: REA_READ_SCOPE,
+  hostApproved: true
+});
+assert.equal(paired.scope, 'rea.read');
+assert.equal(lifecycle.authenticate(paired.sessionToken).displayName, 'AI Studio desktop');
+assert.equal(lifecycle.authenticate(paired.sessionToken).scope, 'rea.read');
+assert.equal(lifecycle.revoke(paired.sessionToken), true);
+assert.throws(
+  () => lifecycle.authenticate(paired.sessionToken),
+  error => error.code === 'SESSION_REVOKED'
+);
+
+lifecycle.issueCode({ code: 'EXPIRED-PAIR-03', clientId: 'desktop-client' });
+fakeNow += 120000;
+assert.throws(
+  () => lifecycle.pair({ code: 'EXPIRED-PAIR-03', clientId: 'desktop-client', hostApproved: true }),
+  error => error.code === 'PAIRING_EXPIRED'
+);
+
+lifecycle.issueCode({ code: 'SESSION-PAIR-04', clientId: 'desktop-client' });
+const expiringSession = lifecycle.pair({
+  code: 'SESSION-PAIR-04', clientId: 'desktop-client', hostApproved: true
+});
+fakeNow += 900000;
+assert.throws(
+  () => lifecycle.authenticate(expiringSession.sessionToken),
+  error => error.code === 'SESSION_EXPIRED'
+);
+
+let bruteNow = 1000;
+const rateLimited = new FakePairingSessionStore({
+  now: () => bruteNow,
+  maxAttempts: 5,
+  lockoutMs: 60000,
+  makeToken: () => 'mock-session-token-rate-limit-test-0000000000'
+});
+rateLimited.issueCode({ code: 'RATE-LIMIT-CODE', clientId: 'attacker-client' });
+for (let attempt = 0; attempt < 5; attempt += 1) {
+  assert.throws(
+    () => rateLimited.pair({ code: 'wrong-code-' + attempt, clientId: 'attacker-client', hostApproved: true }),
+    error => error.code === 'PAIRING_INVALID'
+  );
+}
+assert.throws(
+  () => rateLimited.pair({ code: 'RATE-LIMIT-CODE', clientId: 'attacker-client', hostApproved: true }),
+  error => error.code === 'PAIRING_RATE_LIMITED'
+);
+bruteNow += 60001;
+assert.equal(rateLimited.pair({
+  code: 'RATE-LIMIT-CODE', clientId: 'attacker-client', hostApproved: true
+}).scope, 'rea.read');
+
+const lifecycleAdapter = new FakeReadOnlyAdapter();
+assert.throws(
+  () => lifecycleAdapter.analyze(normalized),
+  error => error.code === 'USER_APPROVAL_REQUIRED'
+);
+assert.throws(
+  () => lifecycleAdapter.analyze(normalized, { userApproved: true, forwardToProvider: true }),
+  error => error.code === 'PROVIDER_FORWARDING_DISABLED'
+);
+const lifecycleResponse = await lifecycleAdapter.analyze(normalized, { userApproved: true });
+assert.equal(validateAnalysisResponse(lifecycleResponse, normalized).ok, true);
+assert.throws(
+  () => lifecycleAdapter.analyze(normalized, { userApproved: true }),
+  error => error.code === 'REQUEST_REPLAYED'
+);
+assert.equal(lifecycleAdapter.calls.length, 1, 'a duplicate request ID must not invoke the fake adapter twice');
+assert.deepEqual(lifecycleAdapter.sideEffectCounts, {
+  writes: 0, shellExecutions: 0, installs: 0, launches: 0, remoteTasks: 0
+});
+for (const code of [
+  'PAIRING_EXPIRED', 'PAIRING_INVALID', 'PAIRING_RATE_LIMITED',
+  'PAIRING_CODE_USED', 'HOST_APPROVAL_REQUIRED', 'SESSION_REVOKED',
+  'REQUEST_REPLAYED', 'USER_APPROVAL_REQUIRED', 'PROVIDER_FORWARDING_DISABLED'
+]) {
+  assert.equal(validateBridgeError({
+    requestId,
+    error: { code, message: 'Request was rejected.', retryable: false }
+  }).ok, true, code + ' must be a recognized contract error');
 }
 
 // Static guardrails: the contract remains disconnected from app runtime and REA.

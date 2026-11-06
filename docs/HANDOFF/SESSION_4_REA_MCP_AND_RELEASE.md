@@ -6,9 +6,10 @@
 - The only accepted analysis operations are `project.overview`, `files.inspect` and `symbols.search`. File/symbol paths must be relative, safe, registered-project scoped and explicitly selected for that request; unknown fields, generic MCP calls, shell commands, oversized payloads and overlong timeouts fail closed.
 - Added `scripts/test-rea-companion-contract.mjs` and `npm run test:rea-companion-contract`. The mock suite covers allowlists, invalid paths, request/result bounds, disclosure parity, provider-forwarding rejection, sanitized errors and exact `127.0.0.1` origin/host checks.
 - The test uses an in-process fake read-only adapter only. It does not install or launch REA, start a listener, open an MCP session, read user project files, call a provider or perform side effects.
+- Added `scripts/rea-companion-fakes.mjs` with deterministic in-memory pairing/session and read-only adapter fakes. Tests simulate one-time codes, explicit host approval, expiry, rate limiting, `rea.read`-only scope, session expiry/revocation, per-request approval, provider-forwarding denial and duplicate-request replay rejection. These fakes use predictable test tokens and are **not production authentication or secure storage**.
 - Both Android CI workflows now run the contract test. AI Studio's Node engine remains `>=20`; no REA package or dependency was added.
 - Local verification: Node.js 22.16.0 `node --check` and `node scripts/test-rea-companion-contract.mjs` passed in an isolated fixture. Hosted CI for this repository commit still needs to complete.
-- **Not implemented:** pairing-code lifecycle, secure session-token storage, real companion transport, REA CLI/MCP process, Android-to-desktop networking and provider-forwarding UI. The validator is not wired into app UI or runtime calls. These require separate implementation review and the user's explicit approval before installing/connecting/executing anything.
+- **Not implemented in production:** pairing-code service, cryptographically secure pairing/session tokens, host approval UI, secure session-token storage, real companion transport, REA CLI/MCP process, Android-to-desktop networking and provider-forwarding UI. The new lifecycle fake tests simulate expected state transitions only. The validator is not wired into app UI or runtime calls. These require separate implementation review and the user's explicit approval before installing/connecting/executing anything.
 
 ---
 
@@ -144,8 +145,8 @@ No side-effecting operation is part of this contract. In particular, do not expo
 
 The next isolated test layer may use an in-process fake bridge and fake REA adapter; it must not install or launch REA, open a real listener, access user project files or execute commands.
 
-- **Pairing:** missing, expired, reused and brute-forced codes fail; host approval is mandatory; successful pairing grants only `rea.read`; revoke invalidates the token immediately.
-- **Session:** missing, malformed, expired and revoked tokens fail closed; no token appears in logs, exports or backups.
+- **Secure persistence:** production session secrets must be kept out of logs, exports, backups and plain preferences; this repository currently has no production session-token storage.
+- **Host hardening:** real Host/CSRF/DNS-rebinding checks and symlink-aware canonical filesystem containment must be implemented and audited by the desktop companion.
 - **Origin/host:** exact paired origin succeeds; wildcard, null, untrusted origin, unexpected Host and simulated DNS-rebinding values are rejected.
 - **Allowlist:** each of the three read-only operations accepts valid schema; unknown operation, unknown field, generic tool name, shell string, URL or arbitrary path is rejected.
 - **Path containment:** absolute paths, `..`, encoded traversal, symlink escape, network share, device path and unregistered project IDs are rejected.
@@ -159,7 +160,7 @@ The next isolated test layer may use an in-process fake bridge and fake REA adap
 
 The pure schema/origin validator and its local regression test are now in the repository and wired into both Android CI workflows. The feature is not a companion connection and does not make REA available in AI Studio.
 
-Pairing-code expiry/reuse/rate limiting, host-side approval, secure session-token storage/revocation, Host and DNS-rebinding defenses, symlink-aware canonical path containment, streaming byte limits, provider-disclosure UI and fake-adapter lifecycle tests remain unimplemented. They must be addressed before any real companion service is exposed.
+The deterministic test harness now simulates pairing-code expiry/reuse/rate limiting, host approval, session expiry/revocation and replay rejection. Production pairing-code enforcement, cryptographically secure session-token creation/storage/revocation, Host and DNS-rebinding defenses, symlink-aware canonical path containment, streaming byte limits and provider-disclosure UI remain unimplemented. They must be addressed before any real companion service is exposed.
 
 A real companion, network listener, pairing secret, REA package installation, MCP process, user project-file access or external data transfer still requires the user's explicit approval. Do not describe the current validator tests as proof of a running or secure companion.
 
