@@ -319,6 +319,36 @@ assert.equal(rateLimited.pair({
   code: 'RATE-LIMIT-CODE', clientId: 'attacker-client', hostApproved: true
 }).scope, 'rea.read');
 
+let rotatingNow = 2000;
+const globalRateLimited = new FakePairingSessionStore({
+  now: () => rotatingNow,
+  maxAttempts: 5,
+  lockoutMs: 60000,
+  makeToken: () => 'mock-session-token-global-limit-00000000000'
+});
+globalRateLimited.issueCode({ code: 'GLOBAL-RATE-CODE', clientId: 'trusted-desktop' });
+for (let attempt = 0; attempt < 5; attempt += 1) {
+  assert.throws(
+    () => globalRateLimited.pair({
+      code: 'bad-global-code-' + attempt,
+      clientId: 'rotating-client-' + attempt,
+      hostApproved: true
+    }),
+    error => error.code === 'PAIRING_INVALID'
+  );
+}
+assert.throws(
+  () => globalRateLimited.pair({
+    code: 'GLOBAL-RATE-CODE', clientId: 'trusted-desktop', hostApproved: true
+  }),
+  error => error.code === 'PAIRING_RATE_LIMITED',
+  'changing caller-controlled client IDs must not bypass the global mock lockout'
+);
+rotatingNow += 60001;
+assert.equal(globalRateLimited.pair({
+  code: 'GLOBAL-RATE-CODE', clientId: 'trusted-desktop', hostApproved: true
+}).scope, 'rea.read');
+
 const lifecycleAdapter = new FakeReadOnlyAdapter();
 await assert.rejects(
   () => lifecycleAdapter.analyze(normalized),

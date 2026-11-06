@@ -30,6 +30,7 @@ export class FakePairingSessionStore {
     this.sessions = new Map();
     this.revokedTokens = new Set();
     this.failures = new Map();
+    this.globalFailures = { attempts: 0, lockedUntil: 0 };
   }
 
   issueCode({ code, clientId = 'test-client', displayName = 'AI Studio', scope = REA_READ_SCOPE } = {}) {
@@ -53,7 +54,14 @@ export class FakePairingSessionStore {
     const key = typeof clientId === 'string' && clientId.trim() ? clientId : 'anonymous';
     const now = this.now();
     const state = this.failures.get(key) || { attempts: 0, lockedUntil: 0 };
-    if (state.lockedUntil > now) throw fakeError('PAIRING_RATE_LIMITED');
+    const globalState = this.globalFailures;
+    if (globalState.lockedUntil > now || state.lockedUntil > now) {
+      throw fakeError('PAIRING_RATE_LIMITED');
+    }
+    if (globalState.lockedUntil && globalState.lockedUntil <= now) {
+      globalState.attempts = 0;
+      globalState.lockedUntil = 0;
+    }
     if (state.lockedUntil && state.lockedUntil <= now) {
       state.attempts = 0;
       state.lockedUntil = 0;
@@ -61,7 +69,9 @@ export class FakePairingSessionStore {
 
     const failAttempt = codeValue => {
       state.attempts += 1;
+      globalState.attempts += 1;
       if (state.attempts >= this.maxAttempts) state.lockedUntil = now + this.lockoutMs;
+      if (globalState.attempts >= this.maxAttempts) globalState.lockedUntil = now + this.lockoutMs;
       this.failures.set(key, state);
       throw fakeError(codeValue);
     };
