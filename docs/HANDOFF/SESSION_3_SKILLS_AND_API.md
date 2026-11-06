@@ -1,3 +1,15 @@
+# Latest verified checkpoint — 2026-11-06 (Native GGUF CI completed)
+
+- Latest application/source commit tested: [c9b3d4c8ac2335a37afe054a49fccb672774314c](https://github.com/babaprobado-bit/A-studio/commit/c9b3d4c8ac2335a37afe054a49fccb672774314c). Subsequent branch commits are handoff-document-only; re-fetch the branch head before continuing.
+- Demo workflow [42262971664](https://github.com/babaprobado-bit/A-studio/actions/runs/42262971664) **completed successfully** on c9b3d4c. Artifact `AI-Studio-Demo-APK`, ID `13525991499`, 3,775,868 bytes; ZIP digest `sha256:7ac4eda88327ac172eda84aaa5b5bd84a03725ee4c5bda57f911cec8418b51c1`.
+- Native GGUF workflow [42262972234](https://github.com/babaprobado-bit/A-studio/actions/runs/42262972234) **completed successfully** on the same source commit. All 16 workflow steps passed, including pinned llama.kt setup, llama.cpp Android source preparation, regression tests, Capacitor sync, Gradle debug APK build and artifact upload. Native artifact `AI-Studio-1.1-OnDevice-LocalCoder-APK`, ID `13525683883`, artifact archive size 18,159,442 bytes, ZIP digest `sha256:2adf39fa441788ff566e178ba9ff3638008b14a30f991ff747ecc5a5515fd6fa`; expires 2026-11-20 17:51:03 UTC.
+- Both CI workflows verify automated tests/build/package on GitHub-hosted runners only. No physical-phone installation, local GGUF inference, or airplane-mode/offline acceptance test has been performed. Do not present CI as proof of real-device or offline operation.
+- Feature branch: `feature/android-offline-skills-v1`. Before this documentation refresh, branch head was `89ed3ff882861f2a9160e0573f374c6d71096334`; this refresh adds documentation-only commits after that point. `main` remains unchanged at `aab010319b6500002844bd24b11da85dd9ca3b00`.
+- PR #2 remains **open, Draft and unmerged**: https://github.com/babaprobado-bit/A-studio/pull/2. Do not merge or mark ready without explicit user approval. The GitHub integration returned HTTP 403 for PR-body update; these handoff files are the detailed source of truth until that permission issue is resolved.
+- Preserve all 10 AI Team engines, provider connections, project/vault/Skills context routes, Local Coder API/Ollama/GGUF paths, and existing features. User has no internet for local/device validation; continue through code and hosted CI without asking for a phone/PC test.
+
+---
+
 # Session 3 of 4 — Skills and Local Coder modes
 
 ## Latest verified checkpoint — 2026-11-06 (CI refresh)
