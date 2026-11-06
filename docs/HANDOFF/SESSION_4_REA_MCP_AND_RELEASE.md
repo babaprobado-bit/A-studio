@@ -230,7 +230,7 @@ Do not assume REA is installed, connected or available inside Android APK.
 - [ ] Backup restores preserve old formats and do not overwrite provider credentials.
 
 ### Release
-- [ ] All seven current package test scripts (`test:site`, `test:workshop`, `test:skills`, `test:device-local-coder`, `test:api-local-coder`, `test:ai-team`, `test:rea-contract`) and Vite build pass.
+- [ ] All seven current package test scripts (`test:site`, `test:workshop`, `test:skills`, `test:device-local-coder`, `test:api-local-coder`, `test:ai-team`, `test:rea-companion-contract`) and Vite build pass.
 - [ ] Regular Android debug workflow passes.
 - [ ] Native GGUF debug workflow passes and artifact exists.
 - [ ] Actual phone install, GGUF inference and airplane-mode test report exists. **No physical-device test has been performed yet.**
