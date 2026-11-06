@@ -64,7 +64,7 @@ const invalidRequests = [
   [{ ...goodRequest, target: { paths: ['../secrets.env'] } }, context, 'parent traversal'],
   [{ ...goodRequest, target: { paths: ['/etc/passwd'] } }, context, 'absolute path'],
   [{ ...goodRequest, target: { paths: ['C:/Users/file.js'] } }, context, 'Windows drive'],
-  [{ ...goodRequest, target: { paths: ['\\\\server\\share\\file.js'] } }, context, 'network share'],
+  [{ ...goodRequest, target: { paths: ['\\\server\share\\file.js'] } }, context, 'network share'],
   [{ ...goodRequest, target: { paths: ['src/%2e%2e/secrets.js'] } }, context, 'encoded traversal'],
   [{ ...goodRequest, target: { paths: ['src//main.js'] } }, context, 'empty segment'],
   [{ ...goodRequest, target: { paths: ['src/../main.js'] } }, context, 'embedded traversal'],
@@ -173,8 +173,8 @@ assert.equal(validateAnalysisResponse(fakeResult, approved.value).ok, true);
 assert.match(fakeResult.result.content, /run a shell command/);
 assert.deepEqual(fakeCalls, ['files.inspect']);
 const fakeSource = await readFile(new URL('./rea-companion-fakes.mjs', import.meta.url), 'utf8');
-assert.doesNotMatch(fakeSource, /node:http|node:child_process|createServer|WebSocket|fetch\\s*\\(/i);
-assert.doesNotMatch(fakeSource, /rea-agents|spawn\\s*\\(|execFile\\s*\\(/i);
+assert.doesNotMatch(fakeSource, /node:http|node:child_process|createServer|WebSocket|fetch\s*\\(/i);
+assert.doesNotMatch(fakeSource, /rea-agents|spawn\s*\\(|execFile\s*\\(/i);
 assert.ok(fakeSource.includes('not cryptographic'));
 for (const method of ['write', 'execute', 'install', 'invokeTool']) {
   assert.equal(typeof fakeAdapter[method], 'undefined');
