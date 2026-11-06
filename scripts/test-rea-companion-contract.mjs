@@ -204,6 +204,33 @@ assert.throws(
   'a denied one-time code must not be reusable'
 );
 
+lifecycle.issueCode({ code: 'CLIENT-BIND-05', clientId: 'trusted-desktop' });
+assert.throws(
+  () => lifecycle.pair({ code: 'CLIENT-BIND-05', clientId: 'untrusted-client', hostApproved: true }),
+  error => error.code === 'PAIRING_INVALID',
+  'a pairing code must remain bound to the client that requested it'
+);
+const clientBoundPair = lifecycle.pair({
+  code: 'CLIENT-BIND-05', clientId: 'trusted-desktop', hostApproved: true
+});
+assert.equal(lifecycle.authenticate(clientBoundPair.sessionToken).clientId, 'trusted-desktop');
+
+lifecycle.issueCode({ code: 'SCOPE-ESCALATE-06', clientId: 'desktop-client' });
+assert.throws(
+  () => lifecycle.pair({
+    code: 'SCOPE-ESCALATE-06', clientId: 'desktop-client', scope: 'rea.write', hostApproved: true
+  }),
+  error => error.code === 'SCOPE_DENIED',
+  'a client must not escalate the fixed read-only scope'
+);
+assert.throws(
+  () => lifecycle.pair({
+    code: 'SCOPE-ESCALATE-06', clientId: 'desktop-client', hostApproved: true
+  }),
+  error => error.code === 'PAIRING_CODE_USED',
+  'a code rejected for scope escalation must not be retried'
+);
+
 lifecycle.issueCode({ code: 'APPROVED-PAIR-02', clientId: 'desktop-client', displayName: 'AI Studio desktop' });
 const paired = lifecycle.pair({
   code: 'APPROVED-PAIR-02',
@@ -211,6 +238,15 @@ const paired = lifecycle.pair({
   scope: REA_READ_SCOPE,
   hostApproved: true
 });
+assert.throws(
+  () => lifecycle.authenticate(''),
+  error => error.code === 'PAIRING_REQUIRED'
+);
+assert.throws(
+  () => lifecycle.authenticate('unknown-session-token-000000000000000000'),
+  error => error.code === 'PAIRING_REQUIRED'
+);
+assert.equal(lifecycle.revoke('unknown-session-token-000000000000000000'), false);
 assert.equal(paired.scope, 'rea.read');
 assert.equal(lifecycle.authenticate(paired.sessionToken).displayName, 'AI Studio desktop');
 assert.equal(lifecycle.authenticate(paired.sessionToken).scope, 'rea.read');
