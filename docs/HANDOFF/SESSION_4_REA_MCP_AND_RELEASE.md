@@ -1,3 +1,28 @@
+# Verified REA integration research — 2026-11-06
+
+## Current upstream facts
+
+- The upstream getting-started guide currently documents Node.js **22.19+**, **24.11+**, or **26+** with npm. This is stricter than AI Studio's current `package.json` engine range (`>=20`); do not silently raise the app's global Node requirement just for an optional companion.
+- The npm package search result reports `rea-agents` **6.8.0** as the current published version at research time. Do not hard-code `@latest` into a persistent MCP registration: upstream guidance says persistent registrations should pin an exact package version and be refreshed through the reviewed setup flow.
+- Official setup is `npx rea-agents@latest setup`; it shows a proposed client-configuration plan and asks before applying changes. `rea doctor` is intended for readiness diagnosis. REA's MCP server is a local process launched by an MCP-capable client; REA analysis is local, but findings returned to an AI agent may then be sent to that agent's model provider.
+- REA supports static JavaScript/Electron analysis without a native analysis engine. Deeper native analysis may require separately installed tools such as Hopper, Ghidra or IDA; these must remain optional and outside AI Studio's Android package.
+- Sources checked: https://rea.vaked.dev/get-started/ ; https://www.npmjs.com/package/rea-agents ; https://rea.tools/faq/ . Re-check these before implementation because REA releases frequently.
+
+## AI Studio integration decision
+
+- **Do not embed or launch the REA CLI from the Android APK.** Capacitor's Android WebView is not a supported local Node.js process host, and the app's current `package.json` does not include REA.
+- Preferred design is an **optional desktop companion** running on a user's own computer. That companion owns the pinned REA MCP stdio process and exposes only a small, documented AI Studio bridge API. AI Studio must not become a generic unrestricted MCP client or generic shell/file proxy.
+- Companion connection must be off by default. Pair explicitly, display companion identity/version and the exact available allowlisted actions, and provide disconnect/revoke. Prefer loopback-only binding for same-computer browser use. If Android-over-LAN is later required, it needs authenticated pairing, TLS, strict origin policy and explicit LAN exposure; never expose an unauthenticated HTTP MCP bridge.
+- Separate read-only inspection from side effects. Read-only requests still disclose the selected target path/question and returned analysis to the chosen AI provider, so show the data disclosure before sending. Any file modification, command execution, project write or remote task requires per-action approval with a preview. No background execution.
+- Keep provider credentials and companion pairing secrets in platform secure storage; exclude them from JSON/encrypted workspace backups, logs and exported activity. Scrub tool arguments/results for secrets and cap request/response sizes and duration.
+- If a companion cannot be safely implemented and tested in this repository, document the blocker instead of faking an in-app REA connection. REA remains optional; AI Studio must work unchanged when it is absent.
+
+## Implementation gate
+
+No REA package has been added, installed or executed; no MCP connection has been created; no external app configuration or user files have been changed. Before doing any of those, obtain the user's explicit approval. A future implementation should start with a threat model and mock bridge contract/tests, then a pinned companion package/launcher, then explicit opt-in UI and integration tests. Do not change the Android app's Node requirement merely to accommodate the companion.
+
+---
+
 # Session 4 of 4 — Optional REA/MCP and final release
 
 ## Goal
