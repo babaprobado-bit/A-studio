@@ -1,5 +1,19 @@
 # AI Studio — Project state and technical handoff
 
+## Latest verified checkpoint — 2026-11-06 (CI refresh)
+
+- Feature source commit under test: [c9b3d4c](https://github.com/babaprobado-bit/A-studio/commit/c9b3d4c8ac2335a37afe054a49fccb672774314c).
+- Latest handoff docs commit before this refresh: [b5589e8](https://github.com/babaprobado-bit/A-studio/commit/b5589e880d84c62ce5778da7789b212817edef41).
+- Demo workflow [42262971664](https://github.com/babaprobado-bit/A-studio/actions/runs/42262971664) **passed** on c9b3d4c. All source/regression steps (including Local Coder/workspace, Skills, device GGUF bridge, site gate), Vite, Android/Capacitor setup and Gradle debug APK + upload passed.
+  - Artifact: AI-Studio-Demo-APK, ID 13525991499, 3,775,868 bytes.
+  - GitHub artifact digest: sha256:7ac4eda88327ac172eda84aaa5b5bd84a03725ee4c5bda57f911cec8418b51c1
+- Native GGUF workflow [42262972234](https://github.com/babaprobado-bit/A-studio/actions/runs/42262972234) is still **in progress** at the last check. llama.kt, llama.cpp source preparation, dependency install, Vite, all regression checks (including new import-size and load-listener tests), Capacitor generation/sync and trusted-LAN Ollama setup passed. Gradle debug APK build was running; no Native artifact had appeared yet.
+- Do not infer a Native APK success until run 42262972234 completes and an artifact is listed.
+- Source checkpoint c9b3d4c and handoff checkpoint b5589e8 are on feature/android-offline-skills-v1. main remains aab010319b6500002844bd24b11da85dd9ca3b00.
+- PR #2 remains open, Draft and unmerged. The PR body update endpoint returned 403 to the connected GitHub integration; these handoff documents are the current detailed checkpoint.
+- No physical-device install, local GGUF inference, or airplane-mode test was performed. CI is not proof of offline/device operation.
+
+
 ## Latest verified checkpoint — 2026-11-06
 
 - Repository: https://github.com/babaprobado-bit/A-studio

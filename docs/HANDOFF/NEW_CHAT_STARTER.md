@@ -1,18 +1,16 @@
 # AI Studio — latest new-chat handoff
 
-> **LATEST VERIFIED CHECKPOINT — 2026-11-06**
+> **LATEST VERIFIED CHECKPOINT — 2026-11-06 (CI refresh)**
 >
 > - Repo: https://github.com/babaprobado-bit/A-studio
-> - Branch: `feature/android-offline-skills-v1`. Latest source/test commit: `c9b3d4c8ac2335a37afe054a49fccb672774314c`.
-> - `main` remains `aab010319b6500002844bd24b11da85dd9ca3b00`. PR #2 remains open, Draft and unmerged: https://github.com/babaprobado-bit/A-studio/pull/2. Do not edit main, merge, or mark the PR ready.
-> - Latest Demo workflow [42262971664](https://github.com/babaprobado-bit/A-studio/actions/runs/42262971664) is for `c9b3d4c). Source/regression checks, Vite, Android generation and sync passed; Gradle debug APK was still running at last check.
-> - Latest Native GGUF workflow [42262972234](https://github.com/babaprobado-bit/A-studio/actions/runs/42262972234) is for `c9b3d4c). Native toolchain and pinned llama.kt passed; llama.cpp source preparation was in progress. Later regression/Gradle steps were pending.
-> - Earlier Demo and Native GGUF workflows [42090697495](https://github.com/babaprobado-bit/A-studio/actions/runs/42090697495) and [42090697496](https://github.com/babaprobado-bit/A-studio/actions/runs/42090697496) succeeded for `cfd5468`, with artifacts. Those artifacts are not built from current `c9b3d4c`.
-> - Three Qwen GGUF model catalogue files have verified SHA-256 pins. Android checks the staged download before installing it; imported local GGUF files remain a separate no-catalogue-hash path.
-> - AI Team has 10 engines, no four-provider cap, tested parallel and sequential flows, explicit live-call consent, and shared Skills/project/vault context wiring.
-> - Newest runtime hardening: listener cleanup cannot mask native model-load results/errors; GGUF file imports stop immediately if actual bytes exceed declared source size, and retain the 8 GB cap/final-size validation.
-> - No physical phone installation, GGUF inference or airplane-mode test has been performed. CI is not evidence of device compatibility or actual offline inference. User says there is no internet; continue source/CI work and do not ask for device testing.
-> - Full source continuation: `docs/HANDOFF/SESSION_3_CODE_AUDIT.md`. Skills/API details: `docs/HANDOFF/SESSION_3_SKILLS_AND_API.md`. Project inventory: `docs/HANDOFF/PROJECT_STATE.md`.
+> - Feature source commit: c9b3d4c8ac2335a37afe054a49fccb672774314c. Latest handoff checkpoint: b5589e880d84c62ce5778da7789b212817edef41.
+> - Demo workflow [42262971664](https://github.com/babaprobado-bit/A-studio/actions/runs/42262971664) passed, including all regression tests, Gradle build and APK upload. Artifact ID: 13525991499 (3,775,868 bytes).
+> - Native GGUF workflow [42262972234](https://github.com/babaprobado-bit/A-studio/actions/runs/42262972234): llama.kt/llama.cpp setup, web build, all regression suites, Capacitor generation/sync and Ollama bridge setup passed. Native Gradle build is in progress at last check; no Native artifact yet.
+> - main is unchanged at aab010319b6500002844bd24b11da85dd9ca3b00. PR #2 stays open, Draft and unmerged. Do not merge or mark ready.
+> - PR body update was blocked by GitHub integration HTTP 403; these handoff files contain the latest detail.
+> - GGUF SHA-256 pins and 10-engine AI Team coverage remain as described in the audit docs. Latest fixes also cover listener-cleanup error masking and immediate stop when imported GGUF bytes exceed declared size.
+> - No physical-phone install, Native GGUF inference or airplane-mode test has been performed. CI is not proof of device compatibility or actual offline operation.
+
 
 ## Current verified checkpoint — 2026-11-05
 
