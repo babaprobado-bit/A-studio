@@ -4,7 +4,7 @@
 
 - Added `src/rea-companion-contract.js` with pure validators for the versioned read-only bridge request/response/error shapes and exact loopback Origin/Host checks.
 - The only accepted analysis operations are `project.overview`, `files.inspect` and `symbols.search`. File/symbol paths must be relative, safe, registered-project scoped and explicitly selected for that request; unknown fields, generic MCP calls, shell commands, oversized payloads and overlong timeouts fail closed.
-- Added `scripts/test-rea-companion-contract.mjs` and `npm run test:rea-companion-contract`. The mock suite covers allowlists, invalid paths, request/result bounds, disclosure parity, provider-forwarding rejection, sanitized errors and exact `127.0.0.1` origin/host checks.
+- Added `scripts/test-rea-companion-contract.mjs` and `npm run test:rea-companion-contract`. The mock suite covers allowlists, invalid paths, request/result bounds, response/request identity and protocol parity, disclosure parity, provider-forwarding rejection, sanitized errors and exact `127.0.0.1` origin/host checks.
 - The test uses an in-process fake read-only adapter only. It does not install or launch REA, start a listener, open an MCP session, read user project files, call a provider or perform side effects.
 - Added `scripts/rea-companion-fakes.mjs` with deterministic in-memory pairing/session and read-only adapter fakes. Tests simulate one-time codes, client-bound pairing, explicit host approval, expiry, rate limiting, `rea.read`-only scope and write-scope escalation rejection, missing/unknown/expired/revoked sessions, per-request approval, provider-forwarding denial and duplicate-request replay rejection. These fakes use predictable test tokens and are **not production authentication or secure storage**.
 - Both Android CI workflows now run the contract test. AI Studio's Node engine remains `>=20`; no REA package or dependency was added.
@@ -91,6 +91,14 @@ A proposed `POST /v1/analysis` request:
 
 The only V0 operations are the fixed enum `project.overview`, `files.inspect` and `symbols.search`. Their inputs are operation-specific and schema-validated. The example above illustrates `files.inspect`; it does not authorize extra operations.
 
+The exact V0 `target` shapes are:
+
+- `project.overview`: `{}` (only metadata for the registered project root).
+- `files.inspect`: `{ "paths": ["relative/path.js"] }`.
+- `symbols.search`: `{ "query": "startGame", "paths": ["relative/path.js"] }`.
+
+Unknown fields are rejected. A `symbols.search` query is a bounded text term, never a command, executable, URL or arbitrary MCP tool name. Each listed file must be in the user's explicit selection for that request.
+
 - `projectId` must refer to a root explicitly registered by the user on the companion host.
 - Paths must be relative, normalized and remain inside that root after resolving symlinks. Reject absolute paths, traversal segments, device paths, network shares and symlinks escaping the root.
 - Paths must be explicitly selected by the user for the current request. No whole-disk or implicit home-directory scan.
@@ -120,7 +128,7 @@ Successful responses should use a stable envelope:
 }
 ```
 
-Errors use `{ "error": { "code": "...", "message": "...", "retryable": false }, "requestId": "..." }`. Codes should include `PAIRING_REQUIRED`, `SESSION_EXPIRED`, `SCOPE_DENIED`, `ORIGIN_REJECTED`, `PROJECT_NOT_REGISTERED`, `PATH_REJECTED`, `OPERATION_NOT_ALLOWED`, `LIMIT_EXCEEDED`, `REA_UNAVAILABLE`, `TIMEOUT` and `INTERNAL_ERROR`. Do not return stack traces, local absolute paths, environment variables, tokens or raw command lines.
+Errors use `{ "error": { "code": "...", "message": "...", "retryable": false }, "requestId": "..." }`. The stable code set includes `PAIRING_REQUIRED`, `PAIRING_EXPIRED`, `PAIRING_INVALID`, `PAIRING_RATE_LIMITED`, `PAIRING_CODE_USED`, `HOST_APPROVAL_REQUIRED`, `SESSION_EXPIRED`, `SESSION_REVOKED`, `SCOPE_DENIED`, `ORIGIN_REJECTED`, `PROJECT_NOT_REGISTERED`, `PATH_REJECTED`, `OPERATION_NOT_ALLOWED`, `REQUEST_REPLAYED`, `USER_APPROVAL_REQUIRED`, `PROVIDER_FORWARDING_DISABLED`, `LIMIT_EXCEEDED`, `REA_UNAVAILABLE`, `TIMEOUT` and `INTERNAL_ERROR`. Do not return stack traces, local absolute paths, environment variables, tokens or raw command lines.
 
 ### Permissions and disclosure UX
 

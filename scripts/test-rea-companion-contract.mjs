@@ -117,6 +117,29 @@ assert.equal(validateAnalysisResponse({
 assert.equal(validateAnalysisResponse({
   ...goodResponse, result: { content: 'ok', command: 'echo hi' }
 }, normalized).ok, false);
+assert.equal(validateAnalysisResponse({
+  ...goodResponse, requestId: 'a5a5a5a5-91f1-4f2f-9f0d-1e3a4b5c6d7e'
+}, normalized).ok, false, 'response request ID must match exactly');
+assert.equal(validateAnalysisResponse({
+  ...goodResponse, companionId: 'bad'
+}, normalized).ok, false, 'companion ID must be opaque and well-formed');
+assert.equal(validateAnalysisResponse({
+  ...goodResponse, protocolVersion: '2'
+}, normalized).ok, false, 'protocol version mismatch must fail closed');
+assert.equal(validateAnalysisResponse({
+  ...goodResponse, operation: 'project.overview'
+}, normalized).ok, false, 'response operation must match the request');
+assert.equal(validateAnalysisResponse({
+  ...goodResponse, status: 'queued'
+}, normalized).ok, false, 'only completed analysis responses are accepted');
+assert.equal(validateAnalysisResponse({
+  ...goodResponse,
+  disclosure: { ...goodResponse.disclosure, projectId: 'other-project_123' }
+}, normalized).ok, false, 'disclosure project ID must match the requested project');
+assert.equal(validateAnalysisResponse({
+  ...goodResponse,
+  disclosure: { ...goodResponse.disclosure, paths: ['src/main.js', 'src/ai-team.js', 'src/extra.js'] }
+}, normalized).ok, false, 'disclosure cannot add paths that were not requested');
 
 assert.equal(validateBridgeError({
   requestId, error: { code: 'PATH_REJECTED', message: 'Selected path is outside the project.', retryable: false }
