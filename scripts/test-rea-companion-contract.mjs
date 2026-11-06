@@ -176,7 +176,7 @@ const fakeSource = await readFile(new URL('./rea-companion-fakes.mjs', import.me
 for (const forbidden of ['node:http', 'node:child_process', 'createServer', 'WebSocket', 'fetch(', 'rea-agents', 'spawn(', 'execFile(']) {
   assert.equal(fakeSource.includes(forbidden), false, 'mock helper must not contain live runtime primitive: ' + forbidden);
 }
-assert.ok(fakeSource.includes('not cryptographic'));
+assert.ok(fakeSource.includes('cryptographic pairing'));
 for (const method of ['write', 'execute', 'install', 'invokeTool']) {
   assert.equal(typeof fakeAdapter[method], 'undefined');
 }
