@@ -137,9 +137,30 @@ jobs:
           python3 scripts/patch-android-local-runtime.py "$PWD"
       - name: Sync Capacitor Android project
         run: npx cap sync android
-      - name: Build debug APK
+      - name: Build debug APK (retry transient repository failures)
         working-directory: android
-        run: chmod +x gradlew && ./gradlew --no-daemon assembleDebug
+        shell: bash
+        run: |
+          chmod +x gradlew
+          for attempt in 1 2 3; do
+            echo "Gradle build attempt ${attempt}/3"
+            if ./gradlew --no-daemon assembleDebug > gradle-build.log 2>&1; then
+              cat gradle-build.log
+              exit 0
+            else
+              build_status=$?
+            fi
+            cat gradle-build.log
+            if ! grep -Eqi 'Received status code 5(02|03|04) from server|HTTP 5(02|03|04)|Gateway Time-out|timed out|UnknownHostException|Temporary failure in name resolution|Connection reset' gradle-build.log; then
+              exit "$build_status"
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "Transient repository failure persisted after three attempts."
+              exit "$build_status"
+            fi
+            sleep $((attempt * 20))
+          done
+          exit 1
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
