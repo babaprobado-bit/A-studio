@@ -91,21 +91,30 @@ jobs:
           if distribution_index < 0:
               raise SystemExit("Gradle distribution URL was not found.")
           url = lines[distribution_index].split("=", 1)[1].replace("\\:", ":")
-          url = url.replace("https://services.gradle.org/", "https://downloads.gradle-dn.com/").replace("https://downloads.gradle.org/", "https://downloads.gradle-dn.com/")
-          if url.endswith("-all.zip"):
-              url = url[:-len("-all.zip")] + "-bin.zip"
-          if not url.endswith("-bin.zip"):
-              raise SystemExit("Expected a standard Gradle -bin distribution URL.")
-          lines[distribution_index] = "distributionUrl=" + url.replace(":", "\\:")
-          timeout_indexes = [index for index, line in enumerate(lines) if line.startswith("networkTimeout=")]
-          if timeout_indexes:
-              lines[timeout_indexes[0]] = "networkTimeout=120000"
-              for index in reversed(timeout_indexes[1:]):
-                  del lines[index]
-          else:
-              lines.append("networkTimeout=120000")
+          match = re.fullmatch(r"https://services\\.gradle\\.org/distributions/gradle-([0-9.]+)-(?:all|bin)\\.zip", url)
+          if not match:
+              raise SystemExit("Unexpected generated Gradle distribution URL.")
+          version = match.group(1)
+          if version != "8.11.1":
+              raise SystemExit(f"Unreviewed Gradle version: {version}")
+          # Use the listed mirror, but require Gradle's official release checksum
+          # before the downloaded distribution can be used by the wrapper.
+          url = f"https://mirrors.aliyun.com/gradle/distributions/v{version}/gradle-{version}-bin.zip"
+          properties = {
+              "distributionUrl": url.replace(":", "\\:"),
+              "distributionSha256Sum": "f397b287023acdba1e9f6fc5ea72d22dd63669d59ed4a289a29b1a76eee151c6",
+              "networkTimeout": "120000",
+          }
+          for key, value in properties.items():
+              indexes = [index for index, line in enumerate(lines) if line.startswith(key + "=")]
+              if indexes:
+                  lines[indexes[0]] = key + "=" + value
+                  for index in reversed(indexes[1:]):
+                      del lines[index]
+              else:
+                  lines.append(key + "=" + value)
           path.write_text("\n".join(lines) + "\n")
-          print("Gradle wrapper:", url, "| networkTimeout=120000ms")
+          print("Gradle wrapper:", url, "| official SHA-256 pinned | networkTimeout=120000ms")
           PY
       - name: Allow local Ollama HTTP on trusted networks
         run: |
