@@ -161,12 +161,25 @@ export class DeviceLocalCoder {
     const listed = await this.plugin.listModels();
     this.models = Array.isArray(listed?.models) ? listed.models : [];
     this.loadedFileName = this.device?.loadedFileName || this.models.find(item => item.loaded)?.fileName || '';
+    if (typeof this.plugin.listActiveDownloads === 'function') {
+      const active = await this.plugin.listActiveDownloads();
+      const downloads = Array.isArray(active?.downloads) ? active.downloads : [];
+      const first = downloads[0];
+      const downloadId = Number(first?.downloadId);
+      if (first && Number.isSafeInteger(downloadId) && downloadId >= 0 && typeof first.fileName === 'string') {
+        this.activeDownloadId = downloadId;
+        this.activeDownloadFileName = first.fileName;
+      } else {
+        this.activeDownloadId = null;
+        this.activeDownloadFileName = '';
+      }
+    }
     return { device: this.device, models: this.models, recommendation: chooseRecommendedDeviceModel(this.device) };
   }
 
   async download(model, onProgress = () => {}, options = {}) {
     if (!this.native) throw new Error('Model indirme yalnızca Android uygulamasında kullanılabilir.');
-    if (this.importStarting || this.downloadStarting || this.activeDownloadId !== null) {
+    if (this.importStarting || this.downloadStarting) {
       throw new Error('Başka bir model aktarımı sürüyor. Önce onu tamamla.');
     }
 
@@ -199,12 +212,18 @@ export class DeviceLocalCoder {
         throw new Error(`Yeterli boş depolama yok. Yaklaşık ${formatModelBytes(requiredStorageBytes)} gerekiyor.`);
       }
 
-      const started = await this.plugin.downloadModel({
-        url: model.url,
-        fileName: model.fileName,
-        sha256: expectedSha256,
-        allowMetered: Boolean(options.allowMetered)
-      });
+      const resumedDownloadId = this.activeDownloadId;
+      if (resumedDownloadId !== null && this.activeDownloadFileName !== model.fileName) {
+        throw new Error('Başka bir modelin indirmesi sürüyor. Önce devam eden indirmeyi tamamla veya iptal et.');
+      }
+      const started = resumedDownloadId !== null
+        ? { downloadId: resumedDownloadId }
+        : await this.plugin.downloadModel({
+          url: model.url,
+          fileName: model.fileName,
+          sha256: expectedSha256,
+          allowMetered: Boolean(options.allowMetered)
+        });
       downloadId = Number(started.downloadId);
       if (!Number.isSafeInteger(downloadId) || downloadId < 0) {
         throw new Error('Android indirme görevi başlatılamadı.');

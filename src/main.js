@@ -596,8 +596,20 @@ function renderDeviceLocalModelManager(){
     if(models.some(model=>model.fileName===previous))installed.value=previous;
     else if(models.length)installed.value=models[0].fileName;
   }
+  const activeDownload=deviceLocalCoder.activeDownloadId!==null;
+  const selectedCatalogueModel=DEVICE_MODEL_CATALOG.find(item=>item.id===catalog?.value);
+  const canResumeSelected=activeDownload&&deviceLocalCoder.activeDownloadFileName===selectedCatalogueModel?.fileName;
   if($('onDeviceModelCatalog'))$('onDeviceModelCatalog').disabled=!Boolean(info?.supported);
-  if($('downloadOnDeviceModel'))$('downloadOnDeviceModel').disabled=!Boolean(info?.supported);
+  if($('downloadOnDeviceModel')){
+    $('downloadOnDeviceModel').disabled=!Boolean(info?.supported)&&!canResumeSelected;
+    $('downloadOnDeviceModel').textContent=activeDownload
+      ?(canResumeSelected?'İndirmeyi sürdür':'Başka model indiriliyor')
+      :'Modeli indir';
+  }
+  if($('cancelOnDeviceDownload')){
+    $('cancelOnDeviceDownload').hidden=!activeDownload;
+    $('cancelOnDeviceDownload').disabled=!activeDownload;
+  }
   if($('importOnDeviceModel'))$('importOnDeviceModel').disabled=!Boolean(info?.supported);
   if($('loadOnDeviceModel'))$('loadOnDeviceModel').disabled=!Boolean(info?.supported&&deviceLocalState?.models?.length);
   if($('deleteOnDeviceModel'))$('deleteOnDeviceModel').disabled=!Boolean(deviceLocalState?.models?.length);
@@ -615,11 +627,13 @@ async function refreshDeviceLocalModels(quiet=false){
     if(!deviceLocalState.device?.supported&&settings.localCoderEngine==='device'){settings.localCoderEngine='ollama';await setPref(DB.settings,settings);}
     renderDeviceLocalModelManager();syncAiTeamProviderUI();
     const recommendation=deviceLocalState.recommendation;
-    if($('onDeviceModelStatus'))$('onDeviceModelStatus').textContent=deviceLocalState.device?.supported
-      ?(recommendation.isUnderpowered
-        ?'Telefon profili: '+recommendation.capabilityTier+'. '+recommendation.recommendationReason+' En küçük modeli denemeden önce boş RAM ve depolamayı kontrol et.'
-        :'Telefon profili: '+recommendation.capabilityTier+'. Önerilen model: '+recommendation.name+'. '+recommendation.recommendationReason+' Modeli indirdikten sonra internet olmadan çalıştırabilirsin.')
-      :'Bu Android sürümü veya işlemci mimarisi yerel modeli desteklemiyor. PC / Ollama ve API sağlayıcıları çalışmaya devam eder.';
+    if($('onDeviceModelStatus'))$('onDeviceModelStatus').textContent=deviceLocalCoder.activeDownloadId!==null
+      ?(deviceLocalCoder.activeDownloadFileName+' indirmesi devam ediyor. Aynı modeli seçip "İndirmeyi sürdür" düğmesiyle kaldığı yerden takip edebilir veya iptal edebilirsin.')
+      :deviceLocalState.device?.supported
+        ?(recommendation.isUnderpowered
+          ?'Telefon profili: '+recommendation.capabilityTier+'. '+recommendation.recommendationReason+' En küçük modeli denemeden önce boş RAM ve depolamayı kontrol et.'
+          :'Telefon profili: '+recommendation.capabilityTier+'. Önerilen model: '+recommendation.name+'. '+recommendation.recommendationReason+' Modeli indirdikten sonra internet olmadan çalıştırabilirsin.')
+        :'Bu Android sürümü veya işlemci mimarisi yerel modeli desteklemiyor. PC / Ollama ve API sağlayıcıları çalışmaya devam eder.';
     return deviceLocalState;
   }catch(error){
     if($('onDeviceModelStatus'))$('onDeviceModelStatus').textContent='Telefon bilgileri okunamadı: '+(error.message||'Native LocalLlm köprüsünü kontrol et.');

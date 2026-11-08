@@ -87,11 +87,13 @@ class LocalLlmPlugin : Plugin() {
         context.getSharedPreferences("aistudio_local_llm_downloads", Context.MODE_PRIVATE)
 
     private fun sha256PreferenceKey(fileName: String) = "$fileName.sha256"
+    private fun pendingDownloadPreferenceKey(fileName: String) = "$fileName.pending"
 
     private fun clearDownloadRecord(fileName: String) {
         downloadPreferences().edit()
             .remove(fileName)
             .remove(sha256PreferenceKey(fileName))
+            .remove(pendingDownloadPreferenceKey(fileName))
             .apply()
     }
 
@@ -162,9 +164,60 @@ class LocalLlmPlugin : Plugin() {
     /** Reconcile downloads after app restart; only completed files get the .gguf extension. */
     private fun reconcileDownloads() {
         val preferences = downloadPreferences()
+        val manager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+
+        // A durable marker closes the tiny crash window between enqueue() and saving its ID.
+        // If the process died in that window, recover the ID by the unique DownloadManager title.
+        val pendingNames = preferences.all
+            .filter { (key, value) -> key.endsWith(".gguf.pending") && value == true }
+            .keys.map { it.removeSuffix(".pending") }
+        if (pendingNames.isNotEmpty()) {
+            val recoveredIds = mutableMapOf<String, Long>()
+            var scanSucceeded = false
+            var pendingCursor: Cursor? = null
+            try {
+                pendingCursor = manager.query(DownloadManager.Query())
+                if (pendingCursor != null) {
+                    val titleIndex = pendingCursor.getColumnIndex(DownloadManager.COLUMN_TITLE)
+                    val idIndex = pendingCursor.getColumnIndex(DownloadManager.COLUMN_ID)
+                    if (titleIndex >= 0 && idIndex >= 0) {
+                        while (pendingCursor.moveToNext()) {
+                            val title = pendingCursor.getString(titleIndex) ?: continue
+                            val prefix = "AI Studio · "
+                            if (title.startsWith(prefix)) {
+                                val fileName = title.removePrefix(prefix)
+                                if (fileName in pendingNames) recoveredIds[fileName] = pendingCursor.getLong(idIndex)
+                            }
+                        }
+                        scanSucceeded = true
+                    }
+                }
+            } catch (_: Exception) {
+                // If the DownloadManager query is temporarily unavailable, keep the marker
+                // and partial file. A later refresh can retry without deleting a live download.
+            } finally {
+                pendingCursor?.close()
+            }
+            if (scanSucceeded) {
+                for (fileName in pendingNames) {
+                    val recoveredId = recoveredIds[fileName]
+                    if (recoveredId == null) {
+                        partialModelFile(fileName).delete()
+                        clearDownloadRecord(fileName)
+                    } else {
+                        // Keep the marker unless the durable ID write succeeds.
+                        preferences.edit()
+                            .putLong(fileName, recoveredId)
+                            .putString(sha256PreferenceKey(fileName), preferences.getString(sha256PreferenceKey(fileName), null))
+                            .remove(pendingDownloadPreferenceKey(fileName))
+                            .commit()
+                    }
+                }
+            }
+        }
+
         val entries = preferences.all.toList()
         if (entries.isNotEmpty()) {
-            val manager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
             for ((fileName, rawId) in entries) {
                 val id = rawId as? Long ?: continue
                 var cursor: Cursor? = null
@@ -197,7 +250,10 @@ class LocalLlmPlugin : Plugin() {
         }
         // This scan must also run when SharedPreferences is empty: a force-stopped
         // import or download can leave an orphaned partial file without a record.
-        val trackedNames = preferences.all.filterValues { it is Long }.keys
+        val preferenceSnapshot = preferences.all
+        val trackedNames = preferenceSnapshot.filterValues { it is Long }.keys +
+            preferenceSnapshot.filter { (key, value) -> key.endsWith(".gguf.pending") && value == true }
+                .keys.map { it.removeSuffix(".pending") }
         modelDirectory().listFiles { file -> file.isFile && file.name.endsWith(".gguf.part", ignoreCase = true) }
             ?.forEach { partial ->
                 val modelName = partial.name.removeSuffix(".part")
@@ -470,6 +526,25 @@ class LocalLlmPlugin : Plugin() {
     }
 
     @PluginMethod
+    fun listActiveDownloads(call: PluginCall) {
+        try {
+            reconcileDownloads()
+            val downloads = JSArray()
+            downloadPreferences().all.forEach { (fileName, rawId) ->
+                val id = rawId as? Long ?: return@forEach
+                if (!fileName.endsWith(".gguf", ignoreCase = true)) return@forEach
+                downloads.put(JSObject().apply {
+                    put("fileName", fileName)
+                    put("downloadId", id)
+                })
+            }
+            call.resolve(JSObject().apply { put("downloads", downloads) })
+        } catch (error: Exception) {
+            call.reject("Etkin model indirmeleri okunamadı: ${error.message}", error)
+        }
+    }
+
+    @PluginMethod
     fun downloadModel(call: PluginCall) {
         try {
             val url = call.getString("url") ?: throw IllegalArgumentException("İndirme adresi eksik.")
@@ -490,8 +565,18 @@ class LocalLlmPlugin : Plugin() {
             if (activeImportFileNames.contains(fileName)) {
                 throw IllegalStateException("Bu model şu anda içe aktarılıyor.")
             }
-            if (downloadPreferences().contains(fileName)) {
+            val preferences = downloadPreferences()
+            val pendingKey = pendingDownloadPreferenceKey(fileName)
+            if (preferences.contains(fileName) || preferences.getBoolean(pendingKey, false)) {
                 throw IllegalStateException("Bu model zaten indiriliyor.")
+            }
+            val anotherActiveDownload = preferences.all.entries.firstOrNull { entry ->
+                (entry.key.endsWith(".gguf") && entry.value is Long) ||
+                    (entry.key.endsWith(".gguf.pending") && entry.value == true)
+            }
+            if (anotherActiveDownload != null && anotherActiveDownload.key != fileName &&
+                anotherActiveDownload.key != pendingKey) {
+                throw IllegalStateException("Başka bir model indirmesi zaten sürüyor.")
             }
             if (destination.exists()) throw IllegalStateException("Model zaten telefonda bulunuyor.")
             val partial = partialModelFile(fileName)
@@ -507,12 +592,25 @@ class LocalLlmPlugin : Plugin() {
                 .setAllowedOverRoaming(false)
                 .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE)
                 .setDestinationInExternalFilesDir(context, "models", partial.name)
+            // Persist the intent before enqueueing. If Android kills the process after
+            // enqueue() but before the ID write, reconcileDownloads() recovers by title.
+            val pendingSaved = preferences.edit()
+                .putBoolean(pendingKey, true)
+                .putString(sha256PreferenceKey(fileName), expectedSha256)
+                .commit()
+            if (!pendingSaved) throw IllegalStateException("İndirme kaydı güvenli şekilde saklanamadı.")
             val manager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
             val downloadId = manager.enqueue(request)
-            downloadPreferences().edit()
+            val recordSaved = preferences.edit()
                 .putLong(fileName, downloadId)
+                .remove(pendingKey)
                 .putString(sha256PreferenceKey(fileName), expectedSha256)
-                .apply()
+                .commit()
+            if (!recordSaved) {
+                // If removal fails the durable pending marker lets the next refresh recover it.
+                try { manager.remove(downloadId) } catch (_: Exception) { }
+                throw IllegalStateException("İndirme kimliği güvenli şekilde saklanamadı.")
+            }
             call.resolve(JSObject().apply { put("downloadId", downloadId) })
         } catch (error: Exception) { call.reject("Model indirilemedi: ${error.message}", error) }
     }

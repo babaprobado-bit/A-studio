@@ -66,6 +66,28 @@ assert.match(nativeReconcileSource,
   'DownloadManager reconciliation must be conditional while orphan cleanup remains outside that block');
 assert.match(nativeReconcileSource, /activeImportFileNames\.contains\(modelName\)/,
   'orphan cleanup must preserve partial files owned by an active import');
+assert.match(nativeSource, /pendingDownloadPreferenceKey\(fileName\)/,
+  'native download bookkeeping must have a durable pending marker');
+const nativeReconcilePending = nativeReconcileSource.indexOf('pendingNames');
+const nativePendingQuery = nativeReconcileSource.indexOf('manager.query(DownloadManager.Query())');
+const nativePendingPersist = nativeReconcileSource.indexOf('.commit()');
+assert.ok(nativeReconcilePending >= 0 && nativePendingQuery > nativeReconcilePending && nativePendingPersist > nativePendingQuery,
+  'pending enqueue markers must be reconciled against DownloadManager and durably converted to IDs');
+assert.match(nativeReconcileSource, /DownloadManager\.COLUMN_TITLE/,
+  'pending enqueue recovery must identify its request by the unique title');
+const nativeEnqueueIndex = nativeDownloadSource.indexOf('manager.enqueue(request)');
+const nativeMarkerIndex = nativeDownloadSource.indexOf('.putBoolean(pendingKey, true)');
+assert.ok(nativeMarkerIndex >= 0 && nativeMarkerIndex < nativeEnqueueIndex,
+  'the pending marker must be committed before DownloadManager enqueue');
+assert.match(nativeSource, /fun listActiveDownloads\(call: PluginCall\)/,
+  'Android must expose persisted active download records after process recreation');
+assert.match(device, /this\.plugin\.listActiveDownloads\(\)/,
+  'the JS bridge must restore persisted active DownloadManager tasks');
+assert.match(device, /resumedDownloadId !== null/,
+  'a restored download must resume polling its existing task rather than enqueue a duplicate');
+assert.match(main, /İndirmeyi sürdür/,
+  'the model manager must expose a resume action for a restored download');
+
 
 const nativeDestroyStart = nativeSource.indexOf('override fun handleOnDestroy()');
 assert.ok(nativeDestroyStart >= 0, 'native plugin must release resources when the Activity is destroyed');
@@ -241,6 +263,31 @@ await assert.rejects(
 );
 assert.equal(insufficientStorageDownloadCalls, 0,
   'insufficient free storage must stop the native download from starting');
+
+let restoredStatusCalls = 0;
+let restoredNativeStartCalls = 0;
+let restoredComplete = false;
+const restoredDownloadPlugin = {
+  getDeviceInfo: async () => ({ ...(await fake.getDeviceInfo()) }),
+  listModels: async () => ({ models: restoredComplete ? [{ fileName: DEVICE_MODEL_CATALOG[0].fileName, sizeBytes: DEVICE_MODEL_CATALOG[0].sizeBytes }] : [] }),
+  listActiveDownloads: async () => ({ downloads: restoredComplete ? [] : [{ fileName: DEVICE_MODEL_CATALOG[0].fileName, downloadId: 777 }] }),
+  downloadModel: async () => { restoredNativeStartCalls += 1; return { downloadId: 778 }; },
+  downloadStatus: async ({ downloadId }) => {
+    assert.equal(downloadId, 777);
+    restoredStatusCalls += 1;
+    restoredComplete = true;
+    return { status: 'complete', progress: 100 };
+  }
+};
+const restoredClient = new DeviceLocalCoder(true, restoredDownloadPlugin);
+await restoredClient.refresh();
+assert.equal(restoredClient.activeDownloadId, 777,
+  'a persisted DownloadManager ID must be restored after app recreation');
+assert.equal(restoredClient.activeDownloadFileName, DEVICE_MODEL_CATALOG[0].fileName);
+await restoredClient.download(DEVICE_MODEL_CATALOG[0], () => {}, { pollIntervalMs: 1 });
+assert.equal(restoredStatusCalls, 1, 'resuming after app recreation must poll the original native task');
+assert.equal(restoredNativeStartCalls, 0, 'resuming must not enqueue a second model download');
+assert.equal(restoredClient.activeDownloadId, null, 'completed restored downloads must clear active state');
 
 await local.download(DEVICE_MODEL_CATALOG[0]);
 assert.equal(firstDownloadArgs.sha256, DEVICE_MODEL_CATALOG[0].sha256,
