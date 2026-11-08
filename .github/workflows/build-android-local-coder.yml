@@ -94,7 +94,7 @@ jobs:
           if distribution_index < 0:
               raise SystemExit("Gradle distribution URL was not found.")
           url = lines[distribution_index].split("=", 1)[1].replace("\\:", ":")
-          url = url.replace("https://services.gradle.org/", "https://downloads.gradle.org/")
+          url = url.replace("https://services.gradle.org/", "https://downloads.gradle-dn.com/").replace("https://downloads.gradle.org/", "https://downloads.gradle-dn.com/")
           if url.endswith("-all.zip"):
               url = url[:-len("-all.zip")] + "-bin.zip"
           if not url.endswith("-bin.zip"):
