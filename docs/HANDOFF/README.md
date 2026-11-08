@@ -1,4 +1,12 @@
-# AI Studio — Four-session handoff
+# AI Studio — Five-session handoff
+
+## Session 5 current verified checkpoint — 2026-11-08
+
+- Latest branch HEAD: `02dff8855b15085d993144da4cf1d5e839105614`; latest application/runtime changes: `0ac56447218a5e7e4297b9adb315597367acb1b1`.
+- Demo run [42470598165](https://github.com/babaprobado-bit/A-studio/actions/runs/42470598165) succeeded on the latest HEAD. Artifact `AI-Studio-Demo-APK`, ID `13613322995`, 3,775,895 bytes, archive SHA-256 `2dca7141b3b282d9d380979417cbe17098fa36962f11492c0fd96931357c721c`.
+- Native GGUF run [42470598002](https://github.com/babaprobado-bit/A-studio/actions/runs/42470598002) passed native/llama.cpp setup, all regression suites and Capacitor sync; the Gradle debug APK step was in progress at last check. No artifact was yet reported for this Session 5 run.
+- PR #2 remains open, Draft and unmerged; `main` remains `aab010319b6500002844bd24b11da85dd9ca3b00`.
+- Read `SESSION_5_ANDROID_RUNTIME_HARDENING.md` for the full change/test/CI/security record. CI does not prove physical-device installation, inference or airplane-mode operation.
 
 ## Current verified checkpoint — 2026-11-05
 
@@ -54,12 +62,13 @@ Purpose: this is the durable project memory for continuing AI Studio across four
 1. docs/HANDOFF/README.md — this index and the four-chat plan.
 2. docs/HANDOFF/PROJECT_STATE.md — architecture, what exists, what does not, test commands and known risks.
 3. The current session document:
+   - SESSION_5_ANDROID_RUNTIME_HARDENING.md (latest Android runtime hardening and CI state)
    - SESSION_1_NATIVE_APK.md
    - SESSION_2_DEVICE_TESTING.md
    - SESSION_3_SKILLS_AND_API.md
    - SESSION_4_REA_MCP_AND_RELEASE.md
 4. ROADMAP.md and current GitHub PR/Actions only as needed.
-5. `docs/HANDOFF/NEW_CHAT_STARTER.md` — copy-ready resume code and prompt for the active Session 3 work.
+5. `docs/HANDOFF/NEW_CHAT_STARTER.md` — copy-ready resume code and prompt for the latest active session.
 
 Do not trust the status snapshot below without checking GitHub. CI can finish between conversations. These docs are a handoff, not a substitute for querying the current branch, PR, workflow and artifacts.
 

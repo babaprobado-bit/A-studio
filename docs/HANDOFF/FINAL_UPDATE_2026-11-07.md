@@ -58,3 +58,8 @@ REA remains optional and mock-only in this repository. No REA package was instal
 5. Run CI again after any source changes. Keep PR #2 Draft and do not touch `main` or merge without explicit approval.
 
 This file supersedes the earlier status sentence in `SESSION_4_REA_MCP_AND_RELEASE.md` that said Native build 42283873400 was still running and no Native APK artifact existed.
+
+
+## Session 5 follow-up — 2026-11-08
+
+The 2026-11-07 successful artifacts above remain valid for source commit `1e59e4bf...`. They are not the latest Session 5 APK outputs. Session 5 changes and current CI are documented in [SESSION_5_ANDROID_RUNTIME_HARDENING.md](SESSION_5_ANDROID_RUNTIME_HARDENING.md): latest branch HEAD `02dff885...`, Demo run `42470598165` passed with artifact `13613322995`, while Native run `42470598002` was still in the debug APK build step at the last check. Re-fetch live Actions before claiming a Native artifact.

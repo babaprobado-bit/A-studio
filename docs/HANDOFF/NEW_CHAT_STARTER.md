@@ -1,5 +1,24 @@
 # Latest verified checkpoint — 2026-11-06 (Native GGUF CI completed)
 
+## SESSION 6 RESUME POINT — 2026-11-08
+
+Repository: https://github.com/babaprobado-bit/A-studio  
+PR #2: https://github.com/babaprobado-bit/A-studio/pull/2  
+Branch: `feature/android-offline-skills-v1`  
+Latest branch HEAD: `02dff8855b15085d993144da4cf1d5e839105614`  
+Latest runtime/source commit: `0ac56447218a5e7e4297b9adb315597367acb1b1`
+
+**Live state at the Session 5 handoff:** Demo run 42470598165 passed and uploaded artifact 13613322995 (3,775,895 bytes). Native run 42470598002 had passed Android SDK/native setup, llama.kt/llama.cpp, all regression suites and Capacitor sync; `Build debug APK` was still in progress and had no artifact yet. Re-fetch live GitHub state before relying on this snapshot.
+
+**Continue next:** finish the Native run and inspect its logs/artifact; validate manifest/package/version/ABI/native libraries; keep checking Android model import/download/load/unload/RAM/lifecycle; harden the global cleartext and backup configuration without breaking trusted-LAN Ollama or existing encrypted workspace data; update the Session 5 handoff with exact new outcomes.
+
+**Rules:** make real file-by-file source changes and test them; do not ask for phone/PC tests; CI is not device/offline proof; PR #2 must stay Draft/open/unmerged; do not modify `main`; do not install, launch, pair or connect REA; preserve all 10 AI Team engines, provider connections, Skills Library and shared project/vault context.
+
+Read `SESSION_5_ANDROID_RUNTIME_HARDENING.md` first for the full test matrix, commit history and known CI network failures. Treat older checkpoints below as history only.
+
+---
+
+
 - Latest application/source commit tested: [c9b3d4c8ac2335a37afe054a49fccb672774314c](https://github.com/babaprobado-bit/A-studio/commit/c9b3d4c8ac2335a37afe054a49fccb672774314c). Subsequent branch commits are handoff-document-only; re-fetch the branch head before continuing.
 - Demo workflow [42262971664](https://github.com/babaprobado-bit/A-studio/actions/runs/42262971664) **completed successfully** on c9b3d4c. Artifact `AI-Studio-Demo-APK`, ID `13525991499`, 3,775,868 bytes; ZIP digest `sha256:7ac4eda88327ac172eda84aaa5b5bd84a03725ee4c5bda57f911cec8418b51c1`.
 - Native GGUF workflow [42262972234](https://github.com/babaprobado-bit/A-studio/actions/runs/42262972234) **completed successfully** on the same source commit. All 16 workflow steps passed, including pinned llama.kt setup, llama.cpp Android source preparation, regression tests, Capacitor sync, Gradle debug APK build and artifact upload. Native artifact `AI-Studio-1.1-OnDevice-LocalCoder-APK`, ID `13525683883`, artifact archive size 18,159,442 bytes, ZIP digest `sha256:2adf39fa441788ff566e178ba9ff3638008b14a30f991ff747ecc5a5515fd6fa`; expires 2026-11-20 17:51:03 UTC.
