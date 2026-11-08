@@ -75,6 +75,34 @@ jobs:
         run: npm run test:site
       - name: Create Android project
         run: npx cap add android
+      - name: Prepare a smaller Gradle distribution
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          path = Path("android/gradle/wrapper/gradle-wrapper.properties")
+          if not path.is_file():
+              raise SystemExit("Generated Gradle wrapper properties were not found.")
+          content = path.read_text()
+          match = re.search(r"(?m)^distributionUrl=(.+)$", content)
+          if not match:
+              raise SystemExit("Gradle distribution URL was not found.")
+          url = match.group(1).replace(r"\\:", ":").replace("-all.zip", "-bin.zip")
+          if not re.search(r"/gradle-[^/]+-bin\\.zip$", url):
+              raise SystemExit("Expected a standard Gradle -bin distribution URL.")
+          content = re.sub(
+              r"(?m)^distributionUrl=.+$",
+              "distributionUrl=" + url.replace(":", r"\\:"),
+              content
+          )
+          if re.search(r"(?m)^networkTimeout=", content):
+              content = re.sub(r"(?m)^networkTimeout=.*$", "networkTimeout=120000", content)
+          else:
+              content = content.rstrip() + "\\nnetworkTimeout=120000\\n"
+          path.write_text(content)
+          print("Gradle wrapper:", url, "| networkTimeout=120000ms")
+          PY
       - name: Allow local Ollama HTTP on trusted networks
         run: |
           python3 - <<'PY'
