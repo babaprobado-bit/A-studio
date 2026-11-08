@@ -62,7 +62,7 @@ const nativeReconcileSource = nativeSource.slice(nativeReconcileStart, nativeRec
 assert.doesNotMatch(nativeReconcileSource, /if\s*\(entries\.isEmpty\(\)\)\s*return/,
   'an empty download-record store must not skip stale partial-file cleanup');
 assert.match(nativeReconcileSource,
-  /if\s*\(entries\.isNotEmpty\(\)\)\s*\{[\s\S]*?\n {8}\}\n(?: {8}\/\/[^\n]*\n)* {8}val trackedNames =/,
+  /if\s*\(entries\.isNotEmpty\(\)\)\s*\{[\s\S]*?\n {8}\}\n(?: {8}\/\/[^\n]*\n)* {8}val preferenceSnapshot = preferences\.all\n {8}val trackedNames =/,
   'DownloadManager reconciliation must be conditional while orphan cleanup remains outside that block');
 assert.match(nativeReconcileSource, /activeImportFileNames\.contains\(modelName\)/,
   'orphan cleanup must preserve partial files owned by an active import');
