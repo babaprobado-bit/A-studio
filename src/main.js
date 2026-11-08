@@ -600,8 +600,14 @@ function renderDeviceLocalModelManager(){
   const selectedCatalogueModel=DEVICE_MODEL_CATALOG.find(item=>item.id===catalog?.value);
   const canResumeSelected=activeDownload&&deviceLocalCoder.activeDownloadFileName===selectedCatalogueModel?.fileName;
   if($('onDeviceModelCatalog'))$('onDeviceModelCatalog').disabled=!Boolean(info?.supported);
+  if(catalog&&!catalog.dataset.resumeChangeBound){
+    catalog.addEventListener('change',()=>renderDeviceLocalModelManager());
+    catalog.dataset.resumeChangeBound='true';
+  }
   if($('downloadOnDeviceModel')){
-    $('downloadOnDeviceModel').disabled=!Boolean(info?.supported)&&!canResumeSelected;
+    $('downloadOnDeviceModel').disabled=activeDownload
+      ?!canResumeSelected
+      :!Boolean(info?.supported);
     $('downloadOnDeviceModel').textContent=activeDownload
       ?(canResumeSelected?'İndirmeyi sürdür':'Başka model indiriliyor')
       :'Modeli indir';
@@ -646,7 +652,8 @@ async function downloadSelectedDeviceModel(){
   if(!model)return;
   const assessment=deviceLocalState?.device?assessDeviceModel(model,deviceLocalState.device):null;
   const warning=assessment&&!assessment.fitsRecommended?'\n\nCihaz uyarısı: '+assessment.warnings.join('; ')+'. Modeli elle seçtin; indirmek yine de mümkün olabilir, ancak yükleme veya hız sorunları yaşanabilir.':'';
-  if(!confirm(model.name+' indirilsin mi? Yaklaşık '+formatModelBytes(model.sizeBytes*1.15)+' boş alan bırak. İlk indirme internet ister; model indirildikten sonra çıkarım çevrimdışı yapılır. İndirme varsayılan olarak ücretli/mobil veri kullanmaz.'+warning))return;
+  const isResuming=deviceLocalCoder.activeDownloadId!==null&&deviceLocalCoder.activeDownloadFileName===model.fileName;
+  if(!confirm(model.name+(isResuming?' indirmesi kaldığı yerden takip edilsin mi?':' indirilsin mi?')+' Yaklaşık '+formatModelBytes(model.sizeBytes*1.15)+' boş alan bırak. İlk indirme internet ister; model indirildikten sonra çıkarım çevrimdışı yapılır. İndirme varsayılan olarak ücretli/mobil veri kullanmaz.'+warning))return;
   const button=$('downloadOnDeviceModel');button.disabled=true;
   const cancelButton=$('cancelOnDeviceDownload');if(cancelButton){cancelButton.hidden=false;cancelButton.disabled=true;}
   if($('onDeviceModelStatus'))$('onDeviceModelStatus').textContent='İndirme başlatılıyor…';

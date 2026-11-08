@@ -214,6 +214,7 @@ export class DeviceLocalCoder {
 
       const resumedDownloadId = this.activeDownloadId;
       if (resumedDownloadId !== null && this.activeDownloadFileName !== model.fileName) {
+        preserveDownloadState = true;
         throw new Error('Başka bir modelin indirmesi sürüyor. Önce devam eden indirmeyi tamamla veya iptal et.');
       }
       const started = resumedDownloadId !== null
@@ -285,7 +286,7 @@ export class DeviceLocalCoder {
       this.downloadStarting = false;
       this.downloadLoopActive = false;
       if (!preserveDownloadState) {
-        if (this.activeDownloadId === downloadId || downloadId === null) {
+        if (downloadId !== null && this.activeDownloadId === downloadId) {
           this.activeDownloadId = null;
           this.activeDownloadFileName = '';
         }

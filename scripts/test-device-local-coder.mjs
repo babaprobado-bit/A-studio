@@ -289,6 +289,21 @@ assert.equal(restoredStatusCalls, 1, 'resuming after app recreation must poll th
 assert.equal(restoredNativeStartCalls, 0, 'resuming must not enqueue a second model download');
 assert.equal(restoredClient.activeDownloadId, null, 'completed restored downloads must clear active state');
 
+const mismatchedResumeClient = new DeviceLocalCoder(true, {
+  getDeviceInfo: async () => ({ ...(await fake.getDeviceInfo()) }),
+  listModels: async () => ({ models: [] }),
+  listActiveDownloads: async () => ({ downloads: [{ fileName: 'another-model.gguf', downloadId: 779 }] }),
+  downloadModel: async () => { throw new Error('must not enqueue a second transfer'); }
+});
+await mismatchedResumeClient.refresh();
+await assert.rejects(
+  () => mismatchedResumeClient.download(DEVICE_MODEL_CATALOG[0]),
+  /Başka bir modelin indirmesi sürüyor/
+);
+assert.equal(mismatchedResumeClient.activeDownloadId, 779,
+  'a rejected request for another model must preserve the restored native task ID');
+
+
 await local.download(DEVICE_MODEL_CATALOG[0]);
 assert.equal(firstDownloadArgs.sha256, DEVICE_MODEL_CATALOG[0].sha256,
   'the pinned catalogue digest must be forwarded to the Android plugin');
