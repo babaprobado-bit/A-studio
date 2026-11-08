@@ -145,37 +145,40 @@ class LocalLlmPlugin : Plugin() {
     private fun reconcileDownloads() {
         val preferences = downloadPreferences()
         val entries = preferences.all.toList()
-        if (entries.isEmpty()) return
-        val manager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-        for ((fileName, rawId) in entries) {
-            val id = rawId as? Long ?: continue
-            var cursor: Cursor? = null
-            try {
-                cursor = manager.query(DownloadManager.Query().setFilterById(id))
-                if (cursor == null || !cursor.moveToFirst()) {
-                    partialModelFile(fileName).delete()
-                    clearDownloadRecord(fileName)
-                    continue
-                }
-                val index = cursor.getColumnIndex(DownloadManager.COLUMN_STATUS)
-                if (index < 0) continue
-                when (cursor.getInt(index)) {
-                    DownloadManager.STATUS_SUCCESSFUL -> {
-                        try { finalizeCatalogueDownload(fileName, preferences.getString(sha256PreferenceKey(fileName), null)) }
-                        catch (_: Exception) { partialModelFile(fileName).delete() }
-                        clearDownloadRecord(fileName)
-                    }
-                    DownloadManager.STATUS_FAILED -> {
+        if (entries.isNotEmpty()) {
+            val manager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+            for ((fileName, rawId) in entries) {
+                val id = rawId as? Long ?: continue
+                var cursor: Cursor? = null
+                try {
+                    cursor = manager.query(DownloadManager.Query().setFilterById(id))
+                    if (cursor == null || !cursor.moveToFirst()) {
                         partialModelFile(fileName).delete()
                         clearDownloadRecord(fileName)
+                        continue
                     }
+                    val index = cursor.getColumnIndex(DownloadManager.COLUMN_STATUS)
+                    if (index < 0) continue
+                    when (cursor.getInt(index)) {
+                        DownloadManager.STATUS_SUCCESSFUL -> {
+                            try { finalizeCatalogueDownload(fileName, preferences.getString(sha256PreferenceKey(fileName), null)) }
+                            catch (_: Exception) { partialModelFile(fileName).delete() }
+                            clearDownloadRecord(fileName)
+                        }
+                        DownloadManager.STATUS_FAILED -> {
+                            partialModelFile(fileName).delete()
+                            clearDownloadRecord(fileName)
+                        }
+                    }
+                } catch (_: Exception) {
+                    // Keep an active/paused download tracked; the next refresh can reconcile it.
+                } finally {
+                    cursor?.close()
                 }
-            } catch (_: Exception) {
-                // Keep an active/paused download tracked; the next refresh can reconcile it.
-            } finally {
-                cursor?.close()
             }
         }
+        // This scan must also run when SharedPreferences is empty: a force-stopped
+        // import or download can leave an orphaned partial file without a record.
         val trackedNames = preferences.all.filterValues { it is Long }.keys
         modelDirectory().listFiles { file -> file.isFile && file.name.endsWith(".gguf.part", ignoreCase = true) }
             ?.forEach { partial ->

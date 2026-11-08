@@ -54,6 +54,19 @@ const nativeFinalizer = nativeSource.slice(nativeFinalizerStart, nativeFinalizer
 assert.ok(nativeFinalizer.indexOf('verifyDownloadedModelSha256') >= 0 &&
   nativeFinalizer.indexOf('verifyDownloadedModelSha256') < nativeFinalizer.indexOf('finalizeDownloadedModel(fileName)'),
   'native SHA-256 verification must finish before the .part file is promoted');
+const nativeReconcileStart = nativeSource.indexOf('private fun reconcileDownloads()');
+const nativeReconcileEnd = nativeSource.indexOf('private fun importModelFromUri(', nativeReconcileStart);
+assert.ok(nativeReconcileStart >= 0 && nativeReconcileEnd > nativeReconcileStart,
+  'native download reconciliation must exist');
+const nativeReconcileSource = nativeSource.slice(nativeReconcileStart, nativeReconcileEnd);
+assert.doesNotMatch(nativeReconcileSource, /if\s*\(entries\.isEmpty\(\)\)\s*return/,
+  'an empty download-record store must not skip stale partial-file cleanup');
+assert.match(nativeReconcileSource,
+  /if\s*\(entries\.isNotEmpty\(\)\)\s*\{[\s\S]*?\n\s{8}\}\s*\n\s{8}val trackedNames =/,
+  'DownloadManager reconciliation must be conditional while orphan cleanup remains outside that block');
+assert.match(nativeReconcileSource, /activeImportFileNames\.contains\(modelName\)/,
+  'orphan cleanup must preserve partial files owned by an active import');
+
 const nativeImportStart = nativeSource.indexOf('private fun importModelFromUri(');
 const nativeImportEnd = nativeSource.indexOf('@PluginMethod', nativeImportStart);
 const nativeImportSource = nativeSource.slice(nativeImportStart, nativeImportEnd);
@@ -158,6 +171,39 @@ const fake={
 };
 const local=new DeviceLocalCoder(true,fake);
 await local.refresh();
+
+let unknownStorageDownloadCalls = 0;
+const unknownStorageClient = new DeviceLocalCoder(true, {
+  getDeviceInfo: async () => ({ ...(await fake.getDeviceInfo()), freeStorageBytes: 0 }),
+  listModels: async () => ({ models: [] }),
+  downloadModel: async () => {
+    unknownStorageDownloadCalls += 1;
+    return { downloadId: 901 };
+  }
+});
+await assert.rejects(
+  () => unknownStorageClient.download(DEVICE_MODEL_CATALOG[0]),
+  /Boş depolama bilgisi okunamadı/
+);
+assert.equal(unknownStorageDownloadCalls, 0,
+  'an unknown free-storage value must stop the native download from starting');
+
+let insufficientStorageDownloadCalls = 0;
+const insufficientStorageClient = new DeviceLocalCoder(true, {
+  getDeviceInfo: async () => ({ ...(await fake.getDeviceInfo()), freeStorageBytes: 100 * 1024 ** 2 }),
+  listModels: async () => ({ models: [] }),
+  downloadModel: async () => {
+    insufficientStorageDownloadCalls += 1;
+    return { downloadId: 902 };
+  }
+});
+await assert.rejects(
+  () => insufficientStorageClient.download(DEVICE_MODEL_CATALOG[0]),
+  /Yeterli boş depolama yok/
+);
+assert.equal(insufficientStorageDownloadCalls, 0,
+  'insufficient free storage must stop the native download from starting');
+
 await local.download(DEVICE_MODEL_CATALOG[0]);
 assert.equal(firstDownloadArgs.sha256, DEVICE_MODEL_CATALOG[0].sha256,
   'the pinned catalogue digest must be forwarded to the Android plugin');

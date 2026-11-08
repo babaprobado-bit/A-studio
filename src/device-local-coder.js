@@ -188,7 +188,16 @@ export class DeviceLocalCoder {
       }
       if (this.models.some(item => item.fileName === model.fileName)) throw new Error('Bu model zaten telefonda bulunuyor. Listeden yükleyebilirsin.');
       const free = Number(this.device?.freeStorageBytes || 0);
-      if (free && free < model.sizeBytes * 1.15) throw new Error(`Yeterli boş depolama yok. Yaklaşık ${formatModelBytes(model.sizeBytes * 1.15)} gerekiyor.`);
+      const requiredStorageBytes = Number(catalogModel.sizeBytes) * 1.15;
+      if (!Number.isFinite(free) || free <= 0) {
+        throw new Error('Boş depolama bilgisi okunamadı; model indirmesi başlatılmadı.');
+      }
+      if (!Number.isFinite(requiredStorageBytes) || requiredStorageBytes <= 0) {
+        throw new Error('Model boyutu doğrulanamadı; indirme başlatılmadı.');
+      }
+      if (free < requiredStorageBytes) {
+        throw new Error(`Yeterli boş depolama yok. Yaklaşık ${formatModelBytes(requiredStorageBytes)} gerekiyor.`);
+      }
 
       const started = await this.plugin.downloadModel({
         url: model.url,
