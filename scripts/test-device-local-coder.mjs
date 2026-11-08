@@ -75,8 +75,8 @@ assert.ok(nativeReconcilePending >= 0 && nativePendingQuery > nativeReconcilePen
   'pending enqueue markers must be reconciled against DownloadManager and durably converted to IDs');
 assert.match(nativeReconcileSource, /DownloadManager\.COLUMN_TITLE/,
   'pending enqueue recovery must identify its request by the unique title');
-const nativeEnqueueIndex = nativeDownloadSource.indexOf('manager.enqueue(request)');
-const nativeMarkerIndex = nativeDownloadSource.indexOf('.putBoolean(pendingKey, true)');
+const nativeEnqueueIndex = nativeSource.indexOf('manager.enqueue(request)');
+const nativeMarkerIndex = nativeSource.indexOf('.putBoolean(pendingKey, true)');
 assert.ok(nativeMarkerIndex >= 0 && nativeMarkerIndex < nativeEnqueueIndex,
   'the pending marker must be committed before DownloadManager enqueue');
 assert.match(nativeSource, /fun listActiveDownloads\(call: PluginCall\)/,
