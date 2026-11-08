@@ -72,3 +72,12 @@ The 2026-11-07 successful artifacts above remain valid for source commit `1e59e4
 - Native GGUF workflow [42472155008](https://github.com/babaprobado-bit/A-studio/actions/runs/42472155008) passed SDK/native setup, llama.kt, llama.cpp, all regression suites, web build and Capacitor sync. At the last check the Gradle debug APK retry step was still running; no Native artifact had been reported.
 - Latest source improvements include durable pending-download recovery after process death, rehydrating/resuming the original DownloadManager task without duplicate enqueue, preservation of an active task when a different model is selected, native catalogue/storage verification, orphan partial cleanup and import cancellation at Activity teardown. See SESSION_5_ANDROID_RUNTIME_HARDENING.md.
 - Branch remains feature/android-offline-skills-v1; PR #2 open/Draft/unmerged; main unchanged. No physical Android install/inference/airplane-mode test. REA is mock-only.
+
+
+## Session 5 final APK verification — 2026-11-08
+
+- Source/test SHA: 90e5da287cc8d50859402cdbf99ccdb533e3360a.
+- Native workflow [42472155008](https://github.com/babaprobado-bit/A-studio/actions/runs/42472155008) succeeded. Artifact ID 13614626123, ZIP 18,158,764 bytes, SHA-256 b1f7421d9b8d7f10a8d38301b9abda2597daa073657d5ecc8fa6871123304c4f. Extracted APK 54,497,680 bytes, SHA-256 cb1ce07516acca97033630cd7d3004b85a9125823045f11274888e729a1e8d8e.
+- APK contains arm64-v8a/libllamakt.so (43,535,488 bytes), libOpenCL.so and libc++_shared.so; no GGUF weights are embedded. Package com.aistudio.alpha1, versionName 1.1.0, versionCode 2, minSdk 29, targetSdk 35, compileSdk 35. It is a debuggable debug APK.
+- Demo run [42472155238](https://github.com/babaprobado-bit/A-studio/actions/runs/42472155238) succeeded; artifact ID 13613679600, ZIP 3,776,220 bytes, SHA-256 c49230bbcc6a98922d6056d7daacb34a944cf288837c7f65b89b537212ef4f77.
+- Manifest reports allowBackup=true and app-wide usesCleartextTraffic=true. Keep the build debug-only; review backup exclusions and scoped cleartext for release while preserving trusted-LAN Ollama. CI does not prove physical-device installation, actual GGUF inference or airplane-mode operation. REA remains mock-only.

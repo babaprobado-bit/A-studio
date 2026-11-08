@@ -1,5 +1,32 @@
 # AI Studio — Session 5 Android runtime hardening
 
+## Native APK final verification — 2026-11-08
+
+### GitHub Actions
+
+- Native run [42472155008](https://github.com/babaprobado-bit/A-studio/actions/runs/42472155008): **success** on source/test SHA 90e5da287cc8d50859402cdbf99ccdb533e3360a. All stages passed: Android SDK/native tools, pinned llama.kt, llama.cpp source preparation, web build, all existing and new regression suites, Capacitor generation/sync, Gradle debug build, artifact upload.
+- Native artifact ID 13614626123, archive size 18,158,764 bytes, SHA-256 b1f7421d9b8d7f10a8d38301b9abda2597daa073657d5ecc8fa6871123304c4f; expires 2026-11-22 10:56:19 UTC.
+- Demo run [42472155238](https://github.com/babaprobado-bit/A-studio/actions/runs/42472155238): **success** on the same source/test SHA. Artifact ID 13613679600, archive size 3,776,220 bytes, SHA-256 c49230bbcc6a98922d6056d7daacb34a944cf288837c7f65b89b537212ef4f77.
+- Native Gradle's first attempt hit HTTP 502 while resolving Kotlin compiler 2.0.21 through Maven Central's GitHub Releases redirect; the scoped transient-network retry succeeded on attempt 2. Final output: BUILD SUCCESSFUL in 13m 44s, 180 tasks executed.
+
+### Downloaded artifact verification
+
+- Downloaded Native artifact ZIP hash matches GitHub's artifact digest exactly.
+- ZIP contains one file: app-debug.apk (54,497,680 bytes). APK SHA-256: cb1ce07516acca97033630cd7d3004b85a9125823045f11274888e729a1e8d8e.
+- APK includes lib/arm64-v8a/libllamakt.so (43,535,488 bytes), libOpenCL.so and libc++_shared.so under arm64-v8a. ELF machine for libllamakt is AArch64. No .gguf model files are embedded.
+- Manifest: package com.aistudio.alpha1; versionCode 2; versionName 1.1.0; minSdk 29; targetSdk 35; compileSdk 35; INTERNET permission; MainActivity exported; AndroidX FileProvider and InitializationProvider not exported.
+- Manifest is debuggable=true. It has allowBackup=true and usesCleartextTraffic=true. The latter supports current LAN Ollama HTTP but is app-wide. Keep the current build classified as debug/testing. Before release, implement and test secret/session backup exclusions and a narrower cleartext policy that does not break explicitly configured LAN Ollama. Do not silently change these settings in this checkpoint.
+
+### Acceptance boundary
+
+The two APK builds prove GitHub-hosted tests and packaging only. No physical installation, real GGUF download/import/inference, RAM/performance test or airplane-mode validation has been performed. REA is still mock-only and no live process/listener/pairing/network connection was started.
+
+### Session 6 continuation key
+
+AI-STUDIO-SESSION6-NATIVE-APK-VERIFIED
+
+---
+
 ## Latest Session 5 update — 2026-11-08 (90e5da source/test checkpoint)
 
 - Latest source/test commit: [90e5da287cc8d50859402cdbf99ccdb533e3360a](https://github.com/babaprobado-bit/A-studio/commit/90e5da287cc8d50859402cdbf99ccdb533e3360a).

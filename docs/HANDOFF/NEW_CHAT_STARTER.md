@@ -1,21 +1,30 @@
-# Latest verified checkpoint — 2026-11-06 (Native GGUF CI completed)
+# AI Studio — Session 6 resume starter
 
-## SESSION 6 RESUME POINT — 2026-11-08 (latest Session 5 checkpoint)
+## SESSION 6 RESUME KEY — 2026-11-08
+
+**Sohbet anahtarı:** AI-STUDIO-SESSION6-NATIVE-APK-VERIFIED
 
 Repository: https://github.com/babaprobado-bit/A-studio  
 PR #2: https://github.com/babaprobado-bit/A-studio/pull/2  
 Branch: feature/android-offline-skills-v1  
-Latest source/test checkpoint: 90e5da287cc8d50859402cdbf99ccdb533e3360a  
-Latest docs may add a docs-only commit; always fetch live branch SHA.
+Latest source/test SHA: 90e5da287cc8d50859402cdbf99ccdb533e3360a  
+Latest documentation SHA at this checkpoint: 500eb960fc5254ed77c6d976a0e827c39449d274
 
-**Verified Actions:** Demo run 42472155238 succeeded; artifact 13613679600, 3,776,220 bytes, ZIP SHA-256 c49230bbcc6a98922d6056d7daacb34a944cf288837c7f65b89b537212ef4f77; extracted APK 4,134,919 bytes, SHA-256 9933e6bad111f2bce75f071d54c9016f2525ed04ccb919c07aa30032894c02d2. Native run 42472155008 passed llama.kt/llama.cpp preparation, web build, regression tests and Capacitor sync; at last check Build debug APK (retry transient repository failures) was in progress and there was no Native artifact. Recheck before claiming it completed.
+**Both APK workflows succeeded on source/test SHA 90e5da.**
 
-**Recent source changes:** android-local-runtime/LocalLlmPlugin.kt, src/device-local-coder.js, src/main.js, and scripts/test-device-local-coder.mjs now cover orphan .part cleanup, pending DownloadManager enqueue recovery after process death, restoring active download IDs, resume without duplicate enqueue, keeping an active task when another model is selected, cancellation of imports on Activity teardown, native URL/hash allowlisting and storage guards. Both Android workflows use Gradle 8.11.1 -bin.zip, Aliyun mirror, official Gradle SHA-256 pin and 120s timeout; Gradle build retries only transient network/DNS failures.
+- Demo run 42472155238; artifact 13613679600; ZIP 3,776,220 bytes; SHA-256 c49230bbcc6a98922d6056d7daacb34a944cf288837c7f65b89b537212ef4f77.
+- Native GGUF run 42472155008; artifact 13614626123; ZIP 18,158,764 bytes; SHA-256 b1f7421d9b8d7f10a8d38301b9abda2597daa073657d5ecc8fa6871123304c4f.
+- Extracted Native APK 54,497,680 bytes; SHA-256 cb1ce07516acca97033630cd7d3004b85a9125823045f11274888e729a1e8d8e. It contains arm64-v8a/libllamakt.so, libOpenCL.so and libc++_shared.so; no GGUF weights are embedded.
 
-**Next:** finish Native run 42472155008, inspect Native APK artifact digest and internal entries/manifest/ABI. Recheck PR #2 and main. Review the remaining broad cleartext Ollama and Android backup surfaces without breaking trusted-LAN Ollama or encrypted project data. Update this handoff again with exact Native outcome.
+**Important manifest review:** package com.aistudio.alpha1, version 1.1.0/code 2, minSdk 29, target/compile SDK 35. This is a debuggable debug APK. Manifest still has allowBackup=true and app-wide usesCleartextTraffic=true for the current trusted-LAN Ollama HTTP path. Review backup exclusions and a scoped cleartext policy before any signed production release.
 
-**Rules:** no phone/PC tests requested; CI is not physical-device/offline proof; PR #2 stays open/Draft/unmerged; do not modify main; do not install/launch/pair/connect REA; preserve all 10 AI Team engines, provider connections, Skills Library and shared project/vault context. Read SESSION_5_ANDROID_RUNTIME_HARDENING.md first.
+**Next work:** review Android backup/cleartext policy while preserving trusted-LAN Ollama; continue source-level lifecycle/RAM/unload/security review; keep all 10 AI Team engines, provider integrations, Skills Library and shared project/vault context. Do not request device testing. CI is not real-device/offline proof.
 
+**Rules:** PR #2 stays open/Draft/unmerged. Do not modify main. Do not install, launch, pair or connect REA; it remains mock-only. No merge.
+
+Read docs/HANDOFF/SESSION_5_ANDROID_RUNTIME_HARDENING.md and docs/HANDOFF/PROJECT_STATE.md before the next code change.
+
+---
 ---
 
 ---
