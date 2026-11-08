@@ -5,6 +5,7 @@ import { DEVICE_MODEL_CATALOG, DeviceLocalCoder, assessDeviceModel, chooseRecomm
 const devicePanelMarkup = await readFile(new URL('../src/device-local-coder-panel.html', import.meta.url), 'utf8');
 const indexMarkup = await readFile(new URL('../index.html', import.meta.url), 'utf8');
 const mainSource = await readFile(new URL('../src/main.js', import.meta.url), 'utf8');
+const deviceLocalCoderSource = await readFile(new URL('../src/device-local-coder.js', import.meta.url), 'utf8');
 const nativeSource = await readFile(new URL('../android-local-runtime/LocalLlmPlugin.kt', import.meta.url), 'utf8');
 for (const markup of [devicePanelMarkup,indexMarkup]) {
   assert.match(markup, /id="onDeviceModelLicense"/);
@@ -81,11 +82,11 @@ assert.ok(nativeMarkerIndex >= 0 && nativeMarkerIndex < nativeEnqueueIndex,
   'the pending marker must be committed before DownloadManager enqueue');
 assert.match(nativeSource, /fun listActiveDownloads\(call: PluginCall\)/,
   'Android must expose persisted active download records after process recreation');
-assert.match(device, /this\.plugin\.listActiveDownloads\(\)/,
+assert.match(deviceLocalCoderSource, /this\.plugin\.listActiveDownloads\(\)/,
   'the JS bridge must restore persisted active DownloadManager tasks');
-assert.match(device, /resumedDownloadId !== null/,
+assert.match(deviceLocalCoderSource, /resumedDownloadId !== null/,
   'a restored download must resume polling its existing task rather than enqueue a duplicate');
-assert.match(main, /İndirmeyi sürdür/,
+assert.match(mainSource, /İndirmeyi sürdür/,
   'the model manager must expose a resume action for a restored download');
 
 
