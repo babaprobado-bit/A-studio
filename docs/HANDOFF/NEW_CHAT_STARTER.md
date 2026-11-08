@@ -8,7 +8,7 @@ Repository: https://github.com/babaprobado-bit/A-studio
 PR #2: https://github.com/babaprobado-bit/A-studio/pull/2  
 Branch: feature/android-offline-skills-v1  
 Latest source/test SHA: 90e5da287cc8d50859402cdbf99ccdb533e3360a  
-Latest documentation SHA at this checkpoint: 500eb960fc5254ed77c6d976a0e827c39449d274
+Handoff documents were refreshed on the feature branch; fetch the live HEAD before making further commits.
 
 **Both APK workflows succeeded on source/test SHA 90e5da.**
 
@@ -29,6 +29,8 @@ Read docs/HANDOFF/SESSION_5_ANDROID_RUNTIME_HARDENING.md and docs/HANDOFF/PROJEC
 
 ---
 
+
+---
 
 - Latest application/source commit tested: [c9b3d4c8ac2335a37afe054a49fccb672774314c](https://github.com/babaprobado-bit/A-studio/commit/c9b3d4c8ac2335a37afe054a49fccb672774314c). Subsequent branch commits are handoff-document-only; re-fetch the branch head before continuing.
 - Demo workflow [42262971664](https://github.com/babaprobado-bit/A-studio/actions/runs/42262971664) **completed successfully** on c9b3d4c. Artifact `AI-Studio-Demo-APK`, ID `13525991499`, 3,775,868 bytes; ZIP digest `sha256:7ac4eda88327ac172eda84aaa5b5bd84a03725ee4c5bda57f911cec8418b51c1`.

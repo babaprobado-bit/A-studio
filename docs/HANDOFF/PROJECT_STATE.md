@@ -1,15 +1,16 @@
 # Session 5 current checkpoint — 2026-11-08
 
-## Session 5 current verified checkpoint — 2026-11-08 (download recovery + Demo APK)
+## Session 5 current verified checkpoint — Native + Demo APKs
 
-- Latest source/test checkpoint: [90e5da287cc8d50859402cdbf99ccdb533e3360a](https://github.com/babaprobado-bit/A-studio/commit/90e5da287cc8d50859402cdbf99ccdb533e3360a). Re-fetch live branch before continuing; docs may add a later docs-only HEAD.
-- Demo run [42472155238](https://github.com/babaprobado-bit/A-studio/actions/runs/42472155238) **succeeded** on 90e5da. Artifact AI-Studio-Demo-APK, ID 13613679600, archive 3,776,220 bytes, SHA-256 c49230bbcc6a98922d6056d7daacb34a944cf288837c7f65b89b537212ef4f77. Downloaded archive digest matched GitHub; extracted APK 4,134,919 bytes, SHA-256 9933e6bad111f2bce75f071d54c9016f2525ed04ccb919c07aa30032894c02d2. Demo package does not contain llama runtime.
-- Native GGUF run [42472155008](https://github.com/babaprobado-bit/A-studio/actions/runs/42472155008) passed SDK/native tools, pinned llama.kt, llama.cpp source preparation, web build, all existing/new regression tests, Capacitor generation/sync and Gradle wrapper preparation. At the last check the retry-aware Build debug APK step was still in progress; no Native artifact was present. Re-fetch its status/artifact list before claiming success.
-- The new dynamic process-restart tests passed in the Demo run: persisted DownloadManager ID is restored, same model resumes polling the original task without duplicate enqueue, and selecting another model preserves the original task.
-- Current branch HEAD at the handoff refresh: 90e5da...; PR #2 open/Draft/unmerged; main unchanged at aab010319b6500002844bd24b11da85dd9ca3b00.
-- No physical device installation, GGUF import/inference, RAM/performance check or airplane-mode test has been done. CI is not device/offline acceptance evidence. REA remains mock-only; no installation or connection was started.
+- Source/test SHA: 90e5da287cc8d50859402cdbf99ccdb533e3360a.
+- Demo run 42472155238: SUCCESS. Artifact 13613679600, ZIP 3,776,220 bytes, SHA-256 c49230bbcc6a98922d6056d7daacb34a944cf288837c7f65b89b537212ef4f77. Extracted APK 4,134,919 bytes, SHA-256 9933e6bad111f2bce75f071d54c9016f2525ed04ccb919c07aa30032894c02d2. No llama runtime in Demo.
+- Native run 42472155008: SUCCESS. All regression, llama.kt/llama.cpp, Gradle, assembleDebug and upload steps passed. Artifact 13614626123, ZIP 18,158,764 bytes, SHA-256 b1f7421d9b8d7f10a8d38301b9abda2597daa073657d5ecc8fa6871123304c4f.
+- Extracted Native APK 54,497,680 bytes, SHA-256 cb1ce07516acca97033630cd7d3004b85a9125823045f11274888e729a1e8d8e. Contains arm64-v8a/libllamakt.so (43,535,488 bytes), libOpenCL.so and libc++_shared.so; no GGUF model weights are embedded.
+- Manifest: package com.aistudio.alpha1; versionCode 2; versionName 1.1.0; minSdk 29; targetSdk 35; compileSdk 35. Debuggable=true, allowBackup=true, usesCleartextTraffic=true. This is a debug APK, not a signed release. Preserve LAN Ollama while reviewing a scoped cleartext policy and backup exclusions before release.
+- First Gradle attempt hit an HTTP 502 resolving Kotlin 2.0.21 from a GitHub Releases redirect; retry succeeded. BUILD SUCCESSFUL in 13m 44s; 180 tasks executed.
+- Session 5 source hardening includes native GGUF allowlist/hash/storage validation, orphan partial cleanup, crash-safe DownloadManager pending recovery, restart/resume without duplicate enqueue, import cancellation on teardown and regression coverage.
+- PR #2 open/Draft/unmerged. main unchanged at aab010319b6500002844bd24b11da85dd9ca3b00. No physical-device installation, real GGUF inference, RAM test or airplane-mode test. REA remains mock-only.
 
----
 
 
 # Latest working checkpoint — 2026-11-06 (REA contract mock tests added)
