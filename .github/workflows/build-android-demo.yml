@@ -79,28 +79,31 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          import re
 
           path = Path("android/gradle/wrapper/gradle-wrapper.properties")
           if not path.is_file():
               raise SystemExit("Generated Gradle wrapper properties were not found.")
-          content = path.read_text()
-          match = re.search(r"(?m)^distributionUrl=(.+)$", content)
-          if not match:
-              raise SystemExit("Gradle distribution URL was not found.")
-          url = match.group(1).replace(r"\\:", ":").replace("-all.zip", "-bin.zip")
-          if not re.search(r"/gradle-[^/]+-bin\\.zip$", url):
-              raise SystemExit("Expected a standard Gradle -bin distribution URL.")
-          content = re.sub(
-              r"(?m)^distributionUrl=.+$",
-              "distributionUrl=" + url.replace(":", r"\\:"),
-              content
+          lines = path.read_text().splitlines()
+          distribution_index = next(
+              (index for index, line in enumerate(lines) if line.startswith("distributionUrl=")),
+              -1
           )
-          if re.search(r"(?m)^networkTimeout=", content):
-              content = re.sub(r"(?m)^networkTimeout=.*$", "networkTimeout=120000", content)
+          if distribution_index < 0:
+              raise SystemExit("Gradle distribution URL was not found.")
+          url = lines[distribution_index].split("=", 1)[1].replace("\\:", ":")
+          if url.endswith("-all.zip"):
+              url = url[:-len("-all.zip")] + "-bin.zip"
+          if not url.endswith("-bin.zip"):
+              raise SystemExit("Expected a standard Gradle -bin distribution URL.")
+          lines[distribution_index] = "distributionUrl=" + url.replace(":", "\\:")
+          timeout_indexes = [index for index, line in enumerate(lines) if line.startswith("networkTimeout=")]
+          if timeout_indexes:
+              lines[timeout_indexes[0]] = "networkTimeout=120000"
+              for index in reversed(timeout_indexes[1:]):
+                  del lines[index]
           else:
-              content = content.rstrip() + "\\nnetworkTimeout=120000\\n"
-          path.write_text(content)
+              lines.append("networkTimeout=120000")
+          path.write_text("\\n".join(lines) + "\\n")
           print("Gradle wrapper:", url, "| networkTimeout=120000ms")
           PY
       - name: Allow local Ollama HTTP on trusted networks
