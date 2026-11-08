@@ -91,10 +91,15 @@ jobs:
           if distribution_index < 0:
               raise SystemExit("Gradle distribution URL was not found.")
           url = lines[distribution_index].split("=", 1)[1].replace("\\:", ":")
-          match = re.fullmatch(r"https://services\\.gradle\\.org/distributions/gradle-([0-9.]+)-(?:all|bin)\\.zip", url)
-          if not match:
-              raise SystemExit("Unexpected generated Gradle distribution URL.")
-          version = match.group(1)
+          prefix = "https://services.gradle.org/distributions/"
+          if not url.startswith(prefix):
+              raise SystemExit("Unexpected generated Gradle distribution host.")
+          archive_name = url.rsplit("/", 1)[-1]
+          if archive_name.endswith("-all.zip"):
+              archive_name = archive_name[:-len("-all.zip")] + "-bin.zip"
+          if not archive_name.startswith("gradle-") or not archive_name.endswith("-bin.zip"):
+              raise SystemExit("Unexpected Gradle archive name.")
+          version = archive_name[len("gradle-"):-len("-bin.zip")]
           if version != "8.11.1":
               raise SystemExit(f"Unreviewed Gradle version: {version}")
           # Use the listed mirror, but require Gradle's official release checksum
