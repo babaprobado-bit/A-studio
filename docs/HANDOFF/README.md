@@ -1,12 +1,13 @@
 # AI Studio — Five-session handoff
 
-## Session 5 current verified checkpoint — 2026-11-08
+## Session 5 current verified checkpoint — 2026-11-08 (download recovery + Demo APK)
 
-- Latest branch HEAD: `02dff8855b15085d993144da4cf1d5e839105614`; latest application/runtime changes: `0ac56447218a5e7e4297b9adb315597367acb1b1`.
-- Demo run [42470598165](https://github.com/babaprobado-bit/A-studio/actions/runs/42470598165) succeeded on the latest HEAD. Artifact `AI-Studio-Demo-APK`, ID `13613322995`, 3,775,895 bytes, archive SHA-256 `2dca7141b3b282d9d380979417cbe17098fa36962f11492c0fd96931357c721c`.
-- Native GGUF run [42470598002](https://github.com/babaprobado-bit/A-studio/actions/runs/42470598002) passed native/llama.cpp setup, all regression suites and Capacitor sync; the Gradle debug APK step was in progress at last check. No artifact was yet reported for this Session 5 run.
-- PR #2 remains open, Draft and unmerged; `main` remains `aab010319b6500002844bd24b11da85dd9ca3b00`.
-- Read `SESSION_5_ANDROID_RUNTIME_HARDENING.md` for the full change/test/CI/security record. CI does not prove physical-device installation, inference or airplane-mode operation.
+- Latest source/test checkpoint: [90e5da287cc8d50859402cdbf99ccdb533e3360a](https://github.com/babaprobado-bit/A-studio/commit/90e5da287cc8d50859402cdbf99ccdb533e3360a). Re-fetch live branch before continuing; docs may add a later docs-only HEAD.
+- Demo run [42472155238](https://github.com/babaprobado-bit/A-studio/actions/runs/42472155238) **succeeded** on 90e5da. Artifact AI-Studio-Demo-APK, ID 13613679600, archive 3,776,220 bytes, SHA-256 c49230bbcc6a98922d6056d7daacb34a944cf288837c7f65b89b537212ef4f77. Downloaded archive digest matched GitHub; extracted APK 4,134,919 bytes, SHA-256 9933e6bad111f2bce75f071d54c9016f2525ed04ccb919c07aa30032894c02d2. Demo package does not contain llama runtime.
+- Native GGUF run [42472155008](https://github.com/babaprobado-bit/A-studio/actions/runs/42472155008) passed SDK/native tools, pinned llama.kt, llama.cpp source preparation, web build, all existing/new regression tests, Capacitor generation/sync and Gradle wrapper preparation. At the last check the retry-aware Build debug APK step was still in progress; no Native artifact was present. Re-fetch its status/artifact list before claiming success.
+- The new dynamic process-restart tests passed in the Demo run: persisted DownloadManager ID is restored, same model resumes polling the original task without duplicate enqueue, and selecting another model preserves the original task.
+- Current branch HEAD at the handoff refresh: 90e5da...; PR #2 open/Draft/unmerged; main unchanged at aab010319b6500002844bd24b11da85dd9ca3b00.
+- No physical device installation, GGUF import/inference, RAM/performance check or airplane-mode test has been done. CI is not device/offline acceptance evidence. REA remains mock-only; no installation or connection was started.
 
 ## Current verified checkpoint — 2026-11-05
 

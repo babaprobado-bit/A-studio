@@ -1,5 +1,21 @@
 # AI Studio — Session 5 Android runtime hardening
 
+## Latest Session 5 update — 2026-11-08 (90e5da source/test checkpoint)
+
+- Latest source/test commit: [90e5da287cc8d50859402cdbf99ccdb533e3360a](https://github.com/babaprobado-bit/A-studio/commit/90e5da287cc8d50859402cdbf99ccdb533e3360a).
+- Download crash recovery was added in android-local-runtime/LocalLlmPlugin.kt: a pending marker is durably committed before DownloadManager enqueue; on next refresh a pending record is reconciled by querying DownloadManager and matching the unique title, then its ID is stored. If the service query fails, the pending marker and partial file are retained. Orphan cleanup skips active imports and pending/download-tracked files.
+- listActiveDownloads now exposes persisted Android task IDs. src/device-local-coder.js restores the task after app restart and resumes polling the existing ID rather than enqueueing a duplicate. src/main.js shows a resume action for the same model and a cancel option; selecting a different model does not discard the restored active task.
+- Regression coverage in scripts/test-device-local-coder.mjs includes pending-marker recovery structure, DownloadManager title/ID matching, restart rehydration, original-task resume (zero duplicate enqueue), selecting another model without losing the active ID, process-teardown import cancellation and native catalogue/storage checks.
+- The first restart-test revisions exposed two test-only errors in CI (a forward reference and undefined source-fixture identifiers). Both were corrected; the latest Demo workflow passed the full device Local Coder bridge suite including the restart coverage.
+- Demo run [42472155238](https://github.com/babaprobado-bit/A-studio/actions/runs/42472155238) **success** on 90e5da. Artifact [AI-Studio-Demo-APK](https://github.com/babaprobado-bit/A-studio/actions/runs/42472155238/artifacts/13613679600), ID 13613679600, archive size 3,776,220 bytes, SHA-256 c49230bbcc6a98922d6056d7daacb34a944cf288837c7f65b89b537212ef4f77. Downloaded ZIP digest matched; it contains app-debug.apk, 4,134,919 bytes, APK SHA-256 9933e6bad111f2bce75f071d54c9016f2525ed04ccb919c07aa30032894c02d2. This Demo APK has no llama runtime.
+- Native run [42472155008](https://github.com/babaprobado-bit/A-studio/actions/runs/42472155008) passed native toolchain/llama.kt/llama.cpp preparation, existing and new regression suites, web build and Capacitor sync; the retry-aware Gradle debug APK build was still active at last check with no artifact reported. Recheck live state.
+- The latest workflow Gradle step pins 8.11.1, uses -bin.zip, Aliyun mirror and upstream distributionSha256Sum, network timeout 120s; it retries only transient network/DNS errors, not compile errors. Prior transient 504 and DNS experiments are historical failed attempts.
+- Compare from the Session 5 starting HEAD bacdc233... to 90e5da shows 12 paths changed: the two Android workflows, LocalLlmPlugin.kt, device Local Coder JS, main UI, its regression test, and six handoff docs. No AI Team provider/router, Skills Library, or shared context source files changed.
+- PR #2 remains open/Draft/unmerged; main remains aab010319b6500002844bd24b11da85dd9ca3b00. CI is not device acceptance. No physical install, actual GGUF inference, RAM benchmark or airplane-mode test; REA remains mock-only.
+
+---
+
+
 **Checkpoint date:** 2026-11-08  
 **Repository:** https://github.com/babaprobado-bit/A-studio  
 **Branch:** `feature/android-offline-skills-v1`  

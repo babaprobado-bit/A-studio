@@ -1,20 +1,22 @@
 # Latest verified checkpoint — 2026-11-06 (Native GGUF CI completed)
 
-## SESSION 6 RESUME POINT — 2026-11-08
+## SESSION 6 RESUME POINT — 2026-11-08 (latest Session 5 checkpoint)
 
 Repository: https://github.com/babaprobado-bit/A-studio  
 PR #2: https://github.com/babaprobado-bit/A-studio/pull/2  
-Branch: `feature/android-offline-skills-v1`  
-Latest branch HEAD: `02dff8855b15085d993144da4cf1d5e839105614`  
-Latest runtime/source commit: `0ac56447218a5e7e4297b9adb315597367acb1b1`
+Branch: feature/android-offline-skills-v1  
+Latest source/test checkpoint: 90e5da287cc8d50859402cdbf99ccdb533e3360a  
+Latest docs may add a docs-only commit; always fetch live branch SHA.
 
-**Live state at the Session 5 handoff:** Demo run 42470598165 passed and uploaded artifact 13613322995 (3,775,895 bytes). Native run 42470598002 had passed Android SDK/native setup, llama.kt/llama.cpp, all regression suites and Capacitor sync; `Build debug APK` was still in progress and had no artifact yet. Re-fetch live GitHub state before relying on this snapshot.
+**Verified Actions:** Demo run 42472155238 succeeded; artifact 13613679600, 3,776,220 bytes, ZIP SHA-256 c49230bbcc6a98922d6056d7daacb34a944cf288837c7f65b89b537212ef4f77; extracted APK 4,134,919 bytes, SHA-256 9933e6bad111f2bce75f071d54c9016f2525ed04ccb919c07aa30032894c02d2. Native run 42472155008 passed llama.kt/llama.cpp preparation, web build, regression tests and Capacitor sync; at last check Build debug APK (retry transient repository failures) was in progress and there was no Native artifact. Recheck before claiming it completed.
 
-**Continue next:** finish the Native run and inspect its logs/artifact; validate manifest/package/version/ABI/native libraries; keep checking Android model import/download/load/unload/RAM/lifecycle; harden the global cleartext and backup configuration without breaking trusted-LAN Ollama or existing encrypted workspace data; update the Session 5 handoff with exact new outcomes.
+**Recent source changes:** android-local-runtime/LocalLlmPlugin.kt, src/device-local-coder.js, src/main.js, and scripts/test-device-local-coder.mjs now cover orphan .part cleanup, pending DownloadManager enqueue recovery after process death, restoring active download IDs, resume without duplicate enqueue, keeping an active task when another model is selected, cancellation of imports on Activity teardown, native URL/hash allowlisting and storage guards. Both Android workflows use Gradle 8.11.1 -bin.zip, Aliyun mirror, official Gradle SHA-256 pin and 120s timeout; Gradle build retries only transient network/DNS failures.
 
-**Rules:** make real file-by-file source changes and test them; do not ask for phone/PC tests; CI is not device/offline proof; PR #2 must stay Draft/open/unmerged; do not modify `main`; do not install, launch, pair or connect REA; preserve all 10 AI Team engines, provider connections, Skills Library and shared project/vault context.
+**Next:** finish Native run 42472155008, inspect Native APK artifact digest and internal entries/manifest/ABI. Recheck PR #2 and main. Review the remaining broad cleartext Ollama and Android backup surfaces without breaking trusted-LAN Ollama or encrypted project data. Update this handoff again with exact Native outcome.
 
-Read `SESSION_5_ANDROID_RUNTIME_HARDENING.md` first for the full test matrix, commit history and known CI network failures. Treat older checkpoints below as history only.
+**Rules:** no phone/PC tests requested; CI is not physical-device/offline proof; PR #2 stays open/Draft/unmerged; do not modify main; do not install/launch/pair/connect REA; preserve all 10 AI Team engines, provider connections, Skills Library and shared project/vault context. Read SESSION_5_ANDROID_RUNTIME_HARDENING.md first.
+
+---
 
 ---
 

@@ -63,3 +63,12 @@ This file supersedes the earlier status sentence in `SESSION_4_REA_MCP_AND_RELEA
 ## Session 5 follow-up — 2026-11-08
 
 The 2026-11-07 successful artifacts above remain valid for source commit `1e59e4bf...`. They are not the latest Session 5 APK outputs. Session 5 changes and current CI are documented in [SESSION_5_ANDROID_RUNTIME_HARDENING.md](SESSION_5_ANDROID_RUNTIME_HARDENING.md): latest branch HEAD `02dff885...`, Demo run `42470598165` passed with artifact `13613322995`, while Native run `42470598002` was still in the debug APK build step at the last check. Re-fetch live Actions before claiming a Native artifact.
+
+
+## Session 5 current checkpoint — 2026-11-08 (latest recheck)
+
+- Latest source/test commit at verification: 90e5da287cc8d50859402cdbf99ccdb533e3360a.
+- Demo workflow [42472155238](https://github.com/babaprobado-bit/A-studio/actions/runs/42472155238) succeeded on 90e5da. Artifact ID 13613679600, 3,776,220 bytes, archive SHA-256 c49230bbcc6a98922d6056d7daacb34a944cf288837c7f65b89b537212ef4f77. Downloaded archive digest matched; extracted APK 4,134,919 bytes, SHA-256 9933e6bad111f2bce75f071d54c9016f2525ed04ccb919c07aa30032894c02d2. Demo has no llama runtime.
+- Native GGUF workflow [42472155008](https://github.com/babaprobado-bit/A-studio/actions/runs/42472155008) passed SDK/native setup, llama.kt, llama.cpp, all regression suites, web build and Capacitor sync. At the last check the Gradle debug APK retry step was still running; no Native artifact had been reported.
+- Latest source improvements include durable pending-download recovery after process death, rehydrating/resuming the original DownloadManager task without duplicate enqueue, preservation of an active task when a different model is selected, native catalogue/storage verification, orphan partial cleanup and import cancellation at Activity teardown. See SESSION_5_ANDROID_RUNTIME_HARDENING.md.
+- Branch remains feature/android-offline-skills-v1; PR #2 open/Draft/unmerged; main unchanged. No physical Android install/inference/airplane-mode test. REA is mock-only.

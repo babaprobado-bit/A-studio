@@ -1,14 +1,16 @@
 # Session 5 current checkpoint — 2026-11-08
 
-- Latest feature branch HEAD: [02dff8855b15085d993144da4cf1d5e839105614](https://github.com/babaprobado-bit/A-studio/commit/02dff8855b15085d993144da4cf1d5e839105614).
-- Latest application/runtime source changes: [0ac56447218a5e7e4297b9adb315597367acb1b1](https://github.com/babaprobado-bit/A-studio/commit/0ac56447218a5e7e4297b9adb315597367acb1b1). Commits after this source SHA in this checkpoint only update the Gradle wrapper handling in both Android workflows.
-- Demo Actions [42470598165](https://github.com/babaprobado-bit/A-studio/actions/runs/42470598165) **passed** on branch HEAD 02dff885. Artifact ID 13613322995, size 3,775,895 bytes, archive SHA-256 `2dca7141b3b282d9d380979417cbe17098fa36962f11492c0fd96931357c721c`. The downloaded ZIP digest matched GitHub's reported digest; it contained `app-debug.apk` (4,134,417 bytes; SHA-256 `a316bfcb194146b05b18b48664adf566e8e8d6044bac0cdd5db64af1e9969782`). This is the Demo APK, without llama runtime.
-- Native GGUF Actions [42470598002](https://github.com/babaprobado-bit/A-studio/actions/runs/42470598002) passed native toolchain, pinned llama.kt, llama.cpp Android sources, Vite, all regression checks, Capacitor generation/sync and Gradle preparation. At the last check the debug APK build was still running and no artifact was reported. Recheck; do not claim Native success based on a running job.
-- The current Gradle wrapper helper uses Gradle 8.11.1 `-bin.zip`, Aliyun mirror URL, official distribution SHA-256 pinned in `distributionSha256Sum`, and 120-second timeout. The latest Demo workflow completed the Gradle build successfully using this path.
-- Session 5 added native allowlisting of exact GGUF filename/URL/SHA, independent native storage preflight, cleanup of orphaned partial files, Activity-teardown import cancellation and JS unknown/insufficient-storage guards with regression tests. See [SESSION_5_ANDROID_RUNTIME_HARDENING.md](SESSION_5_ANDROID_RUNTIME_HARDENING.md).
-- PR #2 remains open, Draft and unmerged. `main` remains `aab010319b6500002844bd24b11da85dd9ca3b00`. No physical-device test was performed. REA is still mock-only; no real install or connection was initiated.
+## Session 5 current verified checkpoint — 2026-11-08 (download recovery + Demo APK)
+
+- Latest source/test checkpoint: [90e5da287cc8d50859402cdbf99ccdb533e3360a](https://github.com/babaprobado-bit/A-studio/commit/90e5da287cc8d50859402cdbf99ccdb533e3360a). Re-fetch live branch before continuing; docs may add a later docs-only HEAD.
+- Demo run [42472155238](https://github.com/babaprobado-bit/A-studio/actions/runs/42472155238) **succeeded** on 90e5da. Artifact AI-Studio-Demo-APK, ID 13613679600, archive 3,776,220 bytes, SHA-256 c49230bbcc6a98922d6056d7daacb34a944cf288837c7f65b89b537212ef4f77. Downloaded archive digest matched GitHub; extracted APK 4,134,919 bytes, SHA-256 9933e6bad111f2bce75f071d54c9016f2525ed04ccb919c07aa30032894c02d2. Demo package does not contain llama runtime.
+- Native GGUF run [42472155008](https://github.com/babaprobado-bit/A-studio/actions/runs/42472155008) passed SDK/native tools, pinned llama.kt, llama.cpp source preparation, web build, all existing/new regression tests, Capacitor generation/sync and Gradle wrapper preparation. At the last check the retry-aware Build debug APK step was still in progress; no Native artifact was present. Re-fetch its status/artifact list before claiming success.
+- The new dynamic process-restart tests passed in the Demo run: persisted DownloadManager ID is restored, same model resumes polling the original task without duplicate enqueue, and selecting another model preserves the original task.
+- Current branch HEAD at the handoff refresh: 90e5da...; PR #2 open/Draft/unmerged; main unchanged at aab010319b6500002844bd24b11da85dd9ca3b00.
+- No physical device installation, GGUF import/inference, RAM/performance check or airplane-mode test has been done. CI is not device/offline acceptance evidence. REA remains mock-only; no installation or connection was started.
 
 ---
+
 
 # Latest working checkpoint — 2026-11-06 (REA contract mock tests added)
 
