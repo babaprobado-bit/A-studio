@@ -103,6 +103,16 @@ The user-provided 2026-11-07 checkpoint remains valid for its own source commit 
 - Native run [42283873400](https://github.com/babaprobado-bit/A-studio/actions/runs/42283873400), success, artifact ID `13538300337`, archive size 18,159,448 bytes, archive SHA-256 `0588ceaadbc307cbb6cf7c7945743efb103c41b684c5bf1df79011dbe2536e5a`.
 These artifacts belong to commit `1e59e4bf...`, not to the newer Session 5 source commit.
 
+## Static secret-storage and backup review — 2026-11-08
+
+- Native provider API keys are accessed through SecureStoragePlugin using keys with the prefix ai-studio-provider-. In the web preview, provider keys are held only in the in-memory runtimeKeys object and are not persisted by this path.
+- The native shared-vault agent token is stored/read/removed through SecureStoragePlugin under ai-studio-shared-vault-agent-token.
+- Ordinary application state is stored through Capacitor Preferences. buildWorkspaceSnapshot() explicitly constructs a whitelist of portable settings, projects, chat, plugins, Skills, snippets, activity and code files; it does not include runtimeKeys, provider API keys or nativeVaultToken.
+- The optional user-exported encrypted workspace backup uses PBKDF2-SHA-256 with 250,000 iterations, random 16-byte salt and 12-byte AES-GCM IV, AES-256-GCM with 128-bit tag, and a minimum 12-character password. The server-side shared vault uses AES-256-GCM and refuses an encryption secret shorter than 32 characters. This explicit encrypted export is separate from Android OS automatic backup.
+- The APK manifest still has allowBackup=true, and no app-specific backup/data-extraction rules were present in the inspected manifest. This does not prove that the SecureStoragePlugin's encrypted entries are safely excluded or portable across device restore. Audit the plugin's Android storage/key-wrapping implementation and Android backup behavior before release; add exclusion rules only after confirming which app data must migrate.
+- The APK manifest has usesCleartextTraffic=true at application scope. This is currently required by the trusted-LAN PC Ollama HTTP workflow, but it is broader than a host/subnet allowlist. Before a production release, consider a dedicated network-security design or explicit per-connection policy while retaining local Ollama compatibility; do not break the existing workflow silently.
+- The inspected package is debuggable=true and comes from assembleDebug. A signed release build with debuggable=false, release signing configuration and backup/network policy review remains future work.
+
 ## APK configuration and acceptance boundary
 
 - Product/display name: AI Studio. Capacitor app ID remains `com.aistudio.alpha1` for install/update compatibility.

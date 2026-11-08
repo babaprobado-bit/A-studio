@@ -16,6 +16,8 @@ Handoff documents were refreshed on the feature branch; fetch the live HEAD befo
 - Native GGUF run 42472155008; artifact 13614626123; ZIP 18,158,764 bytes; SHA-256 b1f7421d9b8d7f10a8d38301b9abda2597daa073657d5ecc8fa6871123304c4f.
 - Extracted Native APK 54,497,680 bytes; SHA-256 cb1ce07516acca97033630cd7d3004b85a9125823045f11274888e729a1e8d8e. It contains arm64-v8a/libllamakt.so, libOpenCL.so and libc++_shared.so; no GGUF weights are embedded.
 
+**Secret-storage review:** native provider API keys and the native vault token use SecureStoragePlugin; web-preview keys remain in memory. Explicit workspace snapshots omit provider keys/tokens, and optional exported backups use PBKDF2-SHA-256 + AES-256-GCM. Android allowBackup remains true, so audit plugin backup/restore semantics before release.
+
 **Important manifest review:** package com.aistudio.alpha1, version 1.1.0/code 2, minSdk 29, target/compile SDK 35. This is a debuggable debug APK. Manifest still has allowBackup=true and app-wide usesCleartextTraffic=true for the current trusted-LAN Ollama HTTP path. Review backup exclusions and a scoped cleartext policy before any signed production release.
 
 **Next work:** review Android backup/cleartext policy while preserving trusted-LAN Ollama; continue source-level lifecycle/RAM/unload/security review; keep all 10 AI Team engines, provider integrations, Skills Library and shared project/vault context. Do not request device testing. CI is not real-device/offline proof.
