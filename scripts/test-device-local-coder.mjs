@@ -77,6 +77,34 @@ assert.ok(cancelImportsOnDestroy >= 0 && cancelImportsOnDestroy < queueEngineRel
 assert.ok(cancelImportsOnDestroy < nativeDestroySource.indexOf('executor.shutdown()'),
   'active GGUF import cancellation must be requested before the executor is shut down');
 
+const nativeCatalogStart = nativeSource.indexOf('private val catalogueDownloadSpecs = mapOf(');
+assert.ok(nativeCatalogStart >= 0, 'native download bridge must keep its own allowlisted catalogue');
+for (const [fileName, url, sha256] of [
+  ['qwen2.5-coder-0.5b-instruct-q4_k_m.gguf', 'https://huggingface.co/Qwen/Qwen2.5-Coder-0.5B-Instruct-GGUF/resolve/main/qwen2.5-coder-0.5b-instruct-q4_k_m.gguf', '1d9614638d18024d0fbb36575a15f1302a3adf044df10345688ec4f6e1c4ff32'],
+  ['qwen2.5-coder-1.5b-instruct-q4_k_m.gguf', 'https://huggingface.co/Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF/resolve/main/qwen2.5-coder-1.5b-instruct-q4_k_m.gguf', 'cc324af070c2ecbfd324a30884d2f951a7ff756aba85cb811a6ec436933bb046'],
+  ['qwen2.5-coder-3b-instruct-q4_k_m.gguf', 'https://huggingface.co/Qwen/Qwen2.5-Coder-3B-Instruct-GGUF/resolve/main/qwen2.5-coder-3b-instruct-q4_k_m.gguf', '724fb256bec1ff062b2f65e4569e871ad2e95ab2a3989723d1769c54294730b7']
+]) {
+  assert.ok(nativeSource.includes(fileName), `native catalogue must include ${fileName}`);
+  assert.ok(nativeSource.includes(url), `native catalogue must pin the URL for ${fileName}`);
+  assert.ok(nativeSource.includes(sha256), `native catalogue must pin the SHA-256 for ${fileName}`);
+}
+const nativeDownloadStart = nativeSource.indexOf('fun downloadModel(call: PluginCall)');
+const nativeDownloadEnd = nativeSource.indexOf('fun cancelDownload(call: PluginCall)', nativeDownloadStart);
+assert.ok(nativeDownloadStart >= 0 && nativeDownloadEnd > nativeDownloadStart,
+  'native catalogue download method must exist');
+const nativeDownloadSource = nativeSource.slice(nativeDownloadStart, nativeDownloadEnd);
+assert.match(nativeDownloadSource, /catalogueDownloadSpecs\[fileName\]/,
+  'native bridge must reject filenames outside its catalogue');
+assert.match(nativeDownloadSource,
+  /url != approved\.url \|\| expectedSha256 != approved\.sha256/,
+  'native bridge must require the exact catalogue URL and SHA-256');
+assert.match(nativeDownloadSource,
+  /val requiredStorageBytes = \(approved\.sizeBytes \* 115L \+ 99L\) \/ 100L/,
+  'native bridge must calculate the catalogue model storage reserve');
+assert.match(nativeDownloadSource,
+  /if \(freeStorageBytes < requiredStorageBytes\)/,
+  'native bridge must reject insufficient storage before enqueue');
+
 const nativeImportStart = nativeSource.indexOf('private fun importModelFromUri(');
 const nativeImportEnd = nativeSource.indexOf('@PluginMethod', nativeImportStart);
 const nativeImportSource = nativeSource.slice(nativeImportStart, nativeImportEnd);

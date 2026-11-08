@@ -43,6 +43,24 @@ class LocalLlmPlugin : Plugin() {
     @Volatile private var loadedFileName: String = ""
     private val activeImportFileNames = ConcurrentHashMap.newKeySet<String>()
     private val activeImportRequests = ConcurrentHashMap<String, AtomicBoolean>()
+    private data class CatalogueDownloadSpec(val url: String, val sha256: String, val sizeBytes: Long)
+    private val catalogueDownloadSpecs = mapOf(
+        "qwen2.5-coder-0.5b-instruct-q4_k_m.gguf" to CatalogueDownloadSpec(
+            "https://huggingface.co/Qwen/Qwen2.5-Coder-0.5B-Instruct-GGUF/resolve/main/qwen2.5-coder-0.5b-instruct-q4_k_m.gguf",
+            "1d9614638d18024d0fbb36575a15f1302a3adf044df10345688ec4f6e1c4ff32",
+            491L * 1024L * 1024L
+        ),
+        "qwen2.5-coder-1.5b-instruct-q4_k_m.gguf" to CatalogueDownloadSpec(
+            "https://huggingface.co/Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF/resolve/main/qwen2.5-coder-1.5b-instruct-q4_k_m.gguf",
+            "cc324af070c2ecbfd324a30884d2f951a7ff756aba85cb811a6ec436933bb046",
+            1120L * 1024L * 1024L
+        ),
+        "qwen2.5-coder-3b-instruct-q4_k_m.gguf" to CatalogueDownloadSpec(
+            "https://huggingface.co/Qwen/Qwen2.5-Coder-3B-Instruct-GGUF/resolve/main/qwen2.5-coder-3b-instruct-q4_k_m.gguf",
+            "724fb256bec1ff062b2f65e4569e871ad2e95ab2a3989723d1769c54294730b7",
+            2100L * 1024L * 1024L
+        )
+    )
     private val maxImportedModelBytes = 8L * 1024L * 1024L * 1024L
 
     private fun modelDirectory(): File {
@@ -458,6 +476,16 @@ class LocalLlmPlugin : Plugin() {
             val fileName = call.getString("fileName") ?: throw IllegalArgumentException("Model dosya adı eksik.")
             val expectedSha256 = normalizeExpectedSha256(call.getString("sha256"))
             val destination = safeModelFile(fileName)
+            val approved = catalogueDownloadSpecs[fileName]
+                ?: throw IllegalArgumentException("Yalnızca uygulama kataloğundaki GGUF modelleri indirilebilir.")
+            if (url != approved.url || expectedSha256 != approved.sha256) {
+                throw IllegalArgumentException("Model URL'si veya SHA-256 özeti katalogla eşleşmiyor.")
+            }
+            val requiredStorageBytes = (approved.sizeBytes * 115L + 99L) / 100L
+            val freeStorageBytes = StatFs(destination.parentFile?.absolutePath ?: modelDirectory().absolutePath).availableBytes
+            if (freeStorageBytes < requiredStorageBytes) {
+                throw IllegalStateException("İndirme için telefonda yeterli boş depolama alanı yok.")
+            }
             reconcileDownloads()
             if (activeImportFileNames.contains(fileName)) {
                 throw IllegalStateException("Bu model şu anda içe aktarılıyor.")
