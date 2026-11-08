@@ -690,6 +690,8 @@ class LocalLlmPlugin : Plugin() {
 
     override fun handleOnDestroy() {
         super.handleOnDestroy()
+        // Stop an active SAF copy before the single-thread executor drains queued work.
+        activeImportRequests.values.forEach { it.set(true) }
         try {
             executor.execute { val previous = engine; engine = null; loadedFileName = ""; try { previous?.free() } catch (_: Exception) { } }
             executor.shutdown()

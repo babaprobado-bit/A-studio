@@ -67,6 +67,16 @@ assert.match(nativeReconcileSource,
 assert.match(nativeReconcileSource, /activeImportFileNames\.contains\(modelName\)/,
   'orphan cleanup must preserve partial files owned by an active import');
 
+const nativeDestroyStart = nativeSource.indexOf('override fun handleOnDestroy()');
+assert.ok(nativeDestroyStart >= 0, 'native plugin must release resources when the Activity is destroyed');
+const nativeDestroySource = nativeSource.slice(nativeDestroyStart);
+const cancelImportsOnDestroy = nativeDestroySource.indexOf('activeImportRequests.values.forEach { it.set(true) }');
+const queueEngineRelease = nativeDestroySource.indexOf('executor.execute');
+assert.ok(cancelImportsOnDestroy >= 0 && cancelImportsOnDestroy < queueEngineRelease,
+  'Activity teardown must signal active GGUF imports to stop before queuing native engine release');
+assert.ok(cancelImportsOnDestroy < nativeDestroySource.indexOf('executor.shutdown()'),
+  'active GGUF import cancellation must be requested before the executor is shut down');
+
 const nativeImportStart = nativeSource.indexOf('private fun importModelFromUri(');
 const nativeImportEnd = nativeSource.indexOf('@PluginMethod', nativeImportStart);
 const nativeImportSource = nativeSource.slice(nativeImportStart, nativeImportEnd);
