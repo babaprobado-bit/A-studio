@@ -64,6 +64,7 @@ app.use(helmet({
         'https://api.deepseek.com',
         'https://api.groq.com',
         'https://openrouter.ai',
+        'https://mcp.openshorts.app',
         'http:'
       ],
       formAction: ["'self'"],

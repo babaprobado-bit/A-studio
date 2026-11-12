@@ -14,7 +14,8 @@
     "test:device-local-coder": "node scripts/test-device-local-coder.mjs",
     "test:api-local-coder": "node scripts/test-api-local-coder.mjs",
     "test:ai-team": "node scripts/test-ai-team.mjs",
-    "test:rea-companion-contract": "node scripts/test-rea-companion-contract.mjs"
+    "test:rea-companion-contract": "node scripts/test-rea-companion-contract.mjs",
+    "test:openshorts": "node scripts/test-openshorts.mjs"
   },
   "dependencies": {
     "express": "^5.1.0",

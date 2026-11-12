@@ -1,4 +1,5 @@
 import { Capacitor } from '@capacitor/core';
+import { connectOpenShorts, callOpenShortsTool, validateOpenShortsSourceUrl } from './openshorts-mcp.js';
 import { runApiLocalCoderSequence } from './local-coder-api.js';
 import { normalizeTeamSelection, normalizeOpenAiEndpoint, selectConfiguredTeam, confirmTeamLiveCalls, runParallelTeamCalls, runSequentialTeamCalls } from './ai-team.js';
 import { DeviceLocalCoder, DEVICE_MODEL_CATALOG, assessDeviceModel, chooseRecommendedDeviceModel, formatModelBytes } from './device-local-coder.js';
@@ -26,6 +27,10 @@ const DB = {
 const nativeApp = Capacitor.isNativePlatform();
 const deviceLocalCoder = new DeviceLocalCoder(nativeApp);
 let deviceLocalState = null;
+let openShortsToolNames = new Set();
+let openShortsJobId = '';
+let openShortsPendingSource = '';
+let openShortsBusy = false;
 const providers = {
   openai: { name:'OpenAI', icon:'O', kind:'openai', endpoint:'https://api.openai.com/v1/chat/completions', model:'gpt-5-mini', keyUrl:'https://platform.openai.com/api-keys', desc:'GPT modelleri · Chat Completions API' },
   anthropic: { name:'Anthropic / Claude', icon:'A', kind:'anthropic', endpoint:'https://api.anthropic.com/v1/messages', model:'claude-sonnet-5', keyUrl:'https://console.anthropic.com/settings/keys', desc:'Claude modelleri · Messages API' },
@@ -227,6 +232,124 @@ async function getSecret(id){ if(!nativeApp)return runtimeKeys[id]||''; try{cons
 async function saveSecret(id,key){ if(!key.trim())return; if(!nativeApp){runtimeKeys[id]=key.trim(); showToast('Önizleme: anahtar yalnızca bu açık oturumda tutulur, güvenli şekilde kaydedilmez.');return;} await SecureStoragePlugin.set({key:'ai-studio-provider-'+id,value:key.trim()}); runtimeKeys[id]=key.trim(); }
 async function deleteSecret(id){ if(!nativeApp){delete runtimeKeys[id];return;} try{await SecureStoragePlugin.remove({key:'ai-studio-provider-'+id});}catch(_){} delete runtimeKeys[id]; }
 async function initKeys(){ for(const id of Object.keys(providers)){runtimeKeys[id]=(id==='device'||id==='ollama')?'':(nativeApp?await getSecret(id):'');} }
+async function initOpenShortsKey(){runtimeKeys.openshorts=nativeApp?await getSecret('openshorts'):'';}
+function setOpenShortsStatus(message,tone='info'){
+  const node=$('openshortsStatus');if(!node)return;
+  node.textContent=String(message||'');node.dataset.tone=tone;
+}
+function renderOpenShortsPanel(){
+  const connected=Boolean(runtimeKeys.openshorts);
+  $('openshortsConnectionBadge').textContent=connected?'Anahtar kayıtlı':'Bağlı değil';
+  $('openshortsConnectionBadge').className='pill '+(connected?'safe':'');
+  $('openshortsProcess').disabled=!openShortsToolNames.has('process_video')||openShortsBusy;
+  $('openshortsQuotaRefresh').disabled=!openShortsToolNames.has('get_quota')||openShortsBusy;
+  $('openshortsCheckStatus').disabled=!openShortsJobId||!openShortsToolNames.has('get_job_status')||openShortsBusy;
+  $('openshortsJobId').textContent=openShortsJobId||'Henüz iş yok';
+  if(!connected)setOpenShortsStatus('Bağlanmak için API anahtarını gir.','info');
+  else if(!openShortsToolNames.size)setOpenShortsStatus('Anahtar bu cihazda kayıtlı. OpenShorts bağlantısını doğrula.','info');
+}
+async function requireOpenShortsTool(name,args={}){
+  const key=runtimeKeys.openshorts||'';
+  if(!key)throw new Error('Önce OpenShorts API anahtarını kaydedip bağlan.');
+  if(!openShortsToolNames.has(name))throw new Error('OpenShorts bağlantısını doğrula; gerekli araç henüz hazır değil.');
+  return callOpenShortsTool({apiKey:key,name,arguments:args});
+}
+function renderOpenShortsClips(clips){
+  const out=$('openshortsClips');
+  if(!Array.isArray(clips)||!clips.length){out.innerHTML='<p class="fineprint">Henüz klip bağlantısı dönmedi.</p>';return;}
+  out.innerHTML=clips.map((clip,index)=>{
+    const title=esc(clip?.title||clip?.youtube_title||('Klip '+(index+1)));
+    const duration=Number.isFinite(Number(clip?.duration_seconds))?Math.max(0,Number(clip.duration_seconds))+' sn':'Süre bilgisi yok';
+    let link='';
+    try{const url=new URL(String(clip?.video_url||''));if(url.protocol==='https:')link='<a class="btn secondary small" href="'+esc(url.toString())+'" target="_blank" rel="noopener noreferrer">Klibi aç / indir ↗</a>';}catch(_){}
+    return '<article class="openshorts-clip"><div><strong>'+title+'</strong><small>'+esc(duration)+'</small></div>'+link+'</article>';
+  }).join('');
+}
+async function connectOpenShortsUi(){
+  if(openShortsBusy)return;
+  openShortsBusy=true;renderOpenShortsPanel();setOpenShortsStatus('OpenShorts MCP bağlantısı ve araç listesi doğrulanıyor…');
+  try{
+    const entered=$('openshortsApiKey').value.trim();
+    if(entered){await saveSecret('openshorts',entered);runtimeKeys.openshorts=entered;}
+    const key=runtimeKeys.openshorts||'';
+    if(!key)throw new Error('OpenShorts API anahtarını gir.');
+    const result=await connectOpenShorts({apiKey:key});
+    openShortsToolNames=new Set(result.tools.map(tool=>tool.name));
+    const ready=['process_video','get_job_status','list_clips','get_quota','add_subtitles'].filter(name=>openShortsToolNames.has(name));
+    $('openshortsApiKey').value='';
+    setOpenShortsStatus('Bağlandı: '+(result.serverInfo.title||result.serverInfo.name)+' · '+ready.length+' araç doğrulandı.','success');
+    showToast('OpenShorts bağlantısı doğrulandı.');
+    await refreshOpenShortsQuota(true);
+  }catch(error){openShortsToolNames.clear();setOpenShortsStatus(error.message||'OpenShorts bağlantısı doğrulanamadı.','error');}
+  finally{openShortsBusy=false;renderOpenShortsPanel();}
+}
+async function disconnectOpenShortsUi(){
+  if(openShortsBusy)return;
+  try{
+    await deleteSecret('openshorts');openShortsToolNames.clear();openShortsPendingSource='';openShortsJobId='';
+    $('openshortsApiKey').value='';$('openshortsClips').innerHTML='';$('openshortsQuota').textContent='Kota henüz kontrol edilmedi.';
+    setOpenShortsStatus('Anahtar bu cihazdan silindi. OpenShorts hesabındaki anahtarı ayrıca iptal etmek için OpenShorts hesap ayarlarını kullan.','info');
+    renderOpenShortsPanel();
+  }catch(error){setOpenShortsStatus('Anahtar silinemedi: '+(error.message||'Güvenli depolama hatası.'),'error');}
+}
+async function refreshOpenShortsQuota(quiet=false){
+  try{
+    const data=await requireOpenShortsTool('get_quota');
+    const minutes=data.minutes,plan=data.plan||'OpenShorts hesabı';
+    $('openshortsQuota').textContent=minutes&&typeof minutes==='object'
+      ?plan+' · '+(minutes.remaining??minutes.left??'Kalan dakika bilgisi yok')+' dakika'
+      :plan+' · '+(minutes==null?'Kota bilgisi dönmedi':String(minutes)+' dakika');
+    if(!quiet)showToast('OpenShorts kotası güncellendi.');
+  }catch(error){
+    $('openshortsQuota').textContent=error.message||'Kota alınamadı.';
+    if(!quiet)setOpenShortsStatus('Kota kontrolü başarısız: '+(error.message||'Bilinmeyen hata.'),'error');
+  }
+}
+async function startOpenShortsJob(forceLowQuality=false){
+  if(openShortsBusy)return;
+  try{
+    const source=validateOpenShortsSourceUrl(forceLowQuality?openShortsPendingSource:$('openshortsVideoUrl').value);
+    if(!$('openshortsConfirmRights').checked)throw new Error('Devam etmek için videonun sahibi olduğunu veya işleme iznin bulunduğunu onayla.');
+    openShortsBusy=true;renderOpenShortsPanel();
+    setOpenShortsStatus('Video OpenShorts kuyruğuna gönderiliyor. Bu işlem hesabının dakika kotasını kullanabilir…');
+    const data=await requireOpenShortsTool('process_video',{
+      source_url:source,confirm_rights:true,output_format:'vertical',layouts:['auto'],
+      ...(forceLowQuality?{force_low_quality:true}:{})
+    });
+    if(data.needs_confirmation){
+      openShortsPendingSource=source;
+      $('openshortsForceLowQuality').hidden=false;$('openshortsForceLowQuality').disabled=false;
+      setOpenShortsStatus(data.hint||'Kaynak çözünürlüğü düşük. Devam etmek için ayrı onay gerekiyor.','warning');
+      return;
+    }
+    const jobId=String(data.job_id||data.id||'').trim();
+    if(!jobId)throw new Error(data.error||'OpenShorts yanıtında iş kimliği bulunamadı.');
+    openShortsJobId=jobId;openShortsPendingSource='';
+    $('openshortsForceLowQuality').hidden=true;$('openshortsForceLowQuality').disabled=true;
+    $('openshortsJobId').textContent=jobId;
+    setOpenShortsStatus('İş oluşturuldu. İşleme birkaç dakika sürebilir; durumu düğmeyle kontrol et.','success');
+    showToast('OpenShorts video işini başlattı.');
+    await refreshOpenShortsQuota(true);
+  }catch(error){setOpenShortsStatus(error.message||'Video işi başlatılamadı.','error');}
+  finally{openShortsBusy=false;renderOpenShortsPanel();}
+}
+async function checkOpenShortsJob(){
+  if(openShortsBusy||!openShortsJobId)return;
+  openShortsBusy=true;renderOpenShortsPanel();
+  try{
+    const status=await requireOpenShortsTool('get_job_status',{job_id:openShortsJobId});
+    if(status.status==='completed'){
+      const clips=await requireOpenShortsTool('list_clips',{job_id:openShortsJobId});
+      renderOpenShortsClips(clips.clips||status.clips||[]);
+      setOpenShortsStatus('İş tamamlandı. Klipleri inceleyebilir ve bağlantılarından açabilirsin.','success');
+    }else if(status.status==='failed'){
+      const logs=Array.isArray(status.recent_logs)?status.recent_logs.join('\n'):'';
+      setOpenShortsStatus('Video işleme başarısız oldu. '+logs.slice(-900),'error');
+    }else setOpenShortsStatus('İş durumu: '+(status.status||'bilinmiyor')+'. Biraz sonra yeniden kontrol et.','info');
+  }catch(error){setOpenShortsStatus(error.message||'İş durumu alınamadı.','error');}
+  finally{openShortsBusy=false;renderOpenShortsPanel();}
+}
+
 function renderProviderCards(){
   const currentChatProvider=$('chatProvider')?.value||'openai';
   $('providerGrid').innerHTML=Object.entries(providers).map(([id,p])=>{
@@ -1408,6 +1531,12 @@ $('exportProjects').addEventListener('click',exportProjects);
 $('importProjectsBtn').addEventListener('click',()=>$('importProjectsFile').click());
 $('importProjectsFile').addEventListener('change',async e=>{if(e.target.files?.[0])await importProjects(e.target.files[0]);e.target.value='';});
 $('pluginForm').addEventListener('submit',addPlugin);
+$('openshortsConnect').addEventListener('click',connectOpenShortsUi);
+$('openshortsDisconnect').addEventListener('click',disconnectOpenShortsUi);
+$('openshortsQuotaRefresh').addEventListener('click',()=>refreshOpenShortsQuota());
+$('openshortsProcess').addEventListener('click',()=>startOpenShortsJob(false));
+$('openshortsForceLowQuality').addEventListener('click',()=>startOpenShortsJob(true));
+$('openshortsCheckStatus').addEventListener('click',checkOpenShortsJob);
 $('skillProfileSelect').addEventListener('change',e=>applySkillProfile(e.target.value));
 $('skillImportBtn').addEventListener('click',()=>$('skillImportFiles').click());
 $('skillImportFiles').addEventListener('change',async e=>{if(e.target.files?.length)await importSkillFiles(e.target.files);e.target.value='';});
@@ -1508,9 +1637,9 @@ async function prepareBrowserFeatures(){
 async function init(){
   try{settings={...clone(defaultSettings),...(await getPref(DB.settings,{}))};settings.models={...clone(defaultSettings.models),...(settings.models||{})};const savedTeam=Array.isArray(settings.team)?settings.team:null;settings.team=normalizeTeamSelection(settings.team||defaultSettings.team,Object.keys(providers));if(savedTeam&&settings.team.includes('openai')&&settings.team.includes('anthropic')&&settings.team.includes('gemini')&&settings.team.includes('deepseek')&&settings.team.includes('groq')&&settings.team.includes('openrouter')&&settings.team.includes('huggingface')&&settings.team.includes('custom')&&settings.team.includes('ollama')&&!settings.team.includes('device'))settings.team.push('device');settings.customEndpoint=typeof settings.customEndpoint==='string'?settings.customEndpoint.slice(0,500):'';if(settings.customEndpoint){try{settings.customEndpoint=normalizeOpenAiEndpoint(settings.customEndpoint);}catch(_){settings.customEndpoint='';}}settings.vaultBaseUrl=typeof settings.vaultBaseUrl==='string'?settings.vaultBaseUrl.slice(0,500):'';settings.localCoderEngine=['device','api'].includes(settings.localCoderEngine)?settings.localCoderEngine:'ollama';settings.localCoderApiProvider=providers[settings.localCoderApiProvider]&&settings.localCoderApiProvider!=='ollama'?settings.localCoderApiProvider:'openai';if(settings.ollamaUrl==='http://192.168.1.100:11434')settings.ollamaUrl='';}catch(_){}
   if(!nativeApp){showToast('Tarayıcıda API anahtarları yalnızca açık oturumda tutulur.');}
-  await initKeys(); projectList=await getPref(DB.projects,[]);activeProjectId=await getPref(DB.activeProject,'');chatHistory=await getPref(DB.chat,[]);userPlugins=await getPref(DB.plugins,[]);const storedSkills=await getPref(DB.skills,{});customSkills=(Array.isArray(storedSkills?.customSkills)?storedSkills.customSkills:[]).map(skill=>normalizeSkill(skill)).filter(Boolean).slice(-100);skillLibrary=[...SKILL_CATALOG,...customSkills];skillProfileId=storedSkills?.profileId==='custom'?'custom':(SKILL_PROFILES[storedSkills?.profileId]?storedSkills.profileId:'karpathy');const validSkillIds=new Set(skillLibrary.map(skill=>skill.id));selectedSkillIds=(Array.isArray(storedSkills?.selectedSkillIds)?storedSkills.selectedSkillIds:[]).filter(id=>validSkillIds.has(id)).slice(0,MAX_SELECTED_SKILLS);if(!selectedSkillIds.length)selectedSkillIds=getProfileSkillIds(skillProfileId);reusableSnippets=await getPref(DB.snippets,[]);agentActivity=await getPref(DB.activity,[]);codeFiles=normalizeCodeFileList(await getPref(DB.codeFiles,[]),true);if(!codeFiles.length)codeFiles=[makeCodeFile()];activeCodeFileId=codeFiles[0].id;await setPref(DB.codeFiles,codeFiles);
+  await initKeys();await initOpenShortsKey(); projectList=await getPref(DB.projects,[]);activeProjectId=await getPref(DB.activeProject,'');chatHistory=await getPref(DB.chat,[]);userPlugins=await getPref(DB.plugins,[]);const storedSkills=await getPref(DB.skills,{});customSkills=(Array.isArray(storedSkills?.customSkills)?storedSkills.customSkills:[]).map(skill=>normalizeSkill(skill)).filter(Boolean).slice(-100);skillLibrary=[...SKILL_CATALOG,...customSkills];skillProfileId=storedSkills?.profileId==='custom'?'custom':(SKILL_PROFILES[storedSkills?.profileId]?storedSkills.profileId:'karpathy');const validSkillIds=new Set(skillLibrary.map(skill=>skill.id));selectedSkillIds=(Array.isArray(storedSkills?.selectedSkillIds)?storedSkills.selectedSkillIds:[]).filter(id=>validSkillIds.has(id)).slice(0,MAX_SELECTED_SKILLS);if(!selectedSkillIds.length)selectedSkillIds=getProfileSkillIds(skillProfileId);reusableSnippets=await getPref(DB.snippets,[]);agentActivity=await getPref(DB.activity,[]);codeFiles=normalizeCodeFileList(await getPref(DB.codeFiles,[]),true);if(!codeFiles.length)codeFiles=[makeCodeFile()];activeCodeFileId=codeFiles[0].id;await setPref(DB.codeFiles,codeFiles);
   if(!Array.isArray(projectList))projectList=[];if(!projectList.some(p=>p&&p.id===activeProjectId))activeProjectId=projectList[0]?.id||'';await setPref(DB.activeProject,activeProjectId);if(!Array.isArray(chatHistory))chatHistory=[];if(!Array.isArray(userPlugins))userPlugins=[];if(!Array.isArray(reusableSnippets))reusableSnippets=[];if(!Array.isArray(agentActivity))agentActivity=[];
-  renderProviderCards();renderProjects();renderChat();renderBuiltinTools();renderPlugins();renderSkillLibrary();renderReuseCatalog();renderSnippetVault();renderAgentActivity();loadActiveCodeFile();syncModeUI();updateDashboard();$('compareSelectionCount').textContent=settings.team.length+' ajan seçili';
+  renderProviderCards();renderProjects();renderChat();renderBuiltinTools();renderPlugins();renderOpenShortsPanel();renderSkillLibrary();renderReuseCatalog();renderSnippetVault();renderAgentActivity();loadActiveCodeFile();syncModeUI();updateDashboard();$('compareSelectionCount').textContent=settings.team.length+' ajan seçili';
   syncLocalCoderEngineUI();await refreshDeviceLocalModels(true);
   if(!nativeApp){$('nativeVaultPanel')?.classList.add('hidden');await loadSharedVault({quiet:true});}else{$('sharedVaultPanel')?.classList.add('hidden');$('nativeVaultPanel')?.classList.remove('hidden');await loadNativeVault({quiet:true});}
 }

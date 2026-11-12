@@ -104,6 +104,43 @@
 
       <section class="screen" id="tools">
         <div class="page-title"><div class="eyebrow">TOOLBOX / PROMPT PLUGINS</div><h1>Araçlar ve eklentiler</h1><p>Hazır görev şablonları kullan, kendi prompt eklentilerini oluştur veya kod parçalarını dışa aktar.</p></div>
+        <section class="panel openshorts-panel" id="openShortsPanel">
+          <div class="section-head">
+            <div><div class="eyebrow">VIDEO WORKFLOW / MCP PLUGIN</div><h2>OpenShorts · Shorts üreticisi</h2></div>
+            <span class="pill" id="openshortsConnectionBadge">Bağlı değil</span>
+          </div>
+          <p class="muted">YouTube bağlantısından veya herkese açık video dosyasından dikey kısa klipler üret. AI Studio, OpenShorts'un resmi MCP sunucusunu kullanır.</p>
+          <label class="field-label" for="openshortsApiKey">OpenShorts API anahtarı</label>
+          <input id="openshortsApiKey" class="input" type="password" maxlength="256" autocomplete="new-password" autocapitalize="off" spellcheck="false" placeholder="osk_…">
+          <p class="fineprint">Anahtarını OpenShorts hesabından oluştur. Android'de güvenli depoya kaydedilir; web önizlemesinde yalnızca açık oturum belleğinde tutulur. Anahtar AI Team modellerine gönderilmez.</p>
+          <div class="row-actions">
+            <button id="openshortsConnect" class="btn secondary" type="button">Bağlan / araçları doğrula</button>
+            <button id="openshortsDisconnect" class="btn ghost small danger-text" type="button">Bu cihazdan anahtarı sil</button>
+            <a class="fineprint" href="https://www.openshorts.app/mcp" target="_blank" rel="noopener noreferrer">Resmî kurulum bilgisi ↗</a>
+          </div>
+          <div id="openshortsStatus" class="openshorts-status" role="status" aria-live="polite">Bağlanmak için API anahtarını gir.</div>
+          <div class="openshorts-quota-row">
+            <span id="openshortsQuota" class="fineprint">Kota henüz kontrol edilmedi.</span>
+            <button id="openshortsQuotaRefresh" class="btn ghost small" type="button" disabled>Kotayı kontrol et</button>
+          </div>
+          <label class="field-label" for="openshortsVideoUrl">Video bağlantısı</label>
+          <input id="openshortsVideoUrl" class="input" type="url" maxlength="2048" inputmode="url" placeholder="https://youtu.be/… veya doğrudan .mp4 bağlantısı">
+          <label class="openshorts-rights">
+            <input id="openshortsConfirmRights" type="checkbox">
+            <span>Bu videonun sahibiyim veya videoyu işleme ve klip oluşturma iznim var.</span>
+          </label>
+          <p class="fineprint">Video işleme hesabındaki OpenShorts dakika kotasını kullanabilir. Başlamadan önce kotayı kontrol et. Yalnızca işleme hakkına sahip olduğun videoları gönder.</p>
+          <div class="row-actions">
+            <button id="openshortsProcess" class="btn primary" type="button" disabled>9:16 klip üret</button>
+            <button id="openshortsForceLowQuality" class="btn ghost small" type="button" hidden disabled>Düşük çözünürlüğü kabul edip devam et</button>
+          </div>
+          <div class="openshorts-job-row">
+            <strong>Son iş</strong><code id="openshortsJobId">Henüz iş yok</code>
+            <button id="openshortsCheckStatus" class="btn ghost small" type="button" disabled>Durumu kontrol et</button>
+          </div>
+          <div id="openshortsClips" class="openshorts-clips" aria-live="polite"></div>
+          <p class="fineprint">Bu entegrasyon klip oluşturur ve indirme bağlantılarını gösterir. Sosyal medya hesaplarına otomatik gönderim yapmaz. Klipleri paylaşmadan önce kendin incele.</p>
+        </section>
         <div class="section-head"><div><div class="eyebrow">LOCAL CODER / OFFLINE WORKFLOW</div><h2>Local Coder atölyesi</h2></div><span class="pill">PC + Telefon</span></div>
         <label class="field-label" for="localCoderEngine">Çalışma motoru</label>
         <select class="input" id="localCoderEngine"><option value="ollama">PC / Ollama · Mevcut bağlantı</option><option value="device">Telefon içi GGUF · Çevrimdışı</option><option value="api">API anahtarlı model · Çevrimiçi</option></select>
