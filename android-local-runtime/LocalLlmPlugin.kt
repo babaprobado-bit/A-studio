@@ -55,10 +55,10 @@ class LocalLlmPlugin : Plugin() {
             "cc324af070c2ecbfd324a30884d2f951a7ff756aba85cb811a6ec436933bb046",
             1120L * 1024L * 1024L
         ),
-        "qwen2.5-coder-3b-instruct-q4_k_m.gguf" to CatalogueDownloadSpec(
-            "https://huggingface.co/Qwen/Qwen2.5-Coder-3B-Instruct-GGUF/resolve/main/qwen2.5-coder-3b-instruct-q4_k_m.gguf",
-            "724fb256bec1ff062b2f65e4569e871ad2e95ab2a3989723d1769c54294730b7",
-            2100L * 1024L * 1024L
+        "qwen2.5-0.5b-instruct-q2_k.gguf" to CatalogueDownloadSpec(
+            "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q2_k.gguf",
+            "9ee36184e616dfc76df4f5dd66f908dbde6979524ae36e6cefb67f532f798cb8",
+            415L * 1024L * 1024L
         )
     )
     private val maxImportedModelBytes = 8L * 1024L * 1024L * 1024L

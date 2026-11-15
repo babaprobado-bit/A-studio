@@ -32,13 +32,13 @@ let openShortsJobId = '';
 let openShortsPendingSource = '';
 let openShortsBusy = false;
 const providers = {
-  openai: { name:'OpenAI', icon:'O', kind:'openai', endpoint:'https://api.openai.com/v1/chat/completions', model:'gpt-5-mini', keyUrl:'https://platform.openai.com/api-keys', desc:'GPT modelleri · Chat Completions API' },
-  anthropic: { name:'Anthropic / Claude', icon:'A', kind:'anthropic', endpoint:'https://api.anthropic.com/v1/messages', model:'claude-sonnet-5', keyUrl:'https://console.anthropic.com/settings/keys', desc:'Claude modelleri · Messages API' },
+  openai: { name:'OpenAI', icon:'O', kind:'openai', endpoint:'https://api.openai.com/v1/chat/completions', model:'', keyUrl:'https://platform.openai.com/api-keys', desc:'GPT modelleri · Chat Completions API' },
+  anthropic: { name:'Anthropic / Claude', icon:'A', kind:'anthropic', endpoint:'https://api.anthropic.com/v1/messages', model:'', keyUrl:'https://console.anthropic.com/settings/keys', desc:'Claude modelleri · Messages API' },
   gemini: { name:'Google Gemini', icon:'G', kind:'gemini', endpoint:'https://generativelanguage.googleapis.com/v1beta/models/', model:'gemini-3.8-flash', keyUrl:'https://aistudio.google.com/apikey', desc:'Gemini modelleri · generateContent' },
-  deepseek: { name:'DeepSeek', icon:'D', kind:'openai', endpoint:'https://api.deepseek.com/chat/completions', model:'deepseek-chat', keyUrl:'https://platform.deepseek.com/api_keys', desc:'OpenAI uyumlu API · model kimliğini düzenleyebilirsin' },
-  groq: { name:'Groq', icon:'Q', kind:'openai', endpoint:'https://api.groq.com/openai/v1/chat/completions', model:'llama-3.3-70b-versatile', keyUrl:'https://console.groq.com/keys', desc:'Hızlı çıkarım · kullanılabilir model listesi değişebilir' },
-  openrouter: { name:'OpenRouter', icon:'R', kind:'openai', endpoint:'https://openrouter.ai/api/v1/chat/completions', model:'openai/gpt-5-mini', keyUrl:'https://openrouter.ai/keys', desc:'Birçok sağlayıcı için tek uyumlu API' },
-  huggingface: { name:'Hugging Face Inference', icon:'H', kind:'openai', endpoint:'https://router.huggingface.co/v1/chat/completions', model:'openai/gpt-oss-120b:fastest', keyUrl:'https://huggingface.co/settings/tokens', desc:'Inference Providers · yüzlerce model için tek API' },
+  deepseek: { name:'DeepSeek', icon:'D', kind:'openai', endpoint:'https://api.deepseek.com/chat/completions', model:'', keyUrl:'https://platform.deepseek.com/api_keys', desc:'OpenAI uyumlu API · model kimliğini düzenleyebilirsin' },
+  groq: { name:'Groq', icon:'Q', kind:'openai', endpoint:'https://api.groq.com/openai/v1/chat/completions', model:'', keyUrl:'https://console.groq.com/keys', desc:'Hızlı çıkarım · kullanılabilir model listesi değişebilir' },
+  openrouter: { name:'OpenRouter', icon:'R', kind:'openai', endpoint:'https://openrouter.ai/api/v1/chat/completions', model:'openrouter/free', keyUrl:'https://openrouter.ai/keys', desc:'Birçok sağlayıcı için tek uyumlu API' },
+  huggingface: { name:'Hugging Face Inference', icon:'H', kind:'openai', endpoint:'https://router.huggingface.co/v1/chat/completions', model:'', keyUrl:'https://huggingface.co/settings/tokens', desc:'Inference Providers · yüzlerce model için tek API' },
   custom: { name:'Özel OpenAI uyumlu API', icon:'+', kind:'openai', endpoint:'', model:'', keyUrl:'', desc:'Kendi API adresin ve model kimliğin; OpenAI chat completions uyumlu servisler' },
   ollama: { name:'LocalCoder / Ollama (PC)', icon:'⌘', kind:'ollama', endpoint:'', model:'qwen2.5-coder:1.5b', keyUrl:'https://ollama.com/', desc:'Ağdaki bilgisayarda çalışan yerel model; telefona gömülü değil' },
   device: { name:'Telefon içi GGUF', icon:'▣', kind:'device', endpoint:'', model:'', keyUrl:'', desc:'Android belleğine yüklenmiş GGUF modeli; API anahtarı ve internet gerekmez' }
@@ -207,11 +207,15 @@ async function importCodeFileCollection(file){
 }
 
 function providerModel(id){if(id==='device')return deviceLocalCoder.loadedFileName||'GGUF model';return id==='ollama' ? (settings.ollamaModel||settings.models.ollama||providers.ollama.model) : (settings.models[id]||providers[id].model);}
+function isFreeOpenRouterModel(model){const id=String(model||'').trim();return id==='openrouter/free'||id.endsWith(':free');}
 function selectedTeam(){return normalizeTeamSelection(settings.team,Object.keys(providers));}
 function providerIsReady(id){
   if(!providers[id])return false;
   if(id==='device')return Boolean(nativeApp&&deviceLocalCoder.loadedFileName);
-  if(id==='ollama')return Boolean(String(settings.ollamaUrl||'').trim());
+  if(id==='ollama')return Boolean(String(settings.ollamaUrl||'').trim()&&String(settings.ollamaModel||settings.models.ollama||providers.ollama.model||'').trim());
+  const model=String(settings.models[id]||providers[id].model||'').trim();
+  if(!model)return false;
+  if(id==='openrouter'&&!isFreeOpenRouterModel(model))return false;
   if(id==='custom')return Boolean(String(settings.customEndpoint||'').trim()&&runtimeKeys[id]);
   return Boolean(runtimeKeys[id]);
 }
@@ -456,19 +460,19 @@ async function callProvider(id,prompt,history,options={}){
     const d=await fetchJson(url+'/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model,messages,stream:false,options:{temperature:0.4}})});
     const answer=d?.message?.content;if(!answer)throw new Error('Ollama yanıtında mesaj yok. Model adını ve sunucuyu kontrol et.');return answer;
   }
-  const p=providers[id]; const key=await getSecret(id); if(!key)throw new Error(p.name+' için API anahtarı ayarlanmamış. Modeller ekranından ekle.');
+  const p=providers[id]; if(!p)throw new Error('Bilinmeyen AI sağlayıcısı.'); const model=String(providerModel(id)||'').trim(); if(!model)throw new Error(p.name+' için model kimliği seçilmemiş. Ücretsiz olduğu doğrulanmış bir model kimliği gir.'); if(id==='openrouter'&&!isFreeOpenRouterModel(model))throw new Error('OpenRouter için yalnızca openrouter/free veya :free ile biten ücretsiz model kimlikleri kullanılabilir.'); const key=await getSecret(id); if(!key)throw new Error(p.name+' için API anahtarı ayarlanmamış. Modeller ekranından ekle.');
   const msgs=history.slice(-8).filter(m=>m.role==='user'||m.role==='assistant').map(m=>({role:m.role,content:m.content})); msgs.push({role:'user',content:prompt});
   if(p.kind==='anthropic'){
-    const d=await fetchJson(p.endpoint,{method:'POST',headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:providerModel(id),max_tokens:2048,system:systemPrompt,messages:msgs.filter(m=>m.role==='user'||m.role==='assistant')})});
+    const d=await fetchJson(p.endpoint,{method:'POST',headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model,max_tokens:2048,system:systemPrompt,messages:msgs.filter(m=>m.role==='user'||m.role==='assistant')})});
     const text=(d.content||[]).filter(x=>x.type==='text').map(x=>x.text).join('\n');if(!text)throw new Error('Claude yanıtında metin bulunamadı.');return text;
   }
   if(p.kind==='gemini'){
     const contents=msgs.map(m=>({role:m.role==='assistant'?'model':'user',parts:[{text:m.content}]}));
-    const url=p.endpoint+encodeURIComponent(providerModel(id))+':generateContent?key='+encodeURIComponent(key);
+    const url=p.endpoint+encodeURIComponent(model)+':generateContent?key='+encodeURIComponent(key);
     const d=await fetchJson(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({systemInstruction:{parts:[{text:systemPrompt}]},contents,generationConfig:{temperature:0.4,maxOutputTokens:2048}})});
     const text=(d.candidates?.[0]?.content?.parts||[]).map(x=>x.text||'').join('\n');if(!text)throw new Error(d.promptFeedback?.blockReason||'Gemini yanıtında metin bulunamadı.');return text;
   }
-  const openAiBody={model:providerModel(id),messages:[{role:'system',content:systemPrompt},...msgs]};
+  const openAiBody={model,messages:[{role:'system',content:systemPrompt},...msgs]};
   if(id==='openai'){openAiBody.max_completion_tokens=2048;}
   else {openAiBody.temperature=0.4;openAiBody.max_tokens=2048;}
   const endpoint=id==='custom'?normalizeOpenAiEndpoint(settings.customEndpoint):p.endpoint;
@@ -1427,6 +1431,10 @@ async function importWorkspace(file){
     if(data?.format!=='ai-studio-workspace-v1')throw new Error('Bu dosya tam AI Studio yedeği değil.');
     const nextSettings={...clone(defaultSettings),...(data.settings&&typeof data.settings==='object'?data.settings:{})};
     nextSettings.models={...clone(defaultSettings.models),...(nextSettings.models&&typeof nextSettings.models==='object'&&!Array.isArray(nextSettings.models)?nextSettings.models:{})};
+    for(const [id,paidDefault] of Object.entries({openai:'gpt-5-mini',anthropic:'claude-sonnet-5',deepseek:'deepseek-chat',groq:'llama-3.3-70b-versatile',huggingface:'openai/gpt-oss-120b:fastest'})){if(nextSettings.models[id]===paidDefault)nextSettings.models[id]='';}
+    if(nextSettings.models.openrouter==='openai/gpt-5-mini')nextSettings.models.openrouter='openrouter/free';
+    for(const [id,paidDefault] of Object.entries({openai:'gpt-5-mini',anthropic:'claude-sonnet-5',deepseek:'deepseek-chat',groq:'llama-3.3-70b-versatile',huggingface:'openai/gpt-oss-120b:fastest'})){if(nextSettings.models[id]===paidDefault)nextSettings.models[id]='';}
+    if(nextSettings.models.openrouter==='openai/gpt-5-mini')nextSettings.models.openrouter='openrouter/free';
     nextSettings.team=normalizeTeamSelection(Array.isArray(nextSettings.team)?nextSettings.team:defaultSettings.team,Object.keys(providers));
     nextSettings.customEndpoint=typeof nextSettings.customEndpoint==='string'?nextSettings.customEndpoint.slice(0,500):'';
     if(nextSettings.customEndpoint){try{nextSettings.customEndpoint=normalizeOpenAiEndpoint(nextSettings.customEndpoint);}catch(_){nextSettings.customEndpoint='';}}
@@ -1635,7 +1643,9 @@ async function prepareBrowserFeatures(){
   }catch(_){}
 }
 async function init(){
-  try{settings={...clone(defaultSettings),...(await getPref(DB.settings,{}))};settings.models={...clone(defaultSettings.models),...(settings.models||{})};const savedTeam=Array.isArray(settings.team)?settings.team:null;settings.team=normalizeTeamSelection(settings.team||defaultSettings.team,Object.keys(providers));if(savedTeam&&settings.team.includes('openai')&&settings.team.includes('anthropic')&&settings.team.includes('gemini')&&settings.team.includes('deepseek')&&settings.team.includes('groq')&&settings.team.includes('openrouter')&&settings.team.includes('huggingface')&&settings.team.includes('custom')&&settings.team.includes('ollama')&&!settings.team.includes('device'))settings.team.push('device');settings.customEndpoint=typeof settings.customEndpoint==='string'?settings.customEndpoint.slice(0,500):'';if(settings.customEndpoint){try{settings.customEndpoint=normalizeOpenAiEndpoint(settings.customEndpoint);}catch(_){settings.customEndpoint='';}}settings.vaultBaseUrl=typeof settings.vaultBaseUrl==='string'?settings.vaultBaseUrl.slice(0,500):'';settings.localCoderEngine=['device','api'].includes(settings.localCoderEngine)?settings.localCoderEngine:'ollama';settings.localCoderApiProvider=providers[settings.localCoderApiProvider]&&settings.localCoderApiProvider!=='ollama'?settings.localCoderApiProvider:'openai';if(settings.ollamaUrl==='http://192.168.1.100:11434')settings.ollamaUrl='';}catch(_){}
+  try{settings={...clone(defaultSettings),...(await getPref(DB.settings,{}))};settings.models={...clone(defaultSettings.models),...(settings.models||{})};
+    for(const [id,paidDefault] of Object.entries({openai:'gpt-5-mini',anthropic:'claude-sonnet-5',deepseek:'deepseek-chat',groq:'llama-3.3-70b-versatile',huggingface:'openai/gpt-oss-120b:fastest'})){if(settings.models[id]===paidDefault)settings.models[id]='';}
+    if(settings.models.openrouter==='openai/gpt-5-mini')settings.models.openrouter='openrouter/free';const savedTeam=Array.isArray(settings.team)?settings.team:null;settings.team=normalizeTeamSelection(settings.team||defaultSettings.team,Object.keys(providers));if(savedTeam&&settings.team.includes('openai')&&settings.team.includes('anthropic')&&settings.team.includes('gemini')&&settings.team.includes('deepseek')&&settings.team.includes('groq')&&settings.team.includes('openrouter')&&settings.team.includes('huggingface')&&settings.team.includes('custom')&&settings.team.includes('ollama')&&!settings.team.includes('device'))settings.team.push('device');settings.customEndpoint=typeof settings.customEndpoint==='string'?settings.customEndpoint.slice(0,500):'';if(settings.customEndpoint){try{settings.customEndpoint=normalizeOpenAiEndpoint(settings.customEndpoint);}catch(_){settings.customEndpoint='';}}settings.vaultBaseUrl=typeof settings.vaultBaseUrl==='string'?settings.vaultBaseUrl.slice(0,500):'';settings.localCoderEngine=['device','api'].includes(settings.localCoderEngine)?settings.localCoderEngine:'ollama';settings.localCoderApiProvider=providers[settings.localCoderApiProvider]&&settings.localCoderApiProvider!=='ollama'?settings.localCoderApiProvider:'openai';if(settings.ollamaUrl==='http://192.168.1.100:11434')settings.ollamaUrl='';}catch(_){}
   if(!nativeApp){showToast('Tarayıcıda API anahtarları yalnızca açık oturumda tutulur.');}
   await initKeys();await initOpenShortsKey(); projectList=await getPref(DB.projects,[]);activeProjectId=await getPref(DB.activeProject,'');chatHistory=await getPref(DB.chat,[]);userPlugins=await getPref(DB.plugins,[]);const storedSkills=await getPref(DB.skills,{});customSkills=(Array.isArray(storedSkills?.customSkills)?storedSkills.customSkills:[]).map(skill=>normalizeSkill(skill)).filter(Boolean).slice(-100);skillLibrary=[...SKILL_CATALOG,...customSkills];skillProfileId=storedSkills?.profileId==='custom'?'custom':(SKILL_PROFILES[storedSkills?.profileId]?storedSkills.profileId:'karpathy');const validSkillIds=new Set(skillLibrary.map(skill=>skill.id));selectedSkillIds=(Array.isArray(storedSkills?.selectedSkillIds)?storedSkills.selectedSkillIds:[]).filter(id=>validSkillIds.has(id)).slice(0,MAX_SELECTED_SKILLS);if(!selectedSkillIds.length)selectedSkillIds=getProfileSkillIds(skillProfileId);reusableSnippets=await getPref(DB.snippets,[]);agentActivity=await getPref(DB.activity,[]);codeFiles=normalizeCodeFileList(await getPref(DB.codeFiles,[]),true);if(!codeFiles.length)codeFiles=[makeCodeFile()];activeCodeFileId=codeFiles[0].id;await setPref(DB.codeFiles,codeFiles);
   if(!Array.isArray(projectList))projectList=[];if(!projectList.some(p=>p&&p.id===activeProjectId))activeProjectId=projectList[0]?.id||'';await setPref(DB.activeProject,activeProjectId);if(!Array.isArray(chatHistory))chatHistory=[];if(!Array.isArray(userPlugins))userPlugins=[];if(!Array.isArray(reusableSnippets))reusableSnippets=[];if(!Array.isArray(agentActivity))agentActivity=[];

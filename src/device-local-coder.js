@@ -23,15 +23,14 @@ export const DEVICE_MODEL_CATALOG = Object.freeze([
     contextSize: 2048, summary: 'Daha güçlü kodlama seçeneği. 8–11 GB RAM sınıfında değerlendir.'
   },
   {
-    id: 'qwen25-coder-3', name: 'Qwen2.5-Coder 3B · Q4_K_M',
-    licenseName: 'Qwen Research License',
-    licenseNotice: 'Yalnızca ticari olmayan araştırma/değerlendirme için; ticari kullanım için ayrı lisans gerekir.',
-    licenseUrl: 'https://huggingface.co/Qwen/Qwen2.5-Coder-3B-Instruct-GGUF/blob/main/LICENSE',
-    fileName: 'qwen2.5-coder-3b-instruct-q4_k_m.gguf',
-    sha256: '724fb256bec1ff062b2f65e4569e871ad2e95ab2a3989723d1769c54294730b7',
-    url: 'https://huggingface.co/Qwen/Qwen2.5-Coder-3B-Instruct-GGUF/resolve/main/qwen2.5-coder-3b-instruct-q4_k_m.gguf',
-    sizeBytes: 2100 * 1024 ** 2, minRamGb: 12, minCpuCores: 8, requiredFreeRamBytes: 3800 * 1024 ** 2,
-    contextSize: 2048, summary: 'Büyük model. 12 GB ve üzeri RAM sınıfında; boş bellek yine de önemlidir.'
+    id: 'qwen25-chat-05', name: 'Qwen2.5 Instruct 0.5B · Q2_K · Sohbet',
+    licenseName: 'Apache-2.0',
+    licenseUrl: 'https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/blob/main/LICENSE',
+    fileName: 'qwen2.5-0.5b-instruct-q2_k.gguf',
+    sha256: '9ee36184e616dfc76df4f5dd66f908dbde6979524ae36e6cefb67f532f798cb8',
+    url: 'https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q2_k.gguf',
+    sizeBytes: 415 * 1024 ** 2, minRamGb: 4, minCpuCores: 4, requiredFreeRamBytes: 1300 * 1024 ** 2,
+    contextSize: 2048, recommendByDefault: false, summary: 'Küçük genel sohbet modeli. Yaklaşık 415 MB; küçük görevler için uygundur.'
   }
 ]);
 
@@ -84,13 +83,13 @@ export function chooseRecommendedDeviceModel(deviceInfo = {}) {
   const freeStorage = Number(deviceInfo.freeStorageBytes || 0);
   const cores = Number(deviceInfo.processorCount || 0);
   const assessments = DEVICE_MODEL_CATALOG.map(model => ({ model, assessment: assessDeviceModel(model, deviceInfo) }));
-  const suitable = assessments.filter(item => item.assessment.fitsRecommended);
-  const selected = suitable.length ? suitable[suitable.length - 1] : assessments[0];
+  const recommendable = assessments.filter(item => item.model.recommendByDefault !== false);
+  const suitable = recommendable.filter(item => item.assessment.fitsRecommended);
+  const selected = suitable.length ? suitable[suitable.length - 1] : recommendable[0];
   const model = selected.model;
   const assessment = selected.assessment;
   const isUnderpowered = suitable.length === 0;
   const tier = isUnderpowered ? 'Sınırlı / veri eksik'
-    : model.id === 'qwen25-coder-3' ? 'Yüksek'
     : model.id === 'qwen25-coder-15' ? 'Orta'
     : 'Başlangıç';
   let recommendationReason = 'RAM, CPU çekirdeği ve boş depolama eşiklerine göre yapılan yaklaşık donanım tahmini; gerçek hız testi değildir.';

@@ -7,6 +7,16 @@ const indexMarkup = await readFile(new URL('../index.html', import.meta.url), 'u
 const mainSource = await readFile(new URL('../src/main.js', import.meta.url), 'utf8');
 const deviceLocalCoderSource = await readFile(new URL('../src/device-local-coder.js', import.meta.url), 'utf8');
 const nativeSource = await readFile(new URL('../android-local-runtime/LocalLlmPlugin.kt', import.meta.url), 'utf8');
+const providerDefaultsStart = mainSource.indexOf('const providers = {');
+const providerDefaultsEnd = mainSource.indexOf('const defaultSettings', providerDefaultsStart);
+const providerDefaults = mainSource.slice(providerDefaultsStart, providerDefaultsEnd);
+assert.match(providerDefaults,/gemini: \{[^\n]*model:'gemini-3\.8-flash'/);
+assert.match(providerDefaults,/openrouter: \{[^\n]*model:'openrouter\/free'/);
+for (const paidDefault of ['gpt-5-mini','claude-sonnet-5','deepseek-chat','llama-3.3-70b-versatile','openai/gpt-oss-120b:fastest']) {
+  assert.ok(!providerDefaults.includes("model:'"+paidDefault+"'"), 'paid model must not be preselected: '+paidDefault);
+}
+assert.match(mainSource,/function isFreeOpenRouterModel\(model\)/);
+assert.match(mainSource,/settings\.models\[id\]===paidDefault/);
 for (const markup of [devicePanelMarkup,indexMarkup]) {
   assert.match(markup, /id="onDeviceModelLicense"/);
   assert.match(markup, /id="cancelOnDeviceDownload"/);
@@ -32,8 +42,8 @@ assert.ok(
 );
 
 assert.equal(DEVICE_MODEL_CATALOG.length, 3);
-assert.deepEqual(DEVICE_MODEL_CATALOG.map(model => model.sha256), ["1d9614638d18024d0fbb36575a15f1302a3adf044df10345688ec4f6e1c4ff32","cc324af070c2ecbfd324a30884d2f951a7ff756aba85cb811a6ec436933bb046","724fb256bec1ff062b2f65e4569e871ad2e95ab2a3989723d1769c54294730b7"],
-  'all official Qwen2.5-Coder catalogue files must have pinned SHA-256 digests');
+assert.deepEqual(DEVICE_MODEL_CATALOG.map(model => model.sha256), ["1d9614638d18024d0fbb36575a15f1302a3adf044df10345688ec4f6e1c4ff32","cc324af070c2ecbfd324a30884d2f951a7ff756aba85cb811a6ec436933bb046","9ee36184e616dfc76df4f5dd66f908dbde6979524ae36e6cefb67f532f798cb8"],
+  'all downloadable catalogue files must have pinned SHA-256 digests');
 assert.ok(DEVICE_MODEL_CATALOG.every(model => /^[a-f0-9]{64}$/.test(model.sha256)),
   'each downloadable catalogue model must have a valid SHA-256 digest');
 assert.equal(normalizeModelSha256(DEVICE_MODEL_CATALOG[0].sha256.toUpperCase()), DEVICE_MODEL_CATALOG[0].sha256);
@@ -105,7 +115,7 @@ assert.ok(nativeCatalogStart >= 0, 'native download bridge must keep its own all
 for (const [fileName, url, sha256] of [
   ['qwen2.5-coder-0.5b-instruct-q4_k_m.gguf', 'https://huggingface.co/Qwen/Qwen2.5-Coder-0.5B-Instruct-GGUF/resolve/main/qwen2.5-coder-0.5b-instruct-q4_k_m.gguf', '1d9614638d18024d0fbb36575a15f1302a3adf044df10345688ec4f6e1c4ff32'],
   ['qwen2.5-coder-1.5b-instruct-q4_k_m.gguf', 'https://huggingface.co/Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF/resolve/main/qwen2.5-coder-1.5b-instruct-q4_k_m.gguf', 'cc324af070c2ecbfd324a30884d2f951a7ff756aba85cb811a6ec436933bb046'],
-  ['qwen2.5-coder-3b-instruct-q4_k_m.gguf', 'https://huggingface.co/Qwen/Qwen2.5-Coder-3B-Instruct-GGUF/resolve/main/qwen2.5-coder-3b-instruct-q4_k_m.gguf', '724fb256bec1ff062b2f65e4569e871ad2e95ab2a3989723d1769c54294730b7']
+  ['qwen2.5-0.5b-instruct-q2_k.gguf', 'https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q2_k.gguf', '9ee36184e616dfc76df4f5dd66f908dbde6979524ae36e6cefb67f532f798cb8']
 ]) {
   assert.ok(nativeSource.includes(fileName), `native catalogue must include ${fileName}`);
   assert.ok(nativeSource.includes(url), `native catalogue must pin the URL for ${fileName}`);
@@ -147,11 +157,13 @@ assert.ok(DEVICE_MODEL_CATALOG.every(model => model.url.startsWith('https://hugg
 assert.ok(DEVICE_MODEL_CATALOG.every(model => model.licenseUrl.startsWith('https://huggingface.co/')));
 assert.equal(DEVICE_MODEL_CATALOG[0].licenseName,'Apache-2.0');
 assert.equal(DEVICE_MODEL_CATALOG[1].licenseName,'Apache-2.0');
-assert.equal(DEVICE_MODEL_CATALOG[2].licenseName,'Qwen Research License');
-assert.match(DEVICE_MODEL_CATALOG[2].licenseNotice,/ticari olmayan/i);
+assert.equal(DEVICE_MODEL_CATALOG[2].licenseName,'Apache-2.0');
+assert.ok(DEVICE_MODEL_CATALOG.every(model => model.licenseName === 'Apache-2.0'),
+  'the downloadable GGUF catalogue must contain only Apache-2.0 models');
+assert.equal(DEVICE_MODEL_CATALOG[2].recommendByDefault,false);
 assert.equal(chooseRecommendedDeviceModel({supported:true,totalMemoryBytes:4*1024**3,availableMemoryBytes:2*1024**3,freeStorageBytes:2*1024**3,processorCount:4}).id,'qwen25-coder-05');
 assert.equal(chooseRecommendedDeviceModel({supported:true,totalMemoryBytes:8*1024**3,availableMemoryBytes:3*1024**3,freeStorageBytes:3*1024**3,processorCount:6}).id,'qwen25-coder-15');
-assert.equal(chooseRecommendedDeviceModel({supported:true,totalMemoryBytes:12*1024**3,availableMemoryBytes:4*1024**3,freeStorageBytes:4*1024**3,processorCount:8}).id,'qwen25-coder-3');
+assert.equal(chooseRecommendedDeviceModel({supported:true,totalMemoryBytes:12*1024**3,availableMemoryBytes:4*1024**3,freeStorageBytes:4*1024**3,processorCount:8}).id,'qwen25-coder-15');
 assert.equal(chooseRecommendedDeviceModel({supported:true,totalMemoryBytes:12*1024**3,availableMemoryBytes:4*1024**3,freeStorageBytes:4*1024**3,processorCount:4}).id,'qwen25-coder-05');
 const tooSmall=chooseRecommendedDeviceModel({supported:true,totalMemoryBytes:3*1024**3,availableMemoryBytes:2*1024**3,freeStorageBytes:2*1024**3,processorCount:8});
 assert.equal(tooSmall.isUnderpowered,true);
