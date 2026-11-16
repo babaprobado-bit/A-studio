@@ -70,6 +70,7 @@ jobs:
       - name: Run existing and new regression checks
         run: |
           npm run test:workshop
+          npm run test:chat-layout
           npm run test:site
           npm run test:skills
           npm run test:api-local-coder
