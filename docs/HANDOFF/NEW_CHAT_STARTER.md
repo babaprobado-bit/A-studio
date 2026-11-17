@@ -1,6 +1,6 @@
-# AI Studio — Session 15 continuation starter
+# AI Studio — Session 16 continuation starter
 
-Read `docs/HANDOFF/README.md`, `docs/HANDOFF/PROJECT_STATE.md`, and `docs/HANDOFF/SESSION_15_FULL_AUTOMATION_2026-11-17.md`. Full Social Media Studio automation chains free/local script generation, Runway Multi-Shot, foreground task polling, separately approved OpenShorts clipping/captions, and automatic result polling. Public publishing remains separately confirmed. Keep PR #2 open/Draft/unmerged and never touch main. Paid Runway access and billing must be parent/guardian-managed. No real provider calls, credits, physical-device tests or posts have been used.
+Read docs/HANDOFF/README.md, docs/HANDOFF/PROJECT_STATE.md, and docs/HANDOFF/SESSION_16_CREATOR_STUDIO_2026-11-17.md. The visible Social Media Studio UI has been replaced by three independent Creator modes: What If, In My Town and Clips. The standard AI chat is the default app screen. What If and In My Town script/video generation must not be combined with each other or automatically routed into Clips. Clips remains a separate authorized-source/OpenShorts workflow. The old publishing UI is hidden. Verify current branch/PR/CI before continuing; keep PR #2 open/Draft/unmerged and never touch main. Any paid Runway account and billing must be parent/guardian-managed. No real provider calls, credits, device tests or public posts are claimed.
 
 ---
 

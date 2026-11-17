@@ -1,3 +1,14 @@
+## Session 16 latest source checkpoint — 2026-11-17
+
+- The visible Social Media Studio screen is replaced by **Creator Studio** with independent What If, In My Town and Clips modes.
+- What If uses the What if [thing] doubled [interval]? format; In My Town is a separate fictional-town story format. Prompts and video-generation instructions explicitly prevent the formats from merging.
+- Clips uses the existing OpenShorts source-video workflow with rights and quota checks. What If / In My Town video automation ends after video generation; it does not automatically transition into Clips.
+- The normal AI chat is now the initial screen and first navigation tab. Existing chat/AI Team/provider logic remains in place.
+- Node syntax, Creator mode/queue and chat-layout tests passed in the remote workspace. GitHub CI and APK artifacts still need verification for the new commit. No device test, live API call, credit use or public post is claimed.
+- Details: [Session 16 Creator Studio handoff](SESSION_16_CREATOR_STUDIO_2026-11-17.md). Keep PR #2 Draft/unmerged; never alter main.
+
+---
+
 ## Session 15 latest source checkpoint — 2026-11-17
 
 - Social Studio full pipeline: free/local AI script → Runway Multi-Shot (3–5 shots) → automatic foreground Runway polling → separate rights/quota approval → OpenShorts clips/captions → automatic job/clip polling → review queue.

@@ -1,10 +1,11 @@
 import { Preferences } from '@capacitor/preferences';
 import { validateOpenShortsSourceUrl } from './openshorts-mcp.js';
 import {
-  SOCIAL_PLATFORMS, buildSocialPrompt, normalizeSocialDraft,
+  SOCIAL_PLATFORMS, normalizeSocialDraft,
   normalizeSocialQueue, normalizeSocialClips, buildSocialPublishArgs
 } from './social-studio-core.js';
 import { buildSocialMultiShotPrompt, isSocialAutomationPolling, getSocialAutomationPollDelay } from './social-studio-automation.js';
+import { buildCreatorPrompt, normalizeCreatorMode } from './creator-studio-core.js';
 import { estimateRunwayVideoCost, createRunwayVideo, getRunwayVideoTask, estimateRunwayMultiShotCost, createRunwayMultiShotVideo } from './runway-video.js';
 import './social-studio.css';
 
@@ -30,28 +31,47 @@ export async function mountSocialStudio({ generateText, openShorts, videoKeyStor
   navButton.type = 'button';
   navButton.className = 'nav-btn';
   navButton.dataset.tab = 'social';
-  navButton.innerHTML = '<span aria-hidden="true">◈</span>Sosyal';
-  const toolsTab = nav.querySelector('[data-tab="tools"]');
-  nav.insertBefore(navButton, toolsTab || null);
+  navButton.innerHTML = '<span aria-hidden="true">✦</span>Creator';
+  const compareTab = nav.querySelector('[data-tab="compare"]');
+  nav.insertBefore(navButton, compareTab || null);
 
   const homeGrid = document.querySelector('#home .quick-grid');
   if (homeGrid && !homeGrid.querySelector('[data-go="social"]')) {
     const card = document.createElement('button');
     card.type = 'button'; card.className = 'quick-card'; card.dataset.go = 'social';
-    card.innerHTML = '<span class="quick-icon">◈</span><strong>Social Media Studio</strong><small>AI senaryo, Shorts, kuyruk ve zamanlama</small>';
+    card.innerHTML = '<span class="quick-icon">✦</span><strong>Creator Studio</strong><small>What If, In My Town ve Clips</small>'; 
     homeGrid.append(card);
   }
 
   const screen = document.createElement('section');
   screen.className = 'screen social-screen'; screen.id = 'social';
   screen.innerHTML = `
-    <div class="page-title social-title"><div class="eyebrow">AI CONTENT WORKFLOW</div><h1>Social Media Studio</h1><p>Fikirden senaryoya, dikey videodan yayın kuyruğuna tek akış. İçeriği önce sen kontrol edersin.</p></div>
-    <div class="social-flow-strip" aria-label="İçerik üretim aşamaları"><span>1 · Fikir</span><i>›</i><span>2 · AI senaryo</span><i>›</i><span>3 · Sıfırdan AI video</span><i>›</i><span>4 · Klip / altyazı</span><i>›</i><span>5 · Onay / yayın</span></div>
-    <div class="social-top-grid">
+    <div class="page-title social-title"><div class="eyebrow">AI STUDIO · CREATOR</div><h1>Creator Studio</h1><p>Üç ayrı üretim alanı. Her format kendi senaryo akışında çalışır.</p></div>
+    <div class="creator-mode-tabs" role="tablist" aria-label="İçerik türü">
+      <button type="button" class="creator-mode-tab active" data-creator-mode="what_if" role="tab" aria-selected="true">✦ What If</button>
+      <button type="button" class="creator-mode-tab" data-creator-mode="in_my_town" role="tab" aria-selected="false">⌂ In My Town</button>
+      <button type="button" class="creator-mode-tab" data-creator-mode="clips" role="tab" aria-selected="false">▣ Clips</button>
+    </div>
+    <p class="creator-mode-description" id="creatorModeDescription">What If: seçtiğin şey belirlediğin aralıklarla iki katına çıkar.</p>
+    <div class="social-flow-strip" aria-label="Üretim aşamaları"><span>1 · Fikir</span><i>›</i><span>2 · AI senaryo</span><i>›</i><span>3 · Çok sahneli video</span></div>
+    <div class="social-top-grid" data-creator-story>
       <section class="panel social-panel">
-        <div class="section-head"><div><div class="eyebrow">01 / CONTENT BRIEF</div><h2>Video fikri</h2></div><span class="pill">AI destekli</span></div>
-        <label class="field-label" for="socialTopic">Konu / ürün / hikâye</label>
-        <textarea class="input" id="socialTopic" rows="3" maxlength="1200" placeholder="Örn. Bir oyunun geliştirme sürecinde yapılan komik hatalar..."></textarea>
+        <div class="section-head"><div><div class="eyebrow">01 / VIDEO BRIEF</div><h2 id="creatorBriefTitle">What If senaryosu</h2></div><span class="pill">AI destekli</span></div>
+        <div id="creatorWhatIfFields">
+          <label class="field-label" for="creatorWhatIfThing">Neyin iki katına çıkmasını istiyorsun?</label>
+          <input class="input" id="creatorWhatIfThing" maxlength="100" value="money" placeholder="money, gravity, population...">
+          <label class="field-label" for="creatorWhatIfInterval">Hangi aralıkla iki katına çıksın?</label>
+          <select class="input" id="creatorWhatIfInterval"><option value="every second">Every second</option><option value="every minute">Every minute</option><option value="every 10 minutes">Every 10 minutes</option><option value="every hour" selected>Every hour</option><option value="every day">Every day</option><option value="every week">Every week</option></select>
+          <p class="fineprint">Örnek: What if money doubled every hour?</p>
+        </div>
+        <div id="creatorTownFields" hidden>
+          <label class="field-label" for="creatorTownName">Kasaba adı (kurgusal)</label>
+          <input class="input" id="creatorTownName" maxlength="80" value="My Town" placeholder="My Town">
+          <label class="field-label" for="creatorTownEvent">In My Town videosunda ne oluyor?</label>
+          <textarea class="input" id="creatorTownEvent" rows="3" maxlength="400" placeholder="Bir olay yaz veya boş bırak, AI özgün bir kasaba fikri bulsun."></textarea>
+          <p class="fineprint">Bu, What If formatından ayrıdır. İki katına çıkma kuralı kullanılmaz.</p>
+        </div>
+        <textarea class="input" id="socialTopic" rows="1" maxlength="1200" hidden></textarea>
         <div class="social-two-col">
           <div><label class="field-label" for="socialAudience">Hedef izleyici</label><input class="input" id="socialAudience" maxlength="180" placeholder="Örn. oyun meraklıları"></div>
           <div><label class="field-label" for="socialTone">Anlatım tarzı</label><select class="input" id="socialTone"><option value="energetic">Enerjik</option><option value="storytelling">Hikâye anlatımı</option><option value="educational">Eğitici</option><option value="funny">Mizahi</option><option value="calm">Sakin ve açıklayıcı</option></select></div>
@@ -60,8 +80,8 @@ export async function mountSocialStudio({ generateText, openShorts, videoKeyStor
           <div><label class="field-label" for="socialDuration">Video süresi</label><select class="input" id="socialDuration"><option value="20">20 saniye</option><option value="30" selected>30 saniye</option><option value="45">45 saniye</option><option value="60">60 saniye</option><option value="90">90 saniye</option></select></div>
           <div><label class="field-label" for="socialLanguage">Dil</label><select class="input" id="socialLanguage"><option value="Turkish">Türkçe</option><option value="English">İngilizce</option><option value="Turkish and English">Türkçe + İngilizce</option></select></div>
         </div>
-        <div class="field-label">Hedef platformlar</div>
-        <div class="social-platforms" id="socialBriefPlatforms">${SOCIAL_PLATFORMS.map((platform) => `<label class="social-check"><input type="checkbox" data-social-brief-platform="${platform.id}" checked><span>${platform.label}</span></label>`).join('')}</div>
+        <div hidden><div class="field-label">Hedef platformlar</div>
+        <div class="social-platforms" id="socialBriefPlatforms">${SOCIAL_PLATFORMS.map((platform) => `<label class="social-check"><input type="checkbox" data-social-brief-platform="${platform.id}" checked><span>${platform.label}</span></label>`).join('')}</div></div>
         <div class="row-actions"><span id="socialAiMode" class="fineprint">AI sağlayıcısı kontrol ediliyor…</span><span class="grow"></span><button type="button" id="socialGenerate" class="btn primary">AI senaryosu üret ✦</button></div>
         <p class="fineprint">Demo modu açıksa gerçek AI isteği gönderilmez. Üretim, AI Studio'da seçili Gemini/Groq/OpenRouter ücretsiz modeli veya cihazdaki/Ollama yerel modeliyle yapılır.</p>
         <div class="social-automation-launch">
@@ -70,7 +90,7 @@ export async function mountSocialStudio({ generateText, openShorts, videoKeyStor
             <div><label class="field-label" for="socialAutomationRatio">Tam otomasyon kadrajı</label><select class="input" id="socialAutomationRatio"><option value="720:1280" selected>Dikey 9:16</option><option value="1280:720">Yatay 16:9</option><option value="960:960">Kare 1:1</option></select></div>
           </div>
           <button type="button" id="socialRunAutomation" class="btn primary">Tam otomasyonu başlat ⚡</button>
-          <p id="socialAutomationStatus" class="fineprint" role="status" aria-live="polite">Tek akış: ücretsiz/yerel AI senaryosu → çok sahneli video → onaylı klip/altyazı işleme → inceleme kuyruğu. Yayın otomatik yapılmaz.</p>
+          <p id="socialAutomationStatus" class="fineprint" role="status" aria-live="polite">Tek akış: ücretsiz/yerel AI senaryosu → çok sahneli AI video. Clips ayrı bir modüldür; burada otomatik başlatılmaz.</p>
         </div>
       </section>
       <section class="panel social-panel">
@@ -85,12 +105,12 @@ export async function mountSocialStudio({ generateText, openShorts, videoKeyStor
         <div class="row-actions"><button type="button" id="socialSaveDraft" class="btn secondary">Taslağı kaydet</button><button type="button" id="socialNewDraft" class="btn ghost small">Yeni taslak</button><span class="grow"></span><span class="fineprint">Her alan düzenlenebilir.</span></div>
       </section>
     </div>
-    <section class="panel social-panel social-ai-video-panel" id="socialAIVideoPanel">
+    <section class="panel social-panel social-ai-video-panel" id="socialAIVideoPanel" data-creator-story>
       <div class="section-head"><div><div class="eyebrow">03 / TEXT-TO-VIDEO · IMAGE-TO-VIDEO</div><h2>Sıfırdan AI video üret</h2></div><span class="pill" id="socialRunwayBadge">AI motoru kontrol ediliyor</span></div>
       <p class="muted">Bir sahne tarif et; AI yeni bir video oluştursun. İstersen ilk kare olarak bir görsel de ver. Bu, mevcut videodan klip kesme işleminden ayrıdır.</p>
       <label class="field-label" for="socialRunwayKey">Runway Dev API anahtarı · yalnızca ebeveyn/vasinin yönettiği hesap</label>
       <div class="social-key-row"><input class="input" id="socialRunwayKey" type="password" maxlength="500" autocomplete="new-password" placeholder="Anahtar uygulamada gizli saklanır"><button type="button" id="socialRunwaySaveKey" class="btn secondary small">Güvenli kaydet</button><button type="button" id="socialRunwayDeleteKey" class="btn ghost small danger-text">Anahtarı sil</button></div>
-      <p class="fineprint">Anahtar sohbet geçmişine veya sosyal medya kuyruğuna yazılmaz. Android'de Secure Storage kullanılır; web önizlemesinde yalnızca açık oturum belleğinde tutulur. Üretim krediyle ücretlendirilir; Runway Dev hesabında önceden var olan promosyon kredisi yoksa ücret doğar.</p>
+      <p class="fineprint">Anahtar sohbet geçmişine veya Creator taslaklarına yazılmaz. Android'de Secure Storage kullanılır; web önizlemesinde yalnızca açık oturum belleğinde tutulur. Üretim krediyle ücretlendirilir; Runway Dev hesabında önceden var olan promosyon kredisi yoksa ücret doğar.</p>
       <label class="field-label" for="socialAIVideoPrompt">Videoda görmek istediğin sahne</label>
       <textarea class="input" id="socialAIVideoPrompt" rows="4" maxlength="1000" placeholder="Örn. Yağmurlu neon bir şehirde yürüyen sevimli robot, sinematik takip kamerası, gerçekçi ışıklar..."></textarea>
       <div class="social-two-col">
@@ -102,17 +122,17 @@ export async function mountSocialStudio({ generateText, openShorts, videoKeyStor
       <div class="row-actions"><button type="button" id="socialAIVideoGenerate" class="btn primary" disabled>AI ile videoyu oluştur ✦</button><button type="button" id="socialAIVideoCheck" class="btn ghost small" disabled>Üretim durumunu kontrol et</button><span class="grow"></span><span id="socialAIVideoStatus" class="fineprint" role="status">API bağlantısı kontrol ediliyor…</span></div>
       <div id="socialAIVideoResult" class="social-ai-video-result" aria-live="polite"></div>
     </section>
-    <section class="panel social-panel social-video-panel" id="socialVideoProduction">
-      <div class="section-head"><div><div class="eyebrow">04 / VIDEO WORKFLOW</div><h2>Mevcut videodan klip çıkar</h2></div><span class="pill" id="socialOpenShortsBadge">OpenShorts kontrol ediliyor</span></div>
-      <p class="muted">Kendi videonu veya yukarıda ürettiğin AI videoyu gönder. OpenShorts dikey klipler, altyazılar ve paylaşım için içerik hazırlar.</p>
+    <section class="panel social-panel social-video-panel" id="socialVideoProduction" data-creator-clips hidden>
+      <div class="section-head"><div><div class="eyebrow">CLIPS / SOURCE VIDEO</div><h2>Clips</h2></div><span class="pill" id="socialOpenShortsBadge">OpenShorts kontrol ediliyor</span></div>
+      <p class="muted">Sahibi olduğun veya işleme iznin bulunan bir kaynak video bağlantısı ekle. OpenShorts kısa klipleri ve altyazıları hazırlar.</p>
       <label class="field-label" for="socialSourceUrl">Kaynak video HTTPS bağlantısı</label><input class="input" id="socialSourceUrl" type="url" maxlength="2048" placeholder="https://youtu.be/... veya doğrudan .mp4 bağlantısı">
       <label class="openshorts-rights"><input type="checkbox" id="socialRightsConfirm"><span>Bu videonun sahibiyim veya videoyu işleme ve kliplerini yayımlama iznim var.</span></label>
       <div class="social-two-col"><div><label class="field-label" for="socialClipCount">Hedef klip sayısı</label><select class="input" id="socialClipCount"><option value="3" selected>3 klip</option><option value="5">5 klip</option><option value="8">8 klip</option></select></div><div class="social-tool-note"><strong>Otomatik adımlar</strong><span>AI an seçimi · 9:16 kadraj · altyazı · açılış kancası</span></div></div>
-      <div class="row-actions"><button type="button" id="socialAutomationClip" class="btn primary" disabled>Otomatik klip + altyazı adımına devam</button><button type="button" id="socialProcessVideo" class="btn primary">Klipleri üret</button><button type="button" id="socialCheckJob" class="btn ghost small" disabled>İş durumunu kontrol et</button><button type="button" id="socialOpenTools" class="btn ghost small">OpenShorts bağlantı ayarları ↗</button><span class="grow"></span><span id="socialQuota" class="fineprint">Kota henüz kontrol edilmedi.</span></div>
+      <div class="row-actions"><button type="button" id="socialAutomationClip" class="btn primary" disabled>Eski otomasyon klip adımına devam</button><button type="button" id="socialProcessVideo" class="btn primary">Klipleri üret</button><button type="button" id="socialCheckJob" class="btn ghost small" disabled>İş durumunu kontrol et</button><button type="button" id="socialOpenTools" class="btn ghost small">OpenShorts bağlantı ayarları ↗</button><span class="grow"></span><span id="socialQuota" class="fineprint">Kota henüz kontrol edilmedi.</span></div>
       <div class="openshorts-status" id="socialVideoStatus" role="status" aria-live="polite">Önce AI senaryosunu kaydet, sonra kaynak videonu ekle.</div>
       <div id="socialClipResults" class="social-clip-grid" aria-live="polite"></div>
     </section>
-    <section class="panel social-panel" id="socialPublishPanel">
+    <section class="panel social-panel" id="socialPublishPanel" hidden>
       <div class="section-head"><div><div class="eyebrow">05 / REVIEW & PUBLISH</div><h2>Önizle, onayla, zamanla</h2></div><span class="pill">İnsan onayı gerekli</span></div>
       <p class="muted" id="socialPublishSummary">Yayınlamak için önce işlenmiş kliplerden birini seç.</p>
       <div class="field-label">Yayınlanacak platformlar</div>
@@ -125,10 +145,10 @@ export async function mountSocialStudio({ generateText, openShorts, videoKeyStor
       <div class="row-actions"><button type="button" id="socialPublishConfirm" class="btn primary" disabled>Onayla ve yayınla / zamanla</button><span class="grow"></span><span id="socialPublishStatus" class="fineprint" role="status"></span></div>
     </section>
     <section class="panel social-panel">
-      <div class="section-head"><div><div class="eyebrow">06 / CONTENT CALENDAR</div><h2>İçerik kuyruğu</h2></div><span class="pill" id="socialQueueCount">0 taslak</span></div>
+      <div class="section-head"><div><div class="eyebrow">CREATOR LIBRARY</div><h2>Taslaklar ve çıktılar</h2></div><span class="pill" id="socialQueueCount">0 taslak</span></div>
       <div id="socialQueueList" class="social-queue-list"><p class="fineprint">Henüz kayıtlı içerik yok.</p></div>
     </section>
-    <div class="notice compact"><strong>Üretim ve maliyet:</strong> Tam otomasyonda Runway Multi-Shot Video 3–5 çekimli 5/10/15 saniyelik sesli sahneler üretir. 720p fiyatı saniyede 13 kredi: yaklaşık $0.65 / $1.30 / $1.95. Ses parçası, yazdığın seslendirme metninin otomatik okunması anlamına gelmez. Tek sahneli Gen-4.5 aracı ayrıca kullanılabilir ve ayrı ücret tarifesine sahiptir. Her ücretli üretim için ayrı onay gerekir. OpenShorts klip/altyazı işlemi de kota kullanabilir ve ayrıca onay ister. Herkese açık yayınlama otomatik yapılmaz.</div>
+    <div class="notice compact"><strong>Üretim ve maliyet:</strong> What If ve In My Town tam otomasyonunda Runway Multi-Shot Video 3–5 çekimli 5/10/15 saniyelik sesli sahneler üretir. 720p fiyatı saniyede 13 kredi: yaklaşık $0.65 / $1.30 / $1.95. Ses parçası, yazdığın seslendirme metninin otomatik okunması anlamına gelmez. Tek sahneli Gen-4.5 aracı ayrıca kullanılabilir ve ayrı ücret tarifesine sahiptir. Her ücretli üretim için ayrı onay gerekir. OpenShorts klip/altyazı işlemi de kota kullanabilir ve ayrıca onay ister. Herkese açık yayınlama otomatik yapılmaz.</div>
   `;
   const toolsScreen = $('tools');
   main.insertBefore(screen, toolsScreen || null);
@@ -143,6 +163,49 @@ export async function mountSocialStudio({ generateText, openShorts, videoKeyStor
   let automationPolling = false;
   const AUTOMATION_MAX_RUNWAY_POLLS = 90;
   const AUTOMATION_MAX_OPENSHORTS_POLLS = 90;
+  let activeCreatorMode = 'what_if';
+  const creatorModeCopy = {
+    what_if: { title: 'What If senaryosu', description: 'What If: seçtiğin şey belirlediğin aralıklarla iki katına çıkar.' },
+    in_my_town: { title: 'In My Town senaryosu', description: 'In My Town: kurgusal kasabada geçen bağımsız hikâye. What If formatıyla karıştırılmaz.' },
+    clips: { title: 'Clips', description: 'Clips: var olan ve işleme iznin bulunan videodan kısa klipler çıkar.' }
+  };
+  const getCreatorDraftData = () => {
+    const creatorSettings = {
+      whatIfThing: String($('creatorWhatIfThing').value || 'money').trim().slice(0, 100) || 'money',
+      whatIfInterval: $('creatorWhatIfInterval').value || 'every hour',
+      townName: String($('creatorTownName').value || 'My Town').trim().slice(0, 80) || 'My Town',
+      townEvent: String($('creatorTownEvent').value || '').trim().slice(0, 400)
+    };
+    const topic = activeCreatorMode === 'what_if'
+      ? 'What if ' + creatorSettings.whatIfThing + ' doubled ' + creatorSettings.whatIfInterval + '?'
+      : activeCreatorMode === 'in_my_town'
+        ? 'In My Town (' + creatorSettings.townName + '): ' + (creatorSettings.townEvent || 'AI-generated original town scenario')
+        : 'Clips: source video processing';
+    $('socialTopic').value = topic;
+    return { creatorMode: activeCreatorMode, creatorSettings, topic };
+  };
+  const setCreatorMode = (mode) => {
+    activeCreatorMode = normalizeCreatorMode(mode);
+    const copy = creatorModeCopy[activeCreatorMode];
+    document.querySelectorAll('[data-creator-mode]').forEach((button) => {
+      const selected = button.dataset.creatorMode === activeCreatorMode;
+      button.classList.toggle('active', selected);
+      button.setAttribute('aria-selected', String(selected));
+    });
+    $('creatorModeDescription').textContent = copy.description;
+    $('creatorBriefTitle').textContent = copy.title;
+    $('creatorWhatIfFields').hidden = activeCreatorMode !== 'what_if';
+    $('creatorTownFields').hidden = activeCreatorMode !== 'in_my_town';
+    document.querySelectorAll('[data-creator-story]').forEach((panel) => { panel.hidden = activeCreatorMode === 'clips'; });
+    $('socialVideoProduction').hidden = activeCreatorMode !== 'clips';
+    $('socialPublishPanel').hidden = true;
+    $('socialGenerate').hidden = activeCreatorMode === 'clips';
+    $('socialRunAutomation').hidden = activeCreatorMode === 'clips';
+    $('socialGenerate').textContent = activeCreatorMode === 'in_my_town' ? 'In My Town senaryosu üret ✦' : 'What If senaryosu üret ✦';
+    $('socialRunAutomation').textContent = activeCreatorMode === 'in_my_town' ? 'In My Town videosunu oluştur ⚡' : 'What If videosunu oluştur ⚡';
+    if (activeCreatorMode !== 'clips') getCreatorDraftData();
+  };
+  document.querySelectorAll('[data-creator-mode]').forEach((button) => button.addEventListener('click', () => setCreatorMode(button.dataset.creatorMode)));
 
   const activeDraft = () => drafts.find((draft) => draft.id === activeDraftId) || null;
   const setStatus = (message, tone = 'info') => {
@@ -157,13 +220,14 @@ export async function mountSocialStudio({ generateText, openShorts, videoKeyStor
     const activePipelineStages = ['runway_submitting', 'runway_polling', 'openshorts_submitting', 'openshorts_polling'];
     const draft = drafts.find((item) => activePipelineStages.includes(item.pipeline?.stage)) || activeDraft();
     const stage = draft?.pipeline?.stage || '';
+    if (['awaiting_clip_approval', 'openshorts_submitting', 'openshorts_polling'].includes(stage) || (stage === 'review' && Boolean(draft?.jobId))) setCreatorMode('clips');
     const labels = {
       runway_submitting: 'Runway isteği gönderiliyor…',
       runway_polling: 'Çok sahneli AI video otomatik takip ediliyor…',
       awaiting_clip_approval: 'Video hazır. Hak ve kota onayından sonra klip/altyazı işleme başlayabilir.',
       openshorts_submitting: 'OpenShorts iş isteği gönderiliyor…',
       openshorts_polling: 'Klip ve altyazılar otomatik hazırlanıyor…',
-      review: 'Klipler hazır. Önizleme ve son kontrol sende.',
+      review: draft?.jobId ? 'Clips çıktıları hazır. Videoları açıp kontrol et.' : 'AI video hazır. What If / In My Town taslağını gözden geçir.',
       needs_attention: 'Otomasyon güvenli şekilde durdu; işlem sonucu kontrol edilmeli.',
       failed: 'Otomasyon adımı başarısız oldu.',
       cancelled: 'Otomasyon iptal edildi.'
@@ -187,7 +251,7 @@ export async function mountSocialStudio({ generateText, openShorts, videoKeyStor
       await Preferences.set({ key: STORAGE_KEY, value: JSON.stringify({ version: 1, drafts }) });
       return true;
     } catch (error) {
-      notify('Sosyal medya kuyruğu kaydedilemedi: ' + (error.message || 'depolama hatası'));
+      notify('Creator çıktıları kaydedilemedi: ' + (error.message || 'depolama hatası'));
       return false;
     }
   };
@@ -196,7 +260,8 @@ export async function mountSocialStudio({ generateText, openShorts, videoKeyStor
     if (!drafts.length) { $('socialQueueList').innerHTML = '<p class="fineprint">Henüz kayıtlı içerik yok. Önce bir AI senaryosu üret.</p>'; return; }
     $('socialQueueList').innerHTML = drafts.map((draft) => {
       const state = statusNames[draft.status] || draft.status || 'Taslak';
-      const platforms = draft.platforms.map(platformName).join(' · ') || 'Platform seçilmedi';
+      const modeLabels = { what_if: 'What If', in_my_town: 'In My Town', clips: 'Clips' };
+      const formatLabel = modeLabels[draft.creatorMode] || 'What If';
       return `<article class="social-queue-card ${draft.id === activeDraftId ? 'selected' : ''}"><div class="social-queue-card-main"><strong>${escapeHtml(draft.title)}</strong><small>${escapeHtml(platforms)} · ${escapeHtml(state)}</small><p>${escapeHtml(draft.hook || draft.topic || 'Henüz kısa açıklama yok')}</p></div><div class="social-queue-actions"><button type="button" class="btn secondary small" data-social-select="${escapeHtml(draft.id)}">Aç</button><button type="button" class="btn ghost small danger-text" data-social-delete="${escapeHtml(draft.id)}">Sil</button></div></article>`;
     }).join('');
   };
@@ -223,9 +288,18 @@ export async function mountSocialStudio({ generateText, openShorts, videoKeyStor
     let safeUrl = '';
     try { const url = new URL(video.videoUrl); if (url.protocol === 'https:' && /\.mp4(?:$|\?)/i.test(url.href)) safeUrl = url.href; } catch {}
     if (!safeUrl) { out.textContent = 'Runway video bağlantısı geçerli bir HTTPS MP4 bağlantısı değil.'; return; }
-    out.innerHTML = `<article class="social-ai-video-card"><video controls playsinline preload="metadata" src="${escapeHtml(safeUrl)}"></video><div class="social-ai-video-actions"><a class="btn secondary small" href="${escapeHtml(safeUrl)}" target="_blank" rel="noopener noreferrer">Videoyu indir / aç ↗</a><button type="button" class="btn primary small" data-social-use-ai-video>OpenShorts klip ve yayın akışına aktar</button></div><p class="fineprint">Runway video bağlantıları geçicidir (yaklaşık 24–48 saat). Videoyu cihazına indir. Yayın için OpenShorts adımında ayrıca hak onayı ve kota kontrolü gerekir.</p></article>`;
+    out.innerHTML = `<article class="social-ai-video-card"><video controls playsinline preload="metadata" src="${escapeHtml(safeUrl)}"></video><div class="social-ai-video-actions"><a class="btn secondary small" href="${escapeHtml(safeUrl)}" target="_blank" rel="noopener noreferrer">Videoyu indir / aç ↗</a><button type="button" class="btn primary small" data-social-use-ai-video>OpenShorts Clips akışına aktar</button></div><p class="fineprint">Runway video bağlantıları geçicidir (yaklaşık 24–48 saat). Videoyu cihazına indir. Clips adımında ayrıca hak onayı ve kota kontrolü gerekir.</p></article>`;
   };
   const fillEditor = (draft) => {
+    if (draft) {
+      const settings = draft.creatorSettings || {};
+      if (settings.whatIfThing) $('creatorWhatIfThing').value = settings.whatIfThing;
+      if (settings.whatIfInterval) $('creatorWhatIfInterval').value = settings.whatIfInterval;
+      if (settings.townName) $('creatorTownName').value = settings.townName;
+      if (settings.townEvent) $('creatorTownEvent').value = settings.townEvent;
+      setCreatorMode(draft.creatorMode || 'what_if');
+      $('socialTopic').value = draft.topic || $('socialTopic').value;
+    }
     $('socialDraftTitle').value = draft?.title || '';
     $('socialHook').value = draft?.hook || '';
     $('socialVoiceover').value = draft?.voiceover || '';
@@ -252,7 +326,10 @@ export async function mountSocialStudio({ generateText, openShorts, videoKeyStor
       drafts.unshift(draft); activeDraftId = draft.id;
     }
     draft.title = $('socialDraftTitle').value.trim().slice(0, 100) || 'Yeni kısa video';
-    draft.topic = $('socialTopic').value.trim().slice(0, 1200);
+    const creatorData = getCreatorDraftData();
+    draft.topic = creatorData.topic;
+    draft.creatorMode = creatorData.creatorMode;
+    draft.creatorSettings = creatorData.creatorSettings;
     draft.hook = $('socialHook').value.trim().slice(0, 300);
     draft.voiceover = $('socialVoiceover').value.trim().slice(0, 6000);
     draft.scenes = $('socialScenes').value.split(/\n\s*\n/).filter(Boolean).slice(0, 10).map((line, index) => ({ time: `Sahne ${index + 1}`, visual: line.slice(0, 500), narration: '' }));
@@ -269,7 +346,7 @@ export async function mountSocialStudio({ generateText, openShorts, videoKeyStor
     $('socialClipResults').innerHTML = normalized.map((clip) => {
       let link = '';
       try { const url = new URL(clip.videoUrl); if (url.protocol === 'https:') link = `<a class="btn ghost small" href="${escapeHtml(url.toString())}" target="_blank" rel="noopener noreferrer">Videoyu aç ↗</a>`; } catch {}
-      return `<article class="social-clip-card"><span class="social-clip-number">KLİP ${clip.index + 1}</span><strong>${escapeHtml(clip.title)}</strong><small>${clip.duration == null ? 'Süre bilinmiyor' : `${clip.duration} sn`}</small><div class="row-actions">${link}<button type="button" class="btn secondary small" data-social-pick-clip="${clip.index}">Yayın için seç</button></div></article>`;
+      return `<article class="social-clip-card"><span class="social-clip-number">KLİP ${clip.index + 1}</span><strong>${escapeHtml(clip.title)}</strong><small>${clip.duration == null ? 'Süre bilinmiyor' : `${clip.duration} sn`}</small><div class="row-actions">${link}</div></article>`;
     }).join('');
   };
   const openPublisher = (index) => {
@@ -322,7 +399,7 @@ export async function mountSocialStudio({ generateText, openShorts, videoKeyStor
           if (task.status === 'SUCCEEDED' && task.videoUrl) {
             draft.sourceUrl = task.videoUrl;
             draft.status = 'ai_video_ready';
-            pipeline.stage = 'awaiting_clip_approval';
+            pipeline.stage = 'review';
             pipeline.lastError = '';
             activeDraftId = draft.id;
             fillEditor(draft);
@@ -373,9 +450,12 @@ export async function mountSocialStudio({ generateText, openShorts, videoKeyStor
 
       if (pipeline.stage === 'awaiting_clip_approval') {
         setStatus('AI video hazır. OpenShorts klip ve altyazı adımı için ayrıca hak/kota onayı gerekiyor.', 'success');
+      } else if (pipeline.stage === 'review' && draft.jobId) {
+        setAutomationStatus('Clips işlemi tamamlandı. Videolar hazır; bunlar yalnızca Clips modülünün çıktılarıdır.');
+        setStatus('Clips videoları hazır. Çıktıları açıp kontrol et.', 'success');
       } else if (pipeline.stage === 'review') {
-        setAutomationStatus('Tam otomasyonun üretim ve düzenleme adımları tamamlandı. Klipler hazır; herkese açık paylaşım için son onay gerekli.');
-        setStatus('Klipler hazır. Her klibi izle ve paylaşım metnini incele.', 'success');
+        setAutomationStatus('What If / In My Town video üretimi tamamlandı. Clips ayrı bir modüldür ve kendiliğinden başlatılmaz.');
+        setStatus('AI video hazır. Senaryonu ve videonu gözden geçir.', 'success');
       } else if (pipeline.stage === 'needs_attention') {
         setAutomationStatus('Otomasyon durdu: ' + (pipeline.lastError || 'Sonuç doğrulanamadı.'));
       } else if (pipeline.stage === 'failed') {
@@ -512,10 +592,10 @@ export async function mountSocialStudio({ generateText, openShorts, videoKeyStor
       if (!$('socialRunwayGuardianApproved').checked) {
         throw new Error('Ücretli video üretimi için ebeveyn/vasinin hesap yönetimi ve onayı gerekir.');
       }
+      const creatorData = getCreatorDraftData();
       const platforms = selectedBriefPlatforms();
-      const prompt = buildSocialPrompt({
-        topic: $('socialTopic').value,
-        platforms,
+      const prompt = buildCreatorPrompt({
+        ...creatorData,
         tone: $('socialTone').value,
         language: $('socialLanguage').value,
         duration: $('socialDuration').value,
@@ -526,12 +606,14 @@ export async function mountSocialStudio({ generateText, openShorts, videoKeyStor
       $('socialRunAutomation').disabled = true;
       setAutomationStatus('1/4 · Ücretsiz/yerel AI ile senaryo hazırlanıyor…');
       const raw = await generateText(prompt);
-      const generated = normalizeSocialDraft(raw, $('socialTopic').value);
+      const generated = normalizeSocialDraft(raw, creatorData.topic);
       const now = new Date().toISOString();
       const draft = {
         id: makeId(),
         ...generated,
-        topic: $('socialTopic').value.trim(),
+        topic: creatorData.topic,
+        creatorMode: creatorData.creatorMode,
+        creatorSettings: creatorData.creatorSettings,
         platforms,
         status: 'script_ready',
         sourceUrl: '',
@@ -634,36 +716,41 @@ export async function mountSocialStudio({ generateText, openShorts, videoKeyStor
   $('socialGenerate').addEventListener('click', async () => {
     if (busy) return;
     try {
+      const creatorData = getCreatorDraftData();
       const platforms = selectedBriefPlatforms();
-      const prompt = buildSocialPrompt({
-        topic: $('socialTopic').value, platforms,
-        tone: $('socialTone').value, language: $('socialLanguage').value,
-        duration: $('socialDuration').value, audience: $('socialAudience').value
+      const prompt = buildCreatorPrompt({
+        ...creatorData,
+        tone: $('socialTone').value,
+        language: $('socialLanguage').value,
+        duration: $('socialDuration').value,
+        audience: $('socialAudience').value
       });
       busy = true; $('socialGenerate').disabled = true;
       $('socialGenerate').textContent = 'Senaryo hazırlanıyor…';
       const raw = await generateText(prompt);
-      const generated = normalizeSocialDraft(raw, $('socialTopic').value);
+      const generated = normalizeSocialDraft(raw, creatorData.topic);
       const now = new Date().toISOString();
       const draft = {
-        id: makeId(), ...generated, topic: $('socialTopic').value.trim(), platforms,
+        id: makeId(), ...generated, topic: creatorData.topic, creatorMode: creatorData.creatorMode, creatorSettings: creatorData.creatorSettings, platforms,
         status: 'script_ready', sourceUrl: '', jobId: '', clips: [], publishRequests: [],
         createdAt: now, updatedAt: now
       };
       drafts.unshift(draft); activeDraftId = draft.id;
       fillEditor(draft); await saveState();
-      notify('AI senaryosu oluşturuldu. Yayınlamadan önce metni ve sahne planını kontrol et.');
+      notify('Senaryo oluşturuldu. Metni ve sahne planını kontrol et.');
     } catch (error) { notify(error.message || 'AI senaryosu oluşturulamadı.'); }
     finally { busy = false; $('socialGenerate').disabled = false; $('socialGenerate').textContent = 'AI senaryosu üret ✦'; renderAiMode(); }
   });
 
   $('socialSaveDraft').addEventListener('click', async () => {
-    const draft = updateEditorRecord(); await saveState(); fillEditor(draft); notify('Sosyal medya taslağı kaydedildi.');
+    const draft = updateEditorRecord(); await saveState(); fillEditor(draft); notify('Creator taslağı kaydedildi.');
   });
   $('socialNewDraft').addEventListener('click', () => {
     activeDraftId = ''; activeClipIndex = null;
     ['socialTopic', 'socialAudience', 'socialDraftTitle', 'socialHook', 'socialVoiceover', 'socialScenes', 'socialCaption', 'socialHashtags', 'socialCta', 'socialSourceUrl', 'socialAIVideoPrompt'].forEach((id) => { $(id).value = ''; });
+    $('creatorWhatIfThing').value = 'money'; $('creatorWhatIfInterval').value = 'every hour'; $('creatorTownName').value = 'My Town'; $('creatorTownEvent').value = '';
     selectedDraftPlatforms(['tiktok', 'instagram', 'youtube']);
+    setCreatorMode(activeCreatorMode);
     $('socialDraftBadge').textContent = 'Yeni taslak'; $('socialClipResults').innerHTML = ''; $('socialAIVideoImage').value = ''; $('socialAIVideoResult').innerHTML = ''; $('socialAIVideoStatus').textContent = 'Yeni taslak. Üretim için tekrar onay gerekir.';
     $('socialPublishSummary').textContent = 'Yayınlamak için önce işlenmiş kliplerden birini seç.';
     $('socialPublishConfirm').disabled = true; renderQueue(); setStatus('Yeni içerik taslağı hazır.');
@@ -781,6 +868,7 @@ export async function mountSocialStudio({ generateText, openShorts, videoKeyStor
     $('socialSourceUrl').value = draft.aiVideo.videoUrl;
     draft.sourceUrl = draft.aiVideo.videoUrl; draft.updatedAt = new Date().toISOString();
     await saveState();
+    setCreatorMode('clips');
     $('socialVideoProduction').scrollIntoView({ behavior: 'smooth', block: 'start' });
     setStatus('Üretilen AI video kaynak olarak eklendi. Hak onayını verip OpenShorts klip/altyazı adımını başlatabilirsin.', 'success');
   });
@@ -927,6 +1015,7 @@ export async function mountSocialStudio({ generateText, openShorts, videoKeyStor
   $('socialAIVideoStatus').textContent = runwayKey
     ? (videoKeyStore.isNative ? 'Runway Gen-4.5 anahtarı Android Secure Storage alanında. Her üretim ayrıca maliyet onayı ister.' : 'Runway anahtarı bu web oturumunun belleğinde. Sekme kapanınca kaybolur; her üretim ayrıca maliyet onayı ister.')
     : 'Runway Gen-4.5 hazır. Ebeveyn/vasinin yönettiği API anahtarını güvenli şekilde ekle. Web önizlemesinde bağlantı CORS kurallarına bağlı olabilir.';
+  setCreatorMode('what_if');
   updateRunwayEstimate();
   renderRunwayState();
   renderAiMode(); renderQueue();

@@ -1,6 +1,8 @@
-# Social Media Studio
+# Social Media Studio — legacy integration reference
 
-AI Studio adds a local content workspace for a review-first short-video pipeline.
+> **Superseded by Creator Studio (2026-11-17).** The visible Social Media Studio screen has been replaced by three independent modes: What If, In My Town and Clips. What If and In My Town stop after their own script-to-video workflow; they do not automatically become Clips. Clips separately processes a source video after rights and quota checks. Public publish/schedule controls are hidden from the current Creator UI. The sections below describe the older integration plumbing and are retained as technical history, not as the current user flow.
+
+AI Studio previously exposed a combined review-first short-video pipeline.
 
 ## Flow
 

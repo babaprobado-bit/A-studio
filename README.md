@@ -1,6 +1,6 @@
 # AI Studio — Android + Private Web Workspace
 
-AI Studio is an Android-first workspace for multi-provider AI coding workflows. The current development branch adds a Skill Library and three Local Coder engine choices while preserving existing project/chat/editor/backup/vault features. Alpha 1 is an internal development milestone label, not part of the product name.
+AI Studio is an Android-first workspace for multi-provider AI coding workflows. The app opens directly in its standard AI chat interface. The Creator Studio provides three independent video workflows: What If, In My Town and Clips. The current development branch also adds a Skill Library and three Local Coder engine choices while preserving project/chat/editor/backup/vault features. Alpha 1 is an internal development milestone label, not part of the product name.
 
 ## Current Local Coder modes
 
@@ -26,6 +26,18 @@ AI Studio is an Android-first workspace for multi-provider AI coding workflows. 
 - Snippet Vault, source/license notes, reusable code catalog, activity history.
 - Standard JSON workspace backup and encrypted backup (AES-256-GCM; PBKDF2-SHA-256, 250,000 iterations). Provider API keys and vault tokens are excluded.
 - Password-gated private web workspace and optional encrypted-at-rest shared vault. The shared vault is not end-to-end encrypted.
+
+## Creator Studio
+
+The former Social Media Studio screen is replaced by Creator Studio. Its three modes stay independent:
+
+- **What If:** the creator chooses what doubles and the interval (for example, What if money doubled every hour?). The prompt keeps the doubling progression mathematically consistent and does not append an In My Town setting.
+- **In My Town:** a separate fictional-town story workflow with its own town name/event. It does not use a What If question or doubling mechanic.
+- **Clips:** a source-video workflow using OpenShorts to create short clips/captions. It requires an authorized HTTPS source, explicit rights confirmation and a quota check. It does not generate a What If or town story.
+
+What If and In My Town can use the selected free/local text model to write a script and the existing separately confirmed Runway video generation path. The pipeline stops when that video is ready; it does not automatically enter Clips. Clips remains a separate user-selected tool. Paid video generation is optional, priced and separately confirmed under parent/guardian-managed account and billing. Public publish/schedule controls are not exposed in the current Creator UI.
+
+The app's initial screen is the existing AI chat. The Chat tab is first in the bottom navigation; Creator is immediately after it. The old home screen remains reachable from navigation.
 
 ## Build Android APK
 

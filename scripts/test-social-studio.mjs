@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { buildCreatorPrompt, normalizeCreatorMode } from '../src/creator-studio-core.js';
 import {
   SOCIAL_PLATFORMS, buildSocialPrompt, normalizeSocialDraft,
   normalizeSocialQueue, normalizeSocialClips, buildSocialPublishArgs
@@ -24,6 +25,12 @@ assert.equal(fallback.title, 'Test konu');
 const queue = normalizeSocialQueue([{ id: 'a', title: 'Draft', platforms: ['youtube', 'unknown'], status: 'script_ready', clips: [{ video_url: 'https://cdn.example/1.mp4' }] }]);
 assert.equal(queue.length, 1);
 assert.deepEqual(queue[0].platforms, ['youtube']);
+assert.equal(queue[0].creatorMode, 'what_if');
+assert.equal(queue[0].creatorSettings.whatIfInterval, 'every hour');
+const townQueue = normalizeSocialQueue([{ id: 'town', creatorMode: 'in_my_town', creatorSettings: { townName: 'Pine Town', townEvent: 'purple rain' } }]);
+assert.equal(townQueue[0].creatorMode, 'in_my_town');
+assert.equal(townQueue[0].creatorSettings.townName, 'Pine Town');
+assert.equal(townQueue[0].creatorSettings.townEvent, 'purple rain');
 const videoQueue = normalizeSocialQueue([{ id: 'video-job', title: 'AI video', platforms: ['youtube'], aiVideo: { provider: 'runway', taskId: 'task-1', status: 'PENDING', promptText: 'A new scene', duration: 5, ratio: '720:1280', estimatedCostUsd: 0.6, apiKey: 'must-not-persist' } }]);
 assert.equal(videoQueue[0].aiVideo.provider, 'runway');
 assert.equal(videoQueue[0].aiVideo.taskId, 'task-1');
@@ -40,6 +47,24 @@ assert.ok(publish.scheduled_date.endsWith('Z'));
 assert.throws(() => buildSocialPublishArgs({ jobId: '', clipIndex: 0, platforms: ['youtube'] }), /iş/);
 assert.throws(() => buildSocialPublishArgs({ jobId: 'job-1', clipIndex: 0, platforms: ['bad'] }), /platform/);
 assert.throws(() => buildSocialPublishArgs({ jobId: 'job-1', clipIndex: 0, platforms: ['youtube'], scheduledLocal: '2020-01-01T12:00', now: new Date('2025-01-01T00:00:00Z') }), /gelecekte/);
+
+const whatIfPrompt = buildCreatorPrompt({ mode: 'what_if', whatIfThing: 'money', whatIfInterval: 'every hour', language: 'English' });
+assert.match(whatIfPrompt, /What if money doubled every hour\?/);
+assert.match(whatIfPrompt, /1x, 2x, 4x, 8x, 16x/);
+assert.match(whatIfPrompt, /Do NOT add "in my town"/);
+assert.doesNotMatch(whatIfPrompt, /IN MY TOWN ONLY/);
+const townPrompt = buildCreatorPrompt({ mode: 'in_my_town', townName: 'My Town', townEvent: 'all street lights turn purple' });
+assert.match(townPrompt, /IN MY TOWN ONLY/);
+assert.match(townPrompt, /all street lights turn purple/);
+assert.match(townPrompt, /Do NOT start with a "What if" question/);
+assert.doesNotMatch(townPrompt, /doubled every/);
+assert.equal(normalizeCreatorMode('clips'), 'clips');
+assert.equal(normalizeCreatorMode('unknown'), 'what_if');
+assert.throws(() => buildCreatorPrompt({ mode: 'clips' }), /Clips modu/);
+const clipsDraft = normalizeSocialQueue([{ id: 'clips', creatorMode: 'clips', topic: 'Clips: source video processing' }]);
+assert.equal(clipsDraft[0].creatorMode, 'clips');
+assert.match(clipsDraft[0].topic, /^Clips:/);
+
 const multiShot = buildRunwayMultiShotPayload({ storyPrompt: 'A robot explores a neon city.', ratio: '720:1280', duration: 15, audio: true });
 assert.equal(multiShot.endpoint, '/recipes/multi_shot_video');
 assert.equal(multiShot.payload.version, '2026-06');
@@ -51,6 +76,13 @@ assert.equal(multiShot.cost.usd, 1.95);
 assert.equal(estimateRunwayMultiShotCost(10, '960:960').usd, 1.3);
 assert.throws(() => estimateRunwayMultiShotCost(8), /5, 10 veya 15/);
 const multiShotPrompt = buildSocialMultiShotPrompt({ topic: 'Bir robotun şehirde kaybolması', title: 'Kayıp Robot', hook: 'Bu ışık nereden geliyor?', scenes: [{visual:'Yağmurlu neon sokak'},{visual:'Robot ışığı takip eder'}] });
+const whatIfVideoPrompt = buildSocialMultiShotPrompt({ creatorMode: 'what_if', topic: 'What if money doubled every hour?', title: 'Money Doubles', scenes: [{ visual: 'Coins multiply on a table' }] });
+assert.match(whatIfVideoPrompt, /FORMAT LOCK: WHAT IF ONLY/);
+assert.match(whatIfVideoPrompt, /powers-of-two progression/);
+const townVideoPrompt = buildSocialMultiShotPrompt({ creatorMode: 'in_my_town', topic: 'In My Town: purple rain', title: 'Purple Rain', scenes: [{ visual: 'A fictional town square under purple rain' }] });
+assert.match(townVideoPrompt, /FORMAT LOCK: IN MY TOWN ONLY/);
+assert.match(townVideoPrompt, /not a What If scenario/);
+
 assert.match(multiShotPrompt, /3–5/);
 assert.match(multiShotPrompt, /Yağmurlu neon sokak/);
 assert.throws(() => buildSocialMultiShotPrompt({ topic: '' }), /konusunu/);
@@ -73,4 +105,4 @@ assert.equal(isSocialAutomationPolling(pipeline.stage), true);
 assert.equal(isSocialAutomationPolling('awaiting_clip_approval'), false);
 assert.ok(getSocialAutomationPollDelay('openshorts_polling', 20) <= 30000);
 
-console.log('Social Studio tests passed: prompt generation, safe JSON normalization, queue validation, clip normalization and guarded publishing schedule.');
+console.log('Creator mode tests passed; legacy processing checks passed: prompt generation, safe JSON normalization, queue validation, clip normalization and guarded publishing schedule.');

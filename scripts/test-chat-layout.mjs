@@ -15,6 +15,7 @@ const requiredIds = [
 for (const id of requiredIds) {
   assert.match(html, new RegExp('id="' + id + '"'), 'Missing chat control: ' + id);
 }
+assert.match(html, /class="screen active" id="chat"/, "AI chat must be the default landing screen");
 assert.match(html, /class="chat-shell"/, 'Chat shell must exist');
 assert.match(html, /role="log"[^>]*aria-live="polite"/, 'Conversation needs an accessible live log');
 assert.match(html, /class="compose chat-composer"/, 'Composer must use the dedicated chat layout');

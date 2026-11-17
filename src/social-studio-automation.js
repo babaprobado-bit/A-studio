@@ -26,8 +26,13 @@ export function buildSocialMultiShotPrompt(draft) {
     const narration = String(scene && scene.narration || '').trim().slice(0,180);
     return visual ? ('Shot ' + (index + 1) + ': ' + visual + (narration ? ' Narration context: ' + narration : '')) : '';
   }).filter(Boolean) : [];
+  const creatorMode = ['what_if', 'in_my_town'].includes(draft && draft.creatorMode) ? draft.creatorMode : 'what_if';
+  const formatRules = creatorMode === 'what_if'
+    ? 'FORMAT LOCK: WHAT IF ONLY. Keep the exact doubling premise and interval from the topic. Show the powers-of-two progression accurately. Do not introduce a town setting or the phrase In My Town.'
+    : 'FORMAT LOCK: IN MY TOWN ONLY. This is a fictional town story, not a What If scenario. Keep the same town layout and recurring characters across shots. Do not add a doubling-every-interval mechanic.';
   return [
     'Create an original multi-shot short-form video from this story.',
+    formatRules,
     'Use 3–5 visually distinct shots with clear cuts, consistent subject and style, and a strong visual opening and ending.',
     'Keep the story coherent and suitable for a broad general audience. Avoid private information, impersonation, unsupported claims, copyrighted characters, and logos.',
     'Do not burn subtitles, captions, hashtags, UI, or title cards into the frames; captions are added in the later editing step.',

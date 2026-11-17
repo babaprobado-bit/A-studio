@@ -74,6 +74,13 @@ export function normalizeSocialQueue(value) {
     id: text(item.id, 80) || `social-${Date.now()}`,
     title: text(item.title, 100) || 'Yeni kısa video',
     topic: text(item.topic, 1200),
+    creatorMode: ['what_if', 'in_my_town', 'clips'].includes(item.creatorMode) ? item.creatorMode : 'what_if',
+    creatorSettings: {
+      whatIfThing: text(item.creatorSettings?.whatIfThing, 100) || 'money',
+      whatIfInterval: ['every second', 'every minute', 'every 10 minutes', 'every hour', 'every day', 'every week'].includes(item.creatorSettings?.whatIfInterval) ? item.creatorSettings.whatIfInterval : 'every hour',
+      townName: text(item.creatorSettings?.townName, 80) || 'My Town',
+      townEvent: text(item.creatorSettings?.townEvent, 400)
+    },
     hook: text(item.hook, 300),
     voiceover: text(item.voiceover, 6000),
     scenes: Array.isArray(item.scenes) ? item.scenes.slice(0, 10) : [],
