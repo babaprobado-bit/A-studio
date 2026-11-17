@@ -1,6 +1,6 @@
 # AI Studio — Session 17 continuation starter
 
-Read `docs/HANDOFF/README.md`, `docs/HANDOFF/PROJECT_STATE.md`, and `docs/HANDOFF/SESSION_17_SECURITY_HARDENING_2026-11-17.md`. Session 17 hardens Ollama HTTP targets and adds matching JS/Kotlin UTF-8 chat budgets for native GGUF. Recheck the feature branch, PR #2 open/Draft/head/base and `main` before any write. Verify Demo and Native GGUF CI/artifacts for the new source commit. Keep all 10 AI Team engines, free-only provider gates, Skills, GGUF and REA mock-only boundaries. Do not claim device inference or app-wide cleartext removal; Android `usesCleartextTraffic=true` remains a documented trusted-LAN residual.
+Read `docs/HANDOFF/README.md`, `docs/HANDOFF/PROJECT_STATE.md`, and `docs/HANDOFF/SESSION_17_SECURITY_HARDENING_2026-11-17.md`. Session 17 hardens Ollama HTTP targets and adds matching JS/Kotlin UTF-8 chat budgets for native GGUF. Recheck the feature branch, PR #2 open/Draft/head/base and `main` before any write. Demo APK run 44138131321 passed on source commit a9face7 and artifact 14352323843 exists. Native GGUF run 44138131366 was still in Gradle packaging at 2026-11-17T17:42Z; recheck it and record any artifact. The branch still lacks Agent Swarm, Plugin Catalog, OpenRouter chat selector and the distinct 13-provider preference registry. Keep all 10 AI Team engines, free-only provider gates, Skills, GGUF and REA mock-only boundaries. Do not claim device inference or app-wide cleartext removal; Android `usesCleartextTraffic=true` remains a documented trusted-LAN residual.
 
 ---
 

@@ -43,3 +43,17 @@ Both Android workflows still inject `android:usesCleartextTraffic="true"` to pre
 2. Run Demo and Native GGUF CI on the exact source commit and inspect artifacts separately.
 3. Continue the carefully scoped 1.1.4 integration: Agent Swarm and searchable prompt-template catalog are not yet present in the current branch. Preserve the ten-engine AI Team and free-only model gates; do not wholesale-copy the old package.
 4. Recheck provider free-tier claims against current official documentation before exposing any new provider as free.
+
+
+## GitHub CI status for source commit `a9face7c3567f045e89c5528a1ad9c25d4af76b1`
+
+- **Demo APK:** run [44138131321](https://github.com/babaprobado-bit/A-studio/actions/runs/44138131321) completed successfully. Artifact `AI-Studio-Demo-APK`, ID `14352323843`, size `3,809,787` bytes, SHA-256 `0e723fa855105f276b4e1b7c4174463abb12213c45c594fa3f2e77cb88cd554e`, expires `2026-12-01T17:35:23Z`. [Artifact ZIP](https://api.github.com/repos/babaprobado-bit/A-studio/actions/artifacts/14352323843/zip).
+- **Native GGUF APK:** run [44138131366](https://github.com/babaprobado-bit/A-studio/actions/runs/44138131366) was still `in_progress` at `2026-11-17T17:42Z`; its Gradle `Build debug APK` step was active. All 15 preceding setup, web-build, regression, Capacitor sync and native-preparation steps had succeeded. No Native artifact was available at that check.
+- The Demo CI run completed the web build, AI Team, Skills Library, chat layout, Local Coder bridge, mock-only REA contract, and APK packaging steps successfully. Native CI also completed the new regression checks successfully before Gradle packaging.
+- These results belong to source commit `a9face7`; they are CI/build evidence only, not physical-device acceptance.
+
+## Remaining source-scope gaps confirmed on this branch
+
+- The repository tree has no `agent-swarm` or `plugin-catalog` module yet. The 1.1.4 report also lists `openrouter-chat.js` as an absent isolated module. Port these only with focused imports/tests and retain the current free-only gates.
+- The current runtime has ten AI Team engine adapters. That is not the same as the user's separate 13-provider preference registry; the full 13-provider ordered catalog/adapters are not present as one integrated registry yet. Do not represent uncertain or paid tiers as free.
+- No `TODO`/`FIXME` markers were found in the core files reviewed in this run (`src/main.js`, `src/ai-team.js`, `src/device-local-coder.js`, `LocalLlmPlugin.kt`, and the two affected test files). This was not a repository-wide search because GitHub code search indexes the default branch, not this feature branch.
