@@ -39,6 +39,8 @@ Local isolated Node checks passed:
 - `node server/workshop-smoke-test.js`
 - `node --check` across the fetched project JS/MJS source and test files.
 
+`test-device-local-coder.mjs` used a temporary test-only `@capacitor/core` stub and injected fake native plugin; it validates the JavaScript bridge wrapper, not the actual Capacitor runtime. `server/smoke-test.js` was not run because npm/Express dependencies were unavailable in the audit shell.
+
 The remote audit shell did not provide `npm`, so no local npm install/build was attempted. Both GitHub Actions workflows installed dependencies and built web assets successfully.
 
 ### Demo APK
@@ -73,7 +75,7 @@ Keep the user's preference order unchanged. Never label a trial credit, paid tie
 | 5 | SambaNova Cloud | Official Free Tier applies when no payment method is linked. Current production models show 20 RPM, 20 RPD and 200,000 TPD; preview models have limited capacity and may be removed. https://docs.sambanova.ai/docs/en/models/rate-limits |
 | 6 | NVIDIA NIM | NVIDIA Developer Program grants free hosted NIM API access for prototyping/research/development/testing. Production use requires NVIDIA AI Enterprise; do not label it free production hosting. https://docs.api.nvidia.com/nim/docs/product |
 | 7 | Z.ai / Zhipu GLM Flash | Official pricing lists GLM-4.7-Flash, GLM-4.5-Flash and GLM-4.6V-Flash at $0. Numeric free-model rate limits are not publicly listed. GLM-5.3-Flash is paid, not free. https://docs.z.ai/guides/overview/pricing |
-| 8 | LLM7.io | Official site advertises a free quota of up to 100,000 tokens/day, 250 requests/hour, 60/minute and 1/second. Limits may change with demand/capacity. https://llm7.io/ |
+| 8 | LLM7.io | The official site is accessible but its current page did not expose readable pricing/quota details in this audit. Treat free access and numeric limits as unverified until confirmed in the official account/terms; do not hardcode a quota. https://llm7.io/ |
 | 9 | SiliconFlow | Official pricing advertises $1 in starter free credits, then pay-as-you-go. Treat as one-time credit, not an ongoing free tier. https://www.siliconflow.com/pricing |
 | 10 | Cohere | Evaluation/trial keys are free and limited to 1,000 API calls/month; endpoint/model rate limits differ. Listed trial Chat models show 20 RPM. https://docs.cohere.com/docs/rate-limits |
 | 11 | Mistral AI | Free mode is the default API mode with the lowest limits for evaluation/prototyping. Exact quotas are account-specific in the Limits page. Pay-as-you-go unlocks higher tiers. This corrects the earlier handoff claim that Free mode did not cover API usage. https://help.mistral.ai/en/articles/698531-why-am-i-hitting-api-rate-limits-and-how-do-i-increase-them |
