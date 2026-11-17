@@ -1,4 +1,13 @@
 # AI Studio — Multi-session handoff
+
+## Session 14 latest source checkpoint — 2026-11-17
+
+- True AI video generation is now in source: Runway Gen-4.5 text-to-video/image-to-video, distinct from OpenShorts clipping. Module/tests/Capacitor/CSP commit `80ff55616063aeb139a6c5887d780364359730c7`; AI Studio SecureStorage wiring commit `8df3fd2b09bc601e2fca152ba3bce0b68ec8561f`.
+- Runway is credit-priced: 12 credits ($0.12) per second; app shows 5s ~$0.60, 8s ~$0.96 and 10s ~$1.20 and requires a per-render confirmation. Account/billing must be parent/guardian-managed; it is not unlimited free generation.
+- Android CapacitorHttp native fetch patch is enabled; server CSP allows Runway API and temporary CloudFront MP4. Runway outputs expire within 24–48 hours. No live API generation or phone test has been performed.
+- Node mock tests passed: Runway video client, Social Studio queue and OpenShorts MCP. Both Android workflows have the test. npm/Vite and APK builds on this new source remain pending GitHub Actions.
+- `main` remains `aab010319b6500002844bd24b11da85dd9ca3b00`; PR #2 remains open/Draft/unmerged. Details: [Session 14 AI video generation handoff](SESSION_14_AI_VIDEO_GENERATION_2026-11-17.md).
+
 ## Session 13 latest source checkpoint — 2026-11-17
 
 - Social Media Studio source commits: `89dd84c9778550d0899bb1e1b7a50535cea6d0a7` (new modules/tests/docs/workflows) and `5ab71091d5daedae87da08be5563f091f2936f71` (main app wiring).

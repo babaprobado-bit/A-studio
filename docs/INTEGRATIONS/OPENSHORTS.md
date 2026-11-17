@@ -19,6 +19,7 @@ https://mcp.openshorts.app/mcp
 - The integration rejects non-HTTPS URLs, localhost, .local hosts, IP-literal hosts, and unsupported URL forms.
 - Enabled tools: process_video, get_job_status, list_clips, get_quota, add_subtitles, and publish_clip. publish_clip is used by Social Media Studio only when the connected MCP server advertises it; every publish/schedule action requires a separate user confirmation. The current UI does not call create_upload or recut_clip.
 - OpenShorts performs video processing on its service. Processing can consume account minutes. Check current OpenShorts account terms and quota before starting jobs.
+- Social Media Studio can separately generate a new short visual clip with Runway Gen-4.5 from text or a first-frame image (paid, per-second credits). That is not an OpenShorts clipping job; its resulting MP4 can optionally be sent into this OpenShorts workflow.
 - No physical Android device acceptance is implied by JavaScript tests or CI results.
 
 ## Protocol

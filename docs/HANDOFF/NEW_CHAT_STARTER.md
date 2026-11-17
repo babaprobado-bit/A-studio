@@ -1,3 +1,9 @@
+# AI Studio — Session 14 continuation starter
+
+Read `docs/HANDOFF/README.md`, `docs/HANDOFF/PROJECT_STATE.md`, and `docs/HANDOFF/SESSION_14_AI_VIDEO_GENERATION_2026-11-17.md`. New source adds real Runway Gen-4.5 text/image-to-video code, separate from OpenShorts clipping. Verify branch and PR before commit; run mocked tests; then dispatch Demo and Native GGUF CI. Paid API use is parent/guardian-managed, with per-render cost confirmation. No API key, credit purchase, live generation, phone test or social post has been performed. Keep PR #2 Draft/unmerged and do not change main.
+
+---
+
 # AI Studio — Session 13 continuation starter
 
 Read first: `docs/HANDOFF/README.md`, `docs/HANDOFF/PROJECT_STATE.md`, and `docs/HANDOFF/SESSION_13_SOCIAL_MEDIA_STUDIO_2026-11-17.md`.

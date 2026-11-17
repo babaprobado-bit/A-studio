@@ -1,3 +1,25 @@
+## Session 14 — True AI video generation — 2026-11-17
+
+- Source module/test/workflow commit: `80ff55616063aeb139a6c5887d780364359730c7`; main app SecureStorage wiring commit: `8df3fd2b09bc601e2fca152ba3bce0b68ec8561f`.
+- Social Studio now has real Gen-4.5 Text-to-Video and Image-to-Video API calls, distinct from OpenShorts video clipping. API key is stored via Android SecureStorage, browser-only session memory, and never in the queue or workspace backup.
+- Usage price is 12 Runway Dev credits/sec ($0.12/sec): 5s $0.60, 8s $0.96, 10s $1.20. Every generation requires a visible estimate and per-request confirmation; use only a parent/guardian-managed account/billing. No credits purchased or API calls made.
+- Android CapacitorHttp native fetch patch is enabled; web server CSP permits the Runway API and CloudFront MP4 output. Gen-4.5 is 2–10s visual video; narration/music is separate and result links expire within 24–48h.
+- Tests passed in Node: Runway mock contract, Social Studio queue and OpenShorts; all source/test syntax checks and workflow YAML/config assertions passed. Remote environment has no npm, so GitHub Actions is the required Vite/Android build verification. New Demo/Native CI still pending.
+- No actual Runway task, generated MP4, physical device, WebView CORS or social platform posting test. `main` remains `aab010319b6500002844bd24b11da85dd9ca3b00`. PR #2 stays open and Draft. See `SESSION_14_AI_VIDEO_GENERATION_2026-11-17.md`.
+
+---
+
+# Session 14 — True AI video generation — 2026-11-17
+
+- New Runway Gen-4.5 client `src/runway-video.js` creates text-to-video and image-to-video tasks and polls output. Social Studio has a distinct AI-video generator section; it is not merely an OpenShorts clip cutter.
+- Gen-4.5 API costs 12 credits/sec ($0.12/sec): 5s about $0.60; 8s $0.96; 10s $1.20. Paid generation requires parent/guardian-managed billing, visible per-request cost and a separate user confirmation. Do not describe it as free.
+- API key is stored using existing Android SecureStorage (web preview only session memory); never stored in Social Studio draft queue/backup. CapacitorHttp native fetch override is enabled to reduce Android WebView CORS issues.
+- Model outputs 2–10 second visual clips. The Runway result can enter the OpenShorts flow for clipping/captions; publication of unprocessed raw Runway output is not implemented. Result URLs expire within 24–48 hours.
+- Mocked Runway/Social Studio/OpenShorts tests and Node syntax/config checks passed. No live API request, credit spend, actual MP4 generation, physical device or social publishing test. New Demo/Native CI must be checked after source commit.
+- Read `docs/HANDOFF/SESSION_14_AI_VIDEO_GENERATION_2026-11-17.md` for details. Keep PR #2 Draft, unmerged; main unchanged.
+
+---
+
 # Session 13 — Social Media Studio — 2026-11-17
 
 - Source commits: `89dd84c9778550d0899bb1e1b7a50535cea6d0a7` (Social Studio modules, tests, docs and CI) and `5ab71091d5daedae87da08be5563f091f2936f71` (main app wiring).
