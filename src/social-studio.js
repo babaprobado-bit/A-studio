@@ -128,7 +128,7 @@ export async function mountSocialStudio({ generateText, openShorts, videoKeyStor
       <div class="section-head"><div><div class="eyebrow">06 / CONTENT CALENDAR</div><h2>İçerik kuyruğu</h2></div><span class="pill" id="socialQueueCount">0 taslak</span></div>
       <div id="socialQueueList" class="social-queue-list"><p class="fineprint">Henüz kayıtlı içerik yok.</p></div>
     </section>
-    <div class="notice compact"><strong>Üretim ve maliyet:</strong> Sıfırdan metin/görselden video üretimi Runway Gen-4.5 API ile yapılır ve ücretlidir; 5 saniye yaklaşık $0.60, 10 saniye yaklaşık $1.20. Üretimden önce maliyet ayrıca gösterilir ve onay sorulur. Sonrasında istersen OpenShorts ile altyazı/klip ve yayın akışına geçersin. Runway Gen-4.5 2–10 saniyelik sessiz görsel klipler üretir; seslendirme/konuşma ayrı aşamadır. Çıktı bağlantıları 24–48 saatte sona erebilir, videoyu zamanında indir.</div>
+    <div class="notice compact"><strong>Üretim ve maliyet:</strong> Tam otomasyonda Runway Multi-Shot Video 3–5 çekimli 5/10/15 saniyelik sesli sahneler üretir. 720p fiyatı saniyede 13 kredi: yaklaşık $0.65 / $1.30 / $1.95. Ses parçası, yazdığın seslendirme metninin otomatik okunması anlamına gelmez. Tek sahneli Gen-4.5 aracı ayrıca kullanılabilir ve ayrı ücret tarifesine sahiptir. Her ücretli üretim için ayrı onay gerekir. OpenShorts klip/altyazı işlemi de kota kullanabilir ve ayrıca onay ister. Herkese açık yayınlama otomatik yapılmaz.</div>
   `;
   const toolsScreen = $('tools');
   main.insertBefore(screen, toolsScreen || null);
@@ -205,7 +205,8 @@ export async function mountSocialStudio({ generateText, openShorts, videoKeyStor
   const renderRunwayState = () => {
     $('socialRunwayBadge').textContent = runwayAvailable ? (runwayKey ? 'Gen-4.5 hazır · ücretli' : 'Runway motoru hazır · anahtar gerekli') : 'Runway servisi kapalı';
     $('socialRunwayBadge').className = 'pill ' + (runwayAvailable ? 'live' : '');
-    $('socialAIVideoGenerate').disabled = !runwayAvailable || !runwayKey || busy;
+    const automationBusy = drafts.some((item) => ['runway_submitting','runway_polling','openshorts_submitting','openshorts_polling'].includes(item.pipeline?.stage));
+    $('socialAIVideoGenerate').disabled = !runwayAvailable || !runwayKey || busy || automationBusy;
     $('socialAIVideoCheck').disabled = !activeDraft()?.aiVideo?.taskId || busy;
     $('socialRunwaySaveKey').disabled = !runwayAvailable;
     $('socialRunwayDeleteKey').disabled = !runwayKey || busy;
@@ -579,6 +580,9 @@ export async function mountSocialStudio({ generateText, openShorts, videoKeyStor
   $('socialAIVideoGenerate').addEventListener('click', async () => {
     if (busy) return;
     try {
+      if (drafts.some((item) => ['runway_submitting','runway_polling','openshorts_submitting','openshorts_polling'].includes(item.pipeline?.stage))) {
+        throw new Error('Tam otomasyon çalışırken ikinci bir ücretli video işi başlatılamaz.');
+      }
       if (!runwayAvailable) throw new Error('Runway video servisi sunucu tarafında etkin değil.');
       if (!runwayKey) throw new Error('Önce ebeveyn/vasinin yönettiği Runway anahtarını güvenli depoya kaydet.');
       if (!$('socialRunwayGuardianApproved').checked) throw new Error('Ücretli üretim için ebeveyn/vasinin yönetim ve onay koşulu işaretlenmeli.');
@@ -654,6 +658,10 @@ export async function mountSocialStudio({ generateText, openShorts, videoKeyStor
   $('socialProcessVideo').addEventListener('click', async () => {
     if (busy) return;
     try {
+      const current = activeDraft();
+      if (['awaiting_clip_approval','openshorts_submitting','openshorts_polling'].includes(current?.pipeline?.stage)) {
+        throw new Error('Bu içerik tam otomasyon akışında. İkinci OpenShorts işi açmamak için otomatik devam düğmesini kullan.');
+      }
       let draft = updateEditorRecord();
       const source = validateOpenShortsSourceUrl($('socialSourceUrl').value);
       if (!$('socialRightsConfirm').checked) throw new Error('Devam etmeden önce videonun sahibi olduğunu veya işleme iznin bulunduğunu onayla.');
@@ -684,6 +692,11 @@ export async function mountSocialStudio({ generateText, openShorts, videoKeyStor
   $('socialCheckJob').addEventListener('click', async () => {
     const draft = activeDraft();
     if (busy || !draft?.jobId) return;
+    if (draft.pipeline?.stage === 'openshorts_polling') {
+      setAutomationStatus('OpenShorts otomatik takip ediliyor; yinelenen kontrol başlatılmadı.');
+      scheduleAutomationPoll(draft.id, 1000);
+      return;
+    }
     busy = true; $('socialCheckJob').disabled = true;
     try {
       const status = await openShorts.call('get_job_status', { job_id: draft.jobId });
