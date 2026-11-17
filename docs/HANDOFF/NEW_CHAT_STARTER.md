@@ -1,6 +1,6 @@
-# AI Studio — Session 19 continuation starter
+# AI Studio — Session 20 continuation starter
 
-Read `docs/HANDOFF/README.md`, `docs/HANDOFF/PROJECT_STATE.md`, and `docs/HANDOFF/SESSION_19_SOCIAL_MEDIA_MANAGER_2026-11-17.md` first. Creator Studio now has four independent tabs: What If, In My Town, Clips, and Social Media. The new Social Media area is a local planner for drafts, platform targets, future date/time, notes, ready-for-review status and caption copying. It does not connect accounts, publish, externally schedule, or run a background publisher. Existing three Creator workflows and the AI chat landing screen must remain intact. Run Demo and Native GGUF GitHub Actions builds for the new source and verify artifacts before claiming APK success. Keep PR #2 open/Draft/unmerged; never modify `main`. Continue preserving all ten AI Team engines, Skills, Local Coder, GGUF, Ollama and REA's mock-only boundary.
+Read docs/HANDOFF/README.md, docs/HANDOFF/PROJECT_STATE.md, and docs/HANDOFF/SESSION_20_AI_POWER_HUB_2026-11-17.md first. AI Power Hub 1.1.4 now contains a 10-role bounded Agent Swarm, 34 prompt templates, free-only OpenRouter Multi-Chat (up to four models), the ordered 13-provider access directory, and explicit optional Cohere Trial / Cloudflare Workers AI routes. The three Creator content-generation modes remain independent; Social Media remains a local planner. Re-run the Native GGUF GitHub Actions workflow for this commit and verify the Native APK artifact before sharing. A Demo APK is not the requested full build. Keep PR #2 open and Draft; never modify main.
 
 ---
 

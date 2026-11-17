@@ -1,6 +1,8 @@
 import { Capacitor } from '@capacitor/core';
 import { connectOpenShorts, callOpenShortsTool, validateOpenShortsSourceUrl } from './openshorts-mcp.js';
 import { mountSocialStudio } from './social-studio.js';
+import { mountAiPowerHub } from './ai-power-hub.js';
+import './ai-power-hub.css';
 import { runApiLocalCoderSequence } from './local-coder-api.js';
 import { normalizeTeamSelection, normalizeOpenAiEndpoint, normalizeOllamaEndpoint, selectConfiguredTeam, confirmTeamLiveCalls, runParallelTeamCalls, runSequentialTeamCalls } from './ai-team.js';
 import { DeviceLocalCoder, DEVICE_MODEL_CATALOG, assessDeviceModel, chooseRecommendedDeviceModel, formatModelBytes } from './device-local-coder.js';
@@ -208,7 +210,7 @@ async function importCodeFileCollection(file){
 }
 
 function providerModel(id){if(id==='device')return deviceLocalCoder.loadedFileName||'GGUF model';return id==='ollama' ? (settings.ollamaModel||settings.models.ollama||providers.ollama.model) : (settings.models[id]||providers[id].model);}
-function isFreeOpenRouterModel(model){const id=String(model||'').trim();return id==='openrouter/free'||id.endsWith(':free');}
+function isFreeOpenRouterModel(model){const id=String(model||'').trim().toLowerCase();return id==='openrouter/free'||id.endsWith(':free');}
 function selectedTeam(){return normalizeTeamSelection(settings.team,Object.keys(providers));}
 function providerIsReady(id){
   if(!providers[id])return false;
@@ -462,7 +464,7 @@ async function callProvider(id,prompt,history,options={}){
     const d=await fetchJson(url+'/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},redirect:'error',body:JSON.stringify({model,messages,stream:false,options:{temperature:0.4}})});
     const answer=d?.message?.content;if(!answer)throw new Error('Ollama yanıtında mesaj yok. Model adını ve sunucuyu kontrol et.');return answer;
   }
-  const p=providers[id]; if(!p)throw new Error('Bilinmeyen AI sağlayıcısı.'); const model=String(providerModel(id)||'').trim(); if(!model)throw new Error(p.name+' için model kimliği seçilmemiş. Ücretsiz olduğu doğrulanmış bir model kimliği gir.'); if(id==='openrouter'&&!isFreeOpenRouterModel(model))throw new Error('OpenRouter için yalnızca openrouter/free veya :free ile biten ücretsiz model kimlikleri kullanılabilir.'); const key=await getSecret(id); if(!key)throw new Error(p.name+' için API anahtarı ayarlanmamış. Modeller ekranından ekle.');
+  const p=providers[id]; if(!p)throw new Error('Bilinmeyen AI sağlayıcısı.'); const model=String(options?.modelOverride||providerModel(id)||'').trim(); if(!model)throw new Error(p.name+' için model kimliği seçilmemiş. Ücretsiz olduğu doğrulanmış bir model kimliği gir.'); if(id==='openrouter'&&!isFreeOpenRouterModel(model))throw new Error('OpenRouter için yalnızca openrouter/free veya :free ile biten ücretsiz model kimlikleri kullanılabilir.'); const key=await getSecret(id); if(!key)throw new Error(p.name+' için API anahtarı ayarlanmamış. Modeller ekranından ekle.');
   const msgs=history.slice(-8).filter(m=>m.role==='user'||m.role==='assistant').map(m=>({role:m.role,content:m.content})); msgs.push({role:'user',content:prompt});
   if(p.kind==='anthropic'){
     const d=await fetchJson(p.endpoint,{method:'POST',headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model,max_tokens:2048,system:systemPrompt,messages:msgs.filter(m=>m.role==='user'||m.role==='assistant')})});
@@ -1390,7 +1392,7 @@ function updateDashboard(){const connected=Object.keys(providers).filter(provide
 }
 async function exportProjects(){downloadText('ai-studio-projects.json',JSON.stringify({format:'ai-studio-projects-v2',exportedAt:new Date().toISOString(),projects:projectList},null,2),'application/json;charset=utf-8');}
 function buildWorkspaceSnapshot(){
-  return {format:'ai-studio-workspace-v1',exportedAt:new Date().toISOString(),settings:{demoMode:settings.demoMode,models:settings.models,team:settings.team,customEndpoint:settings.customEndpoint||'',ollamaUrl:settings.ollamaUrl,ollamaModel:settings.ollamaModel,localCoderEngine:['device','api'].includes(settings.localCoderEngine)?settings.localCoderEngine:'ollama',localCoderApiProvider:settings.localCoderApiProvider||'openai',systemPrompt:settings.systemPrompt,shareReusableContext:settings.shareReusableContext===true,shareVaultContext:settings.shareVaultContext===true,vaultBaseUrl:settings.vaultBaseUrl||''},projects:projectList,activeProjectId,chat:chatHistory,plugins:userPlugins.filter(p=>p.kind!=='builtin').map(p=>({name:p.name,prompt:p.prompt})),skills:createSkillBackupState({customSkills,selectedSkillIds,profileId:skillProfileId}),snippets:reusableSnippets,activity:agentActivity,codeFiles,activeCodeFileId};
+  return {format:'ai-studio-workspace-v1',exportedAt:new Date().toISOString(),settings:{demoMode:settings.demoMode,models:settings.models,team:settings.team,customEndpoint:settings.customEndpoint||'',ollamaUrl:settings.ollamaUrl,ollamaModel:settings.ollamaModel,localCoderEngine:['device','api'].includes(settings.localCoderEngine)?settings.localCoderEngine:'ollama',localCoderApiProvider:settings.localCoderApiProvider||'openai',systemPrompt:settings.systemPrompt,shareReusableContext:settings.shareReusableContext===true,shareVaultContext:settings.shareVaultContext===true,vaultBaseUrl:settings.vaultBaseUrl||'',swarmMaxAgents:settings.swarmMaxAgents,swarmConcurrency:settings.swarmConcurrency,openrouterChatModels:settings.openrouterChatModels,enabledPromptPluginIds:settings.enabledPromptPluginIds,cloudflareAccountId:settings.cloudflareAccountId||'',cloudflareModel:settings.cloudflareModel||'',cohereTrialModel:settings.cohereTrialModel||''},projects:projectList,activeProjectId,chat:chatHistory,plugins:userPlugins.filter(p=>p.kind!=='builtin').map(p=>({name:p.name,prompt:p.prompt})),skills:createSkillBackupState({customSkills,selectedSkillIds,profileId:skillProfileId}),snippets:reusableSnippets,activity:agentActivity,codeFiles,activeCodeFileId};
 }
 async function exportWorkspace(){
   await saveCurrentCodeFile(false);
@@ -1437,6 +1439,14 @@ async function importWorkspace(file){
     if(nextSettings.models.openrouter==='openai/gpt-5-mini')nextSettings.models.openrouter='openrouter/free';
     for(const [id,paidDefault] of Object.entries({openai:'gpt-5-mini',anthropic:'claude-sonnet-5',deepseek:'deepseek-chat',groq:'llama-3.3-70b-versatile',huggingface:'openai/gpt-oss-120b:fastest'})){if(nextSettings.models[id]===paidDefault)nextSettings.models[id]='';}
     if(nextSettings.models.openrouter==='openai/gpt-5-mini')nextSettings.models.openrouter='openrouter/free';
+    nextSettings.swarmMaxAgents=Number.isFinite(Number(nextSettings.swarmMaxAgents))?Math.max(2,Math.min(10,Math.floor(Number(nextSettings.swarmMaxAgents)))):3;
+    nextSettings.swarmConcurrency=Number.isFinite(Number(nextSettings.swarmConcurrency))?Math.max(1,Math.min(4,Math.floor(Number(nextSettings.swarmConcurrency)))):2;
+    nextSettings.openrouterChatModels=Array.isArray(nextSettings.openrouterChatModels)?[...new Set(nextSettings.openrouterChatModels.filter(id=>typeof id==='string'&&(id.trim().toLowerCase()==='openrouter/free'||id.trim().toLowerCase().endsWith(':free'))))].slice(0,4):['openrouter/free'];
+    if(!nextSettings.openrouterChatModels.length)nextSettings.openrouterChatModels=['openrouter/free'];
+    nextSettings.enabledPromptPluginIds=Array.isArray(nextSettings.enabledPromptPluginIds)?[...new Set(nextSettings.enabledPromptPluginIds.filter(id=>typeof id==='string'))].slice(0,34):undefined;
+    nextSettings.cloudflareAccountId=typeof nextSettings.cloudflareAccountId==='string'&&/^[a-f0-9]{32}$/i.test(nextSettings.cloudflareAccountId)?nextSettings.cloudflareAccountId:'';
+    nextSettings.cloudflareModel=['@cf/zai-org/glm-4.7-flash','@cf/google/gemma-4-26b-a4b-it','@cf/nvidia/nemotron-3-120b-a12b'].includes(nextSettings.cloudflareModel)?nextSettings.cloudflareModel:'@cf/zai-org/glm-4.7-flash';
+    nextSettings.cohereTrialModel=typeof nextSettings.cohereTrialModel==='string'?nextSettings.cohereTrialModel.slice(0,120):'command-a-03-2025';
     nextSettings.team=normalizeTeamSelection(Array.isArray(nextSettings.team)?nextSettings.team:defaultSettings.team,Object.keys(providers));
     nextSettings.customEndpoint=typeof nextSettings.customEndpoint==='string'?nextSettings.customEndpoint.slice(0,500):'';
     if(nextSettings.customEndpoint){try{nextSettings.customEndpoint=normalizeOpenAiEndpoint(nextSettings.customEndpoint);}catch(_){nextSettings.customEndpoint='';}}
@@ -1463,10 +1473,10 @@ async function importWorkspace(file){
     const nextActiveProjectId=nextProjects.some(project=>project.id===data.activeProjectId)?data.activeProjectId:(nextProjects[0]?.id||'');
     if(!confirm('Bu yedek mevcut proje, sohbet, kod dosyaları, ayar ve özel prompt kayıtlarını değiştirecek. API anahtarları yedeğe dahil değildir ve bu cihazdaki anahtarlar silinmeyecek. Devam?'))return;
     await Promise.all([setPref(DB.settings,nextSettings),setPref(DB.projects,nextProjects),setPref(DB.activeProject,nextActiveProjectId),setPref(DB.chat,nextChat),setPref(DB.plugins,nextPlugins),setPref(DB.snippets,nextSnippets),setPref(DB.activity,nextActivity),setPref(DB.codeFiles,nextFiles),setPref(DB.skills,{customSkills:nextCustomSkills,selectedSkillIds:nextSelectedSkillIds,profileId:nextSkillProfileId})]);
-    settings=nextSettings;projectList=nextProjects;activeProjectId=nextActiveProjectId;chatHistory=nextChat;userPlugins=nextPlugins;reusableSnippets=nextSnippets;agentActivity=nextActivity;codeFiles=nextFiles;activeCodeFileId=nextActiveFileId;customSkills=nextCustomSkills;skillLibrary=[...SKILL_CATALOG,...customSkills];selectedSkillIds=nextSelectedSkillIds;skillProfileId=nextSkillProfileId;
+    Object.assign(settings,nextSettings);projectList=nextProjects;activeProjectId=nextActiveProjectId;chatHistory=nextChat;userPlugins=nextPlugins;reusableSnippets=nextSnippets;agentActivity=nextActivity;codeFiles=nextFiles;activeCodeFileId=nextActiveFileId;customSkills=nextCustomSkills;skillLibrary=[...SKILL_CATALOG,...customSkills];selectedSkillIds=nextSelectedSkillIds;skillProfileId=nextSkillProfileId;
     renderProviderCards();renderProjects();renderChat();renderPlugins();renderSkillLibrary();renderSnippetVault();renderAgentActivity();renderReuseCatalog();renderCodeFileSelector();loadActiveCodeFile();syncModeUI();updateDashboard();
     $('compareSelectionCount').textContent=settings.team.length+' ajan seçili';
-    showToast('Tam çalışma alanı geri yüklendi. API anahtarları ayrı güvenli depoda kaldı.');
+    window.dispatchEvent(new Event('ai-studio-workspace-restored'));showToast('Tam çalışma alanı geri yüklendi. API anahtarları ayrı güvenli depoda kaldı.');
   }catch(err){showToast('Yedek geri yüklenemedi: '+(err.message||'JSON dosyasını kontrol et.'));}
 }
 async function importProjects(file){try{const data=JSON.parse(await file.text());const incoming=Array.isArray(data)?data:data.projects;if(!Array.isArray(incoming))throw new Error('JSON içinde projects dizisi bulunamadı.');for(const p of incoming){if(typeof p?.name==='string'&&typeof p?.notes==='string'){projectList.push({id:crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random()),name:p.name.slice(0,100),notes:p.notes.slice(0,20000),updated:p.updated||new Date().toISOString()});}}if(!getActiveProject()&&projectList.length)activeProjectId=projectList[0].id;await Promise.all([setPref(DB.projects,projectList),setPref(DB.activeProject,activeProjectId)]);renderProjects();updateDashboard();showToast('Proje yedeği içe aktarıldı.');}catch(e){showToast('İçe aktarma başarısız: '+(e.message||'JSON dosyasını kontrol et.'));}}
@@ -1664,7 +1674,14 @@ async function init(){
     openShorts:{available:name=>openShortsToolNames.has(name),call:(name,args)=>requireOpenShortsTool(name,args)},
     videoKeyStore:{isNative:nativeApp,get:()=>getSecret('runway'),save:key=>saveSecret('runway',key),remove:()=>deleteSecret('runway')},
     go,notify:showToast,getAiMode:()=>settings.demoMode?'Demo açık':($('chatProvider').selectedOptions[0]?.textContent||'Seçili AI modeli')
-  });renderSkillLibrary();renderReuseCatalog();renderSnippetVault();renderAgentActivity();loadActiveCodeFile();syncModeUI();updateDashboard();$('compareSelectionCount').textContent=settings.team.length+' ajan seçili';
+  });
+  await mountAiPowerHub({
+    root:$('tools'),getSettings:()=>settings,saveSettings:()=>setPref(DB.settings,settings),
+    getConfiguredTeam:()=>configuredTeam(),callProvider:(id,prompt,history,callOptions)=>callProvider(id,prompt,history,callOptions),
+    getSecret,saveSecret,deleteSecret,isDemo:()=>settings.demoMode,notify:showToast,
+    logActivity:logAgentActivity,go,getDeviceInfo:()=>deviceLocalState?.device||null,nativeApp,getSystemPrompt:()=>settings.systemPrompt
+  });
+  renderSkillLibrary();renderReuseCatalog();renderSnippetVault();renderAgentActivity();loadActiveCodeFile();syncModeUI();updateDashboard();$('compareSelectionCount').textContent=settings.team.length+' ajan seçili';
   syncLocalCoderEngineUI();await refreshDeviceLocalModels(true);
   if(!nativeApp){$('nativeVaultPanel')?.classList.add('hidden');await loadSharedVault({quiet:true});}else{$('sharedVaultPanel')?.classList.add('hidden');$('nativeVaultPanel')?.classList.remove('hidden');await loadNativeVault({quiet:true});}
 }

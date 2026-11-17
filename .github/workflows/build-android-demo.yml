@@ -89,6 +89,14 @@ jobs:
         run: npm run test:rea-companion-contract
       - name: Test private website login gate
         run: npm run test:site
+      - name: Test AI Swarm, Plugin Library and free provider controls
+        run: |
+          node --check src/agent-swarm.js
+          node --check src/plugin-catalog.js
+          node --check src/openrouter-chat.js
+          node --check src/free-api-providers.js
+          node --check src/ai-power-hub.js
+          npm run test:ai-power-hub
       - name: Create Android project
         run: npx cap add android
       - name: Prepare a smaller Gradle distribution

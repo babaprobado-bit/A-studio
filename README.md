@@ -1,6 +1,6 @@
 # AI Studio — Android + Private Web Workspace
 
-AI Studio is an Android-first workspace for multi-provider AI coding workflows. The app opens directly in its standard AI chat interface. The Creator Studio provides three independent video workflows: What If, In My Town and Clips. The current development branch also adds a Skill Library and three Local Coder engine choices while preserving project/chat/editor/backup/vault features. Alpha 1 is an internal development milestone label, not part of the product name.
+AI Studio 1.1.4 is an Android-first workspace for multi-provider AI and coding workflows. The app opens in its standard AI chat interface. Creator Studio keeps What If, In My Town and Clips independent and adds a separate local Social Media draft planner. AI Power Hub adds a 10-engine Swarm coordinator, 34 prompt templates, free-only OpenRouter multi-chat and a 13-provider access directory. The existing Skill Library, Local Coder engines, project/chat/editor/backup/vault features remain in place.
 
 ## Current Local Coder modes
 
@@ -17,10 +17,14 @@ AI Studio is an Android-first workspace for multi-provider AI coding workflows. 
 
 ## Existing workspace features
 
-- Real provider adapters for OpenAI, Anthropic, Google Gemini, DeepSeek, Groq, OpenRouter and Ollama.
+- Real provider adapters for OpenAI, Anthropic, Google Gemini, DeepSeek, Groq, OpenRouter and Ollama; separate optional Cohere Trial and Cloudflare Workers AI routes in AI Power Hub.
 - Encrypted Android API-key storage through Android secure storage. Browser preview holds keys in memory only.
 - Demo mode enabled by default. Multi-provider/team runs that may make paid requests require confirmation.
-- Parallel team requests and sequential text pipelines.
+- All ten AI Team engines, parallel team requests and sequential text pipelines.
+- AI Swarm: task planning, up to ten bounded specialist calls, a shared result board, conflict-aware task scheduling, transient retry and final synthesis. Native Android concurrency is capped at two and drops to one when reported free RAM is below 900 MiB. Swarm proposes changes but does not write files or run shell commands.
+- Plugin Library: 34 searchable, enable/disable prompt templates. Templates are text instructions, not executable plugins.
+- OpenRouter Multi-Chat: compare up to four models concurrently; only openrouter/free or :free IDs with zero listed input/output prices are accepted.
+- 13-provider directory separates genuine free-tier, trial, account-dependent, unverified and non-free API routes; unknown free quotas are not presented as guaranteed.
 - Local project notes, chat history, shared project context and opt-in selected code/snippet context.
 - Multi-file code workspace; up to 100 files and 100 KB per file.
 - Snippet Vault, source/license notes, reusable code catalog, activity history.
@@ -29,13 +33,14 @@ AI Studio is an Android-first workspace for multi-provider AI coding workflows. 
 
 ## Creator Studio
 
-The former Social Media Studio screen is replaced by Creator Studio. Its three modes stay independent:
+Creator Studio has three independent content-generation modes plus a fourth separate Social Media planner:
 
 - **What If:** the creator chooses what doubles and the interval (for example, What if money doubled every hour?). The prompt keeps the doubling progression mathematically consistent and does not append an In My Town setting.
 - **In My Town:** a separate fictional-town story workflow with its own town name/event. It does not use a What If question or doubling mechanic.
 - **Clips:** a source-video workflow using OpenShorts to create short clips/captions. It requires an authorized HTTPS source, explicit rights confirmation and a quota check. It does not generate a What If or town story.
+- **Social Media:** a local-only draft planner with target platform, future date/time, planning notes, ready-for-review status and caption copying. It does not connect accounts, publish, externally schedule or run background jobs.
 
-What If and In My Town can use the selected free/local text model to write a script and the existing separately confirmed Runway video generation path. The pipeline stops when that video is ready; it does not automatically enter Clips. Clips remains a separate user-selected tool. Paid video generation is optional, priced and separately confirmed under parent/guardian-managed account and billing. Public publish/schedule controls are not exposed in the current Creator UI.
+What If and In My Town can use the selected free/local text model to write a script and the existing separately confirmed Runway video generation path. The pipeline stops when that video is ready; it does not automatically enter Clips. Clips remains a separate user-selected tool. Paid video generation is optional, priced and separately confirmed under parent/guardian-managed account and billing. Public publishing and external scheduling controls are not exposed in the current Creator UI.
 
 The app's initial screen is the existing AI chat. The Chat tab is first in the bottom navigation; Creator is immediately after it. The old home screen remains reachable from navigation.
 
@@ -48,7 +53,7 @@ Regular debug APK:
 
 Native GGUF debug APK:
 1. Use separate workflow Build Android APK with on-device Local Coder.
-2. Download artifact AI-Studio-1.1-OnDevice-LocalCoder-APK only after workflow completes successfully.
+2. Download artifact AI-Studio-1.1.4-Native-GGUF-APK only after the Native workflow completes successfully.
 3. That artifact targets Android 10+ / arm64 devices. Model weights are not bundled; download a supported GGUF model through the in-app model manager.
 
 Repository does not commit generated android/ project. GitHub Actions creates it with npx cap add android, configures native bridge, syncs Capacitor and runs Gradle. Workflows produce debug builds, not signed store releases.
@@ -63,6 +68,7 @@ Run from repository root:
     npm run test:site
     npm run test:skills
     npm run test:device-local-coder
+    npm run test:ai-power-hub
 
 JavaScript tests and mock plugins do not prove Kotlin/NDK compilation or real phone-local inference. Check native Android workflow and test on a physical supported phone.
 
@@ -70,7 +76,8 @@ JavaScript tests and mock plugins do not prove Kotlin/NDK compilation or real ph
 
 The durable project memory and exact next prompts live here:
 
-- docs/HANDOFF/README.md — read first; repository/branch status and all four sessions.
+- docs/HANDOFF/README.md — read first; repository/branch status and latest session checkpoints.
+- docs/HANDOFF/SESSION_20_AI_POWER_HUB_2026-11-17.md — Agent Swarm, 34 prompt plugins, OpenRouter free multi-chat, provider directory, optional Cohere/Cloudflare routes and regression gates.
 - docs/HANDOFF/PROJECT_STATE.md — architecture, source map, existing features, limits and security notes.
 - docs/HANDOFF/SESSION_1_NATIVE_APK.md — finish native build and obtain GGUF APK.
 - docs/HANDOFF/SESSION_2_DEVICE_TESTING.md — physical-phone and airplane-mode proof.

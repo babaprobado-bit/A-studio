@@ -1,0 +1,51 @@
+.ai-power-hub{display:grid;gap:14px;margin:14px 0 24px}
+.ai-power-intro,.ai-power-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:14px}
+.ai-power-intro h2,.ai-power-heading h3{margin:3px 0 6px}
+.ai-power-intro p,.ai-power-heading p{margin:0;color:var(--muted);font-size:12px}
+.ai-power-tabs{display:flex;gap:7px;overflow-x:auto;padding:2px 0 8px;scrollbar-width:thin}
+.ai-power-tab{flex:0 0 auto;border:1px solid var(--line);border-radius:12px;background:#111a2b;color:var(--muted);font-size:11px;font-weight:800;padding:10px 12px}
+.ai-power-tab.active{color:#f1edff;border-color:#7768bb;background:linear-gradient(135deg,#302852,#17273b)}
+.ai-power-panel{display:grid;gap:13px;min-width:0;padding:14px;border:1px solid var(--line);border-radius:16px;background:var(--panel,#101a2b)}
+.ai-power-panel[hidden]{display:none!important}
+.ai-power-heading{align-items:center}
+.ai-power-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.ai-power-call-budget{display:grid;gap:4px;align-content:center;padding:10px;border:1px solid var(--line);border-radius:12px;background:#0b1323}
+.ai-power-call-budget span,.ai-power-call-budget small{font-size:10px;color:var(--muted)}
+.ai-power-call-budget strong{font-size:15px}
+.ai-power-board,.ai-power-result,.ai-directory-card,.ai-plugin-card,.ai-provider-form{min-width:0;padding:12px;border:1px solid var(--line);border-radius:12px;background:#0b1323}
+.ai-power-board{display:grid;gap:8px;max-height:260px;overflow:auto}
+.ai-power-board-message{padding:8px;border:1px solid var(--line);border-radius:9px}
+.ai-power-board-message strong{font-size:11px}
+.ai-power-board-message p{margin:4px 0 0;color:var(--muted);font-size:11px;overflow-wrap:anywhere}
+.ai-power-result{display:grid;gap:8px}
+.ai-power-result pre{max-height:360px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;margin:0;color:#dbe5f5;font:12px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace}
+.ai-power-summary{border-color:#7768bb}
+.ai-power-summary h4{margin:0}
+.ai-plugin-grid,.ai-model-grid,.ai-provider-directory{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.ai-plugin-card{display:grid;gap:7px;min-width:0}
+.ai-plugin-card p,.ai-directory-card p{margin:0;color:var(--muted);font-size:11px;line-height:1.5;overflow-wrap:anywhere}
+.ai-plugin-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.ai-plugin-head strong{font-size:12px}
+.ai-consent{display:flex;align-items:flex-start;gap:7px;color:var(--muted);font-size:10px}
+.ai-consent input{margin:2px 0 0}
+.ai-model-choice{display:flex;align-items:flex-start;gap:9px;padding:10px;border:1px solid var(--line);border-radius:10px;background:#0b1323;min-width:0}
+.ai-model-choice input{margin-top:3px}
+.ai-model-choice span{display:grid;gap:4px;min-width:0}
+.ai-model-choice strong{font-size:11px;overflow-wrap:anywhere}
+.ai-model-choice small{font-size:9px;color:var(--muted);overflow-wrap:anywhere}
+.ai-directory-card{display:grid;gap:7px;min-width:0}
+.ai-directory-card a{font-size:10px}
+.ai-provider-setup{display:grid;gap:12px;margin-top:4px}
+.ai-provider-form{display:grid;gap:9px}
+.ai-provider-form h4{margin:0;font-size:14px}
+.ai-provider-form .field-label{margin:0}
+.ai-provider-form .row-actions{flex-wrap:wrap}
+#freeProviderResult{white-space:pre-wrap;overflow-wrap:anywhere;max-height:320px;overflow:auto}
+#swarmStatus[data-tone="error"],#cohereTrialStatus[data-tone="error"],#cloudflareStatus[data-tone="error"],#openRouterModelStatus[data-tone="error"],#openRouterMultiStatus[data-tone="error"]{color:#ff9c9c}
+#swarmStatus[data-tone="success"],#cohereTrialStatus[data-tone="success"],#cloudflareStatus[data-tone="success"],#openRouterModelStatus[data-tone="success"],#openRouterMultiStatus[data-tone="success"]{color:#91e1b4}
+@media(max-width:620px){
+ .ai-power-intro,.ai-power-heading{align-items:flex-start;flex-direction:column}
+ .ai-power-options,.ai-plugin-grid,.ai-model-grid,.ai-provider-directory{grid-template-columns:1fr}
+ .ai-power-panel{padding:11px}
+ .ai-power-tabs{margin-right:-2px}
+}
