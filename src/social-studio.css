@@ -61,3 +61,10 @@
 .social-ai-video-actions { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
 .social-ai-video-card .fineprint { margin:0; }
 @media(max-width:520px) { .social-key-row { grid-template-columns:minmax(0,1fr) auto; } .social-key-row #socialRunwayDeleteKey { grid-column:2; } }
+
+/* Full-pipeline automation controls and progress */
+.social-automation-launch { display:grid; gap:9px; margin-top:12px; padding:12px; border:1px solid #65528d; border-radius:13px; background:#17172f; }
+.social-automation-launch > .btn { width:100%; }
+.social-automation-launch .fineprint { margin:0; line-height:1.45; }
+#socialAutomationClip { min-height:38px; }
+@media(max-width:520px) { .social-automation-launch .social-two-col { grid-template-columns:1fr; } }

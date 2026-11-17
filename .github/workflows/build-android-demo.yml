@@ -55,6 +55,7 @@ jobs:
           node --check src/rea-companion-contract.js
           node --check src/shared-vault-context.js
           node --check src/social-studio.js
+          node --check src/social-studio-automation.js
           node --check src/social-studio-core.js
           node --check scripts/test-runway-video.mjs
           node --check src/runway-video.js

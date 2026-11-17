@@ -13,6 +13,7 @@ on:
       - '.github/workflows/build-android-local-coder.yml'
       - 'src/main.js'
       - 'src/social-studio.js'
+      - 'src/social-studio-automation.js'
       - 'src/social-studio-core.js'
       - 'src/runway-video.js'
       - 'src/openshorts-mcp.js'
@@ -78,6 +79,7 @@ jobs:
       - name: Run existing and new regression checks
         run: |
           node --check src/social-studio.js
+          node --check src/social-studio-automation.js
           node --check src/social-studio-core.js
           node --check scripts/test-runway-video.mjs
           node --check src/runway-video.js
