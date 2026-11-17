@@ -1,5 +1,6 @@
 import { Capacitor } from '@capacitor/core';
 import { connectOpenShorts, callOpenShortsTool, validateOpenShortsSourceUrl } from './openshorts-mcp.js';
+import { mountSocialStudio } from './social-studio.js';
 import { runApiLocalCoderSequence } from './local-coder-api.js';
 import { normalizeTeamSelection, normalizeOpenAiEndpoint, selectConfiguredTeam, confirmTeamLiveCalls, runParallelTeamCalls, runSequentialTeamCalls } from './ai-team.js';
 import { DeviceLocalCoder, DEVICE_MODEL_CATALOG, assessDeviceModel, chooseRecommendedDeviceModel, formatModelBytes } from './device-local-coder.js';
@@ -279,7 +280,7 @@ async function connectOpenShortsUi(){
     if(!key)throw new Error('OpenShorts API anahtarını gir.');
     const result=await connectOpenShorts({apiKey:key});
     openShortsToolNames=new Set(result.tools.map(tool=>tool.name));
-    const ready=['process_video','get_job_status','list_clips','get_quota','add_subtitles'].filter(name=>openShortsToolNames.has(name));
+    const ready=['process_video','get_job_status','list_clips','get_quota','add_subtitles','publish_clip'].filter(name=>openShortsToolNames.has(name));
     $('openshortsApiKey').value='';
     setOpenShortsStatus('Bağlandı: '+(result.serverInfo.title||result.serverInfo.name)+' · '+ready.length+' araç doğrulandı.','success');
     showToast('OpenShorts bağlantısı doğrulandı.');
@@ -1652,7 +1653,17 @@ async function init(){
   if(!nativeApp){showToast('Tarayıcıda API anahtarları yalnızca açık oturumda tutulur.');}
   await initKeys();await initOpenShortsKey(); projectList=await getPref(DB.projects,[]);activeProjectId=await getPref(DB.activeProject,'');chatHistory=await getPref(DB.chat,[]);userPlugins=await getPref(DB.plugins,[]);const storedSkills=await getPref(DB.skills,{});customSkills=(Array.isArray(storedSkills?.customSkills)?storedSkills.customSkills:[]).map(skill=>normalizeSkill(skill)).filter(Boolean).slice(-100);skillLibrary=[...SKILL_CATALOG,...customSkills];skillProfileId=storedSkills?.profileId==='custom'?'custom':(SKILL_PROFILES[storedSkills?.profileId]?storedSkills.profileId:'karpathy');const validSkillIds=new Set(skillLibrary.map(skill=>skill.id));selectedSkillIds=(Array.isArray(storedSkills?.selectedSkillIds)?storedSkills.selectedSkillIds:[]).filter(id=>validSkillIds.has(id)).slice(0,MAX_SELECTED_SKILLS);if(!selectedSkillIds.length)selectedSkillIds=getProfileSkillIds(skillProfileId);reusableSnippets=await getPref(DB.snippets,[]);agentActivity=await getPref(DB.activity,[]);codeFiles=normalizeCodeFileList(await getPref(DB.codeFiles,[]),true);if(!codeFiles.length)codeFiles=[makeCodeFile()];activeCodeFileId=codeFiles[0].id;await setPref(DB.codeFiles,codeFiles);
   if(!Array.isArray(projectList))projectList=[];if(!projectList.some(p=>p&&p.id===activeProjectId))activeProjectId=projectList[0]?.id||'';await setPref(DB.activeProject,activeProjectId);if(!Array.isArray(chatHistory))chatHistory=[];if(!Array.isArray(userPlugins))userPlugins=[];if(!Array.isArray(reusableSnippets))reusableSnippets=[];if(!Array.isArray(agentActivity))agentActivity=[];
-  renderProviderCards();renderProjects();renderChat();renderBuiltinTools();renderPlugins();renderOpenShortsPanel();renderSkillLibrary();renderReuseCatalog();renderSnippetVault();renderAgentActivity();loadActiveCodeFile();syncModeUI();updateDashboard();$('compareSelectionCount').textContent=settings.team.length+' ajan seçili';
+  renderProviderCards();renderProjects();renderChat();renderBuiltinTools();renderPlugins();renderOpenShortsPanel();await mountSocialStudio({
+    generateText:async prompt=>{
+      if(settings.demoMode)throw new Error('Demo modu açık. Gerçek AI senaryosu için Demo modunu kapat.');
+      const providerId=$('chatProvider').value||'gemini';
+      const freeOrLocal=providerId==='gemini'||providerId==='groq'||providerId==='ollama'||providerId==='device'||(providerId==='openrouter'&&isFreeOpenRouterModel(providerModel(providerId)));
+      if(!freeOrLocal)throw new Error('Social Studio yalnızca Gemini, Groq, OpenRouter :free veya yerel Ollama/GGUF modeliyle çalışır. Ücretli sağlayıcı çağrısı yapılmadı.');
+      return callProvider(providerId,prompt,[]);
+    },
+    openShorts:{available:name=>openShortsToolNames.has(name),call:(name,args)=>requireOpenShortsTool(name,args)},
+    go,notify:showToast,getAiMode:()=>settings.demoMode?'Demo açık':($('chatProvider').selectedOptions[0]?.textContent||'Seçili AI modeli')
+  });renderSkillLibrary();renderReuseCatalog();renderSnippetVault();renderAgentActivity();loadActiveCodeFile();syncModeUI();updateDashboard();$('compareSelectionCount').textContent=settings.team.length+' ajan seçili';
   syncLocalCoderEngineUI();await refreshDeviceLocalModels(true);
   if(!nativeApp){$('nativeVaultPanel')?.classList.add('hidden');await loadSharedVault({quiet:true});}else{$('sharedVaultPanel')?.classList.add('hidden');$('nativeVaultPanel')?.classList.remove('hidden');await loadNativeVault({quiet:true});}
 }
