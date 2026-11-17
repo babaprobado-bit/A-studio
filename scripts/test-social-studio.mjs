@@ -60,6 +60,15 @@ assert.equal(pipeline.duration, 15);
 assert.equal(pipeline.ratio, '960:960');
 assert.equal(pipeline.runwayPollCount, 90);
 assert.equal('apiKey' in pipeline, false);
+const queuedMultiShot = normalizeSocialQueue([{
+  id: 'multi-shot-15s',
+  title: 'Kısa test',
+  aiVideo: { generator: 'multi_shot_video', ratio: '960:960', duration: 15, promptText: 'x'.repeat(1400) }
+}])[0];
+assert.equal(queuedMultiShot.aiVideo.duration, 15);
+assert.equal(queuedMultiShot.aiVideo.ratio, '960:960');
+assert.equal(queuedMultiShot.aiVideo.promptText.length, 1400);
+
 assert.equal(isSocialAutomationPolling(pipeline.stage), true);
 assert.equal(isSocialAutomationPolling('awaiting_clip_approval'), false);
 assert.ok(getSocialAutomationPollDelay('openshorts_polling', 20) <= 30000);

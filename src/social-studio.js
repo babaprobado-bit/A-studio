@@ -781,6 +781,10 @@ export async function mountSocialStudio({ generateText, openShorts, videoKeyStor
   $('socialProcessVideo').addEventListener('click', async () => {
     if (busy) return;
     try {
+      const current = activeDraft();
+      if (['awaiting_clip_approval', 'openshorts_submitting', 'openshorts_polling'].includes(current?.pipeline?.stage)) {
+        throw new Error('Bu içerik tam otomasyon akışında. İkinci OpenShorts işi açmamak için otomatik devam düğmesini kullan.');
+      }
       let draft = updateEditorRecord();
       const source = validateOpenShortsSourceUrl($('socialSourceUrl').value);
       if (!$('socialRightsConfirm').checked) throw new Error('Devam etmeden önce videonun sahibi olduğunu veya işleme iznin bulunduğunu onayla.');
@@ -811,6 +815,11 @@ export async function mountSocialStudio({ generateText, openShorts, videoKeyStor
   $('socialCheckJob').addEventListener('click', async () => {
     const draft = activeDraft();
     if (busy || !draft?.jobId) return;
+    if (draft.pipeline?.stage === 'openshorts_polling') {
+      setAutomationStatus('OpenShorts otomatik takip ediliyor; yinelenen kontrol başlatılmadı.');
+      scheduleAutomationPoll(draft.id, 1000);
+      return;
+    }
     busy = true; $('socialCheckJob').disabled = true;
     try {
       const status = await openShorts.call('get_job_status', { job_id: draft.jobId });
