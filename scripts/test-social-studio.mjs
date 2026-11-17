@@ -3,6 +3,8 @@ import {
   SOCIAL_PLATFORMS, buildSocialPrompt, normalizeSocialDraft,
   normalizeSocialQueue, normalizeSocialClips, buildSocialPublishArgs
 } from '../src/social-studio-core.js';
+import { buildSocialMultiShotPrompt, normalizeSocialAutomationState, isSocialAutomationPolling, getSocialAutomationPollDelay } from '../src/social-studio-automation.js';
+import { buildRunwayMultiShotPayload, estimateRunwayMultiShotCost } from '../src/runway-video.js';
 
 const prompt = buildSocialPrompt({ topic: 'Yeni bir oyun geliştirme günlüğü', platforms: ['youtube', 'tiktok', 'youtube'], tone: 'storytelling', duration: 45 });
 assert.match(prompt, /Yeni bir oyun geliştirme günlüğü/);
@@ -38,4 +40,28 @@ assert.ok(publish.scheduled_date.endsWith('Z'));
 assert.throws(() => buildSocialPublishArgs({ jobId: '', clipIndex: 0, platforms: ['youtube'] }), /iş/);
 assert.throws(() => buildSocialPublishArgs({ jobId: 'job-1', clipIndex: 0, platforms: ['bad'] }), /platform/);
 assert.throws(() => buildSocialPublishArgs({ jobId: 'job-1', clipIndex: 0, platforms: ['youtube'], scheduledLocal: '2020-01-01T12:00', now: new Date('2025-01-01T00:00:00Z') }), /gelecekte/);
+const multiShot = buildRunwayMultiShotPayload({ storyPrompt: 'A robot explores a neon city.', ratio: '720:1280', duration: 15, audio: true });
+assert.equal(multiShot.endpoint, '/recipes/multi_shot_video');
+assert.equal(multiShot.payload.version, '2026-06');
+assert.equal(multiShot.payload.mode, 'auto');
+assert.equal(multiShot.payload.duration, 15);
+assert.equal(multiShot.payload.audio, true);
+assert.equal(multiShot.cost.credits, 195);
+assert.equal(multiShot.cost.usd, 1.95);
+assert.equal(estimateRunwayMultiShotCost(10, '960:960').usd, 1.3);
+assert.throws(() => estimateRunwayMultiShotCost(8), /5, 10 veya 15/);
+const multiShotPrompt = buildSocialMultiShotPrompt({ topic: 'Bir robotun şehirde kaybolması', title: 'Kayıp Robot', hook: 'Bu ışık nereden geliyor?', scenes: [{visual:'Yağmurlu neon sokak'},{visual:'Robot ışığı takip eder'}] });
+assert.match(multiShotPrompt, /3–5/);
+assert.match(multiShotPrompt, /Yağmurlu neon sokak/);
+assert.throws(() => buildSocialMultiShotPrompt({ topic: '' }), /konusunu/);
+const pipeline = normalizeSocialAutomationState({ stage: 'runway_polling', duration: 15, ratio: '960:960', estimatedCostUsd: 1.95, runwayPollCount: 999, apiKey: 'must-not-persist' });
+assert.equal(pipeline.stage, 'runway_polling');
+assert.equal(pipeline.duration, 15);
+assert.equal(pipeline.ratio, '960:960');
+assert.equal(pipeline.runwayPollCount, 90);
+assert.equal('apiKey' in pipeline, false);
+assert.equal(isSocialAutomationPolling(pipeline.stage), true);
+assert.equal(isSocialAutomationPolling('awaiting_clip_approval'), false);
+assert.ok(getSocialAutomationPollDelay('openshorts_polling', 20) <= 30000);
+
 console.log('Social Studio tests passed: prompt generation, safe JSON normalization, queue validation, clip normalization and guarded publishing schedule.');

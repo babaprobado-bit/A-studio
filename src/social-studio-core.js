@@ -1,3 +1,4 @@
+import { normalizeSocialAutomationState } from './social-studio-automation.js';
 export const SOCIAL_PLATFORMS = Object.freeze([
   { id: 'tiktok', label: 'TikTok' },
   { id: 'instagram', label: 'Instagram Reels' },
@@ -84,8 +85,11 @@ export function normalizeSocialQueue(value) {
     sourceUrl: text(item.sourceUrl, 2048),
     jobId: text(item.jobId, 160),
     clips: Array.isArray(item.clips) ? item.clips.slice(0, 30) : [],
+    pipeline: normalizeSocialAutomationState(item.pipeline),
     aiVideo: item.aiVideo && typeof item.aiVideo === 'object' ? {
-      provider: 'runway',
+      provider: text(item.aiVideo.provider, 40) || 'runway',
+      generator: text(item.aiVideo.generator, 50),
+      audio: item.aiVideo.audio === true,
       model: text(item.aiVideo.model, 40) || 'gen4.5',
       taskId: text(item.aiVideo.taskId, 100),
       status: text(item.aiVideo.status, 30).toUpperCase(),

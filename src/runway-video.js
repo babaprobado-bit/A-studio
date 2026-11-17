@@ -44,6 +44,35 @@ export function buildRunwayVideoPayload({ promptText, ratio = '720:1280', durati
   return { endpoint: image ? '/image_to_video' : '/text_to_video', payload, cost };
 }
 
+
+export const RUNWAY_MULTI_SHOT_VERSION = '2026-06';
+export const RUNWAY_MULTI_SHOT_CREDITS_PER_SECOND = 13;
+export const RUNWAY_MULTI_SHOT_RATIOS = Object.freeze(['720:1280', '1280:720', '960:960']);
+
+export function estimateRunwayMultiShotCost(durationSeconds, ratio = '720:1280') {
+  const duration = Number(durationSeconds);
+  if (![5, 10, 15].includes(duration)) throw new Error('Runway Multi-Shot video süresi 5, 10 veya 15 saniye olmalı.');
+  if (!RUNWAY_MULTI_SHOT_RATIOS.includes(ratio)) throw new Error('Runway Multi-Shot için desteklenmeyen kadraj.');
+  const credits = duration * RUNWAY_MULTI_SHOT_CREDITS_PER_SECOND;
+  return { duration, credits, usd: Number((credits / 100).toFixed(2)), creditsPerSecond: RUNWAY_MULTI_SHOT_CREDITS_PER_SECOND };
+}
+
+export function buildRunwayMultiShotPayload({ storyPrompt, ratio = '720:1280', duration = 10, audio = true }) {
+  const prompt = cleanText(storyPrompt, 2500);
+  if (!prompt) throw new Error('Çok sahneli video için hikâye açıklaması boş olamaz.');
+  if (String(storyPrompt ?? '').trim().length > 2500) throw new Error('Çok sahneli video açıklaması en fazla 2500 karakter olabilir.');
+  const cost = estimateRunwayMultiShotCost(duration, ratio);
+  return { endpoint: '/recipes/multi_shot_video', payload: { version: RUNWAY_MULTI_SHOT_VERSION, mode: 'auto', prompt, ratio, duration: cost.duration, audio: Boolean(audio) }, cost };
+}
+
+export async function createRunwayMultiShotVideo({ apiKey, storyPrompt, ratio = '720:1280', duration = 10, audio = true, fetchImpl = fetch }) {
+  const built = buildRunwayMultiShotPayload({ storyPrompt, ratio, duration, audio });
+  const result = await runwayRequest({ apiKey, path: built.endpoint, method: 'POST', body: built.payload, fetchImpl });
+  const taskId = cleanText(result?.id, 100);
+  if (!taskId) throw new Error(redact(result?.error || 'Runway Multi-Shot yanıtında üretim işi kimliği bulunamadı.', apiKey));
+  return { taskId, status: cleanText(result?.status || 'PENDING', 30).toUpperCase(), model: 'multi_shot_video', cost: built.cost, audio: Boolean(audio) };
+}
+
 function redact(value, key) {
   let message = String(value || 'Runway video isteği başarısız oldu.');
   if (key) message = message.split(key).join('[API anahtarı gizlendi]');
