@@ -1,3 +1,13 @@
+# AI Studio — Session 13 continuation starter
+
+Read first: `docs/HANDOFF/README.md`, `docs/HANDOFF/PROJECT_STATE.md`, and `docs/HANDOFF/SESSION_13_SOCIAL_MEDIA_STUDIO_2026-11-17.md`.
+
+Current source app commit: `5ab71091d5daedae87da08be5563f091f2936f71`. Module/docs/workflow commit: `89dd84c9778550d0899bb1e1b7a50535cea6d0a7`. Branch: `feature/android-offline-skills-v1`. PR #2 is open and Draft; never merge/close/mark ready. `main` must remain unchanged at `aab010319b6500002844bd24b11da85dd9ca3b00`.
+
+Next task: poll Demo run `44040503272` and Native GGUF run `44040503458`, inspect logs, then inspect real artifact metadata only after successful completion. Do not claim text-to-AI-actor-video generation: this Social Studio currently creates scripts/storyboards and clips supplied video sources using OpenShorts; every public post/schedule is separately confirmed. Do not connect or post to real social accounts during CI work. No physical-device tests.
+
+---
+
 # AI Studio — Session 6 resume starter
 
 ## SESSION 6 RESUME KEY — 2026-11-08

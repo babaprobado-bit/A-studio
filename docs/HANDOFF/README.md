@@ -1,4 +1,12 @@
-# AI Studio — Five-session handoff
+# AI Studio — Multi-session handoff
+## Session 13 latest source checkpoint — 2026-11-17
+
+- Social Media Studio source commits: `89dd84c9778550d0899bb1e1b7a50535cea6d0a7` (new modules/tests/docs/workflows) and `5ab71091d5daedae87da08be5563f091f2936f71` (main app wiring).
+- New Social tab: AI scripts/storyboards via free/local provider paths, local draft queue, OpenShorts vertical clipping, quota guard, explicit publish/schedule confirmation. Full text-to-AI-actor-video generation is not implemented by this MCP integration.
+- Demo run `44040503272`: all web build and regression steps passed; Gradle APK packaging still in progress at this checkpoint. Native GGUF run `44040503458`: SDK setup passed; native build tools still installing. No new artifact verified yet.
+- PR #2 remains open and Draft. `main` remains `aab010319b6500002844bd24b11da85dd9ca3b00`. No physical-device or public-post test was performed.
+- Details: [Session 13 Social Media Studio handoff](SESSION_13_SOCIAL_MEDIA_STUDIO_2026-11-17.md). Re-check live CI and artifacts before making claims.
+
 
 ## Session 5 current verified checkpoint — 2026-11-08 (Native + Demo APKs verified)
 

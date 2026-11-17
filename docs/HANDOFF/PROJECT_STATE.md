@@ -1,3 +1,15 @@
+# Session 13 — Social Media Studio — 2026-11-17
+
+- Source commits: `89dd84c9778550d0899bb1e1b7a50535cea6d0a7` (Social Studio modules, tests, docs and CI) and `5ab71091d5daedae87da08be5563f091f2936f71` (main app wiring).
+- Social Studio generates editable video scripts/storyboards with title, hook, voiceover, scenes, caption, hashtags and CTA. Only Gemini, Groq, OpenRouter `:free`, Ollama and device GGUF are permitted; Demo mode and paid-provider fallback are blocked.
+- OpenShorts handles quota-checked vertical clipping from an owned/permitted YouTube or direct HTTPS source, status polling and clips. `publish_clip` is optional and allowlisted; each immediate publish/schedule needs a separate explicit confirmation. The queue stores drafts/receipts, never API keys.
+- Current limit: no prompt-to-finished AI-actor/UGC video generation, no local-file create_upload and no recut_clip UI. This integration uses the published OpenShorts MCP clip-and-publish tools.
+- CI at the last checkpoint: Demo run `44040503272` passed dependency install, Vite build and every regression test including Social Studio/OpenShorts; Gradle packaging was running. Native run `44040503458` passed Android SDK setup; native build tools were installing. No new artifact verified.
+- Remote sandbox lacked npm; direct Node tests and syntax checks passed. No phone, real social account, real video processing or public posting was tested.
+- PR #2 remains open/Draft/unmerged. `main` remains `aab010319b6500002844bd24b11da85dd9ca3b00`. Read `SESSION_13_SOCIAL_MEDIA_STUDIO_2026-11-17.md` for complete handoff.
+
+---
+
 # Session 5 current checkpoint — 2026-11-08
 
 ## Session 5 current verified checkpoint — Native + Demo APKs
