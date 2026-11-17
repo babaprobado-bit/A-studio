@@ -1,3 +1,12 @@
+## Session 15 latest source checkpoint — 2026-11-17
+
+- Social Studio full pipeline: free/local AI script → Runway Multi-Shot (3–5 shots) → automatic foreground Runway polling → separate rights/quota approval → OpenShorts clips/captions → automatic job/clip polling → review queue.
+- Multi-Shot: 5/10/15s, vertical/horizontal/square 720p, 13 credits/sec ($0.13/sec). Separate confirmation and parent/guardian-managed billing required. OpenShorts minutes are separately checked and approved.
+- Polling pauses in the background and resumes when the app returns. Uncertain billable submissions are never blindly retried. Public publish/schedule remains a separate confirmed action.
+- Code commits: `1e5f972d3e51be7e900f366c0cfa0f818e73c0b8`, `aeae31c40985c6eb94b1d6a0d48e1baf83db7b26`, `63b8e5a087691d1fb4a026e0d3507d775fc36dcf`. No real provider calls, credit use, phone test or public posts performed. Details in [Session 15 full automation handoff](SESSION_15_FULL_AUTOMATION_2026-11-17.md). Keep PR #2 Draft/unmerged; main unchanged.
+
+---
+
 # AI Studio — Multi-session handoff
 
 ## Session 14 latest source checkpoint — 2026-11-17

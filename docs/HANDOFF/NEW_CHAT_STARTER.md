@@ -1,3 +1,9 @@
+# AI Studio — Session 15 continuation starter
+
+Read `docs/HANDOFF/README.md`, `docs/HANDOFF/PROJECT_STATE.md`, and `docs/HANDOFF/SESSION_15_FULL_AUTOMATION_2026-11-17.md`. Full Social Media Studio automation chains free/local script generation, Runway Multi-Shot, foreground task polling, separately approved OpenShorts clipping/captions, and automatic result polling. Public publishing remains separately confirmed. Keep PR #2 open/Draft/unmerged and never touch main. Paid Runway access and billing must be parent/guardian-managed. No real provider calls, credits, physical-device tests or posts have been used.
+
+---
+
 # AI Studio — Session 14 continuation starter
 
 Read `docs/HANDOFF/README.md`, `docs/HANDOFF/PROJECT_STATE.md`, and `docs/HANDOFF/SESSION_14_AI_VIDEO_GENERATION_2026-11-17.md`. New source adds real Runway Gen-4.5 text/image-to-video code, separate from OpenShorts clipping. Verify branch and PR before commit; run mocked tests; then dispatch Demo and Native GGUF CI. Paid API use is parent/guardian-managed, with per-render cost confirmation. No API key, credit purchase, live generation, phone test or social post has been performed. Keep PR #2 Draft/unmerged and do not change main.

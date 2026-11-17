@@ -34,3 +34,14 @@ Each generation requires a typed prompt or reference image, visible cost estimat
 - The user must have the rights to process and publish the source video. Do not post content that impersonates someone, exposes private information or uses unlicensed material.
 - Scheduling is submitted to OpenShorts. The app does not run a background timer and does not guarantee an account/platform's final publish status.
 - This is source/CI coverage only. No physical-device acceptance is claimed.
+
+
+## Full automation: brief to review queue
+
+Use **Tam otomasyonu başlat** to run the production chain. AI Studio first generates an editable script package through the selected free/local text model. It then creates a story prompt from the title, hook and scene plan and starts Runway Multi-Shot Video. The recipe automatically splits the story into 3–5 shots. Choose 5, 10 or 15 seconds and vertical, horizontal or square 720p framing. Generated scene audio is enabled, but it is not a spoken rendering of the written voiceover.
+
+Runway Multi-Shot Video is credit-priced at 13 credits per second at 720p (1 credit = USD $0.01): approximately $0.65 for 5 seconds, $1.30 for 10 seconds and $1.95 for 15 seconds. The app displays the estimate and asks for a separate confirmation before each generation. The account and billing must remain under a parent/guardian's management.
+
+When the Runway task completes, AI Studio automatically stores the MP4 URL and pauses at the OpenShorts gate. The user confirms video rights and reviews the remaining OpenShorts minute quota before processing. Once approved, AI Studio submits the clip/caption job once and automatically polls its job status and clip list. Completed clips enter the review queue.
+
+Polling runs only while AI Studio is foregrounded, pauses while hidden and resumes when the app becomes visible or is reopened. The app does not claim unattended Android background execution. Provider submission errors with uncertain outcomes are marked for attention and never blindly retried, to avoid duplicate charges/jobs. Public publishing and scheduling always remain separate, explicit user-confirmed actions.

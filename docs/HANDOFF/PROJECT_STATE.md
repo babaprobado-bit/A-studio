@@ -1,3 +1,13 @@
+## Session 15 — Full Social Media Studio automation — 2026-11-17
+
+- Single launch action chains selected free/local AI text generation to Runway Multi-Shot Video (3–5 shots, 5/10/15 seconds, scene audio), then separately approved OpenShorts clipping/captioning and review queue.
+- Runway and OpenShorts tasks are polled automatically while the app is foregrounded; polling pauses while hidden and resumes on return/reopen. Polling limits/backoff are applied. Uncertain billable submissions are never blindly retried.
+- 720p Multi-Shot pricing is 13 credits/sec ($0.13/sec): 5s $0.65, 10s $1.30, 15s $1.95. Each generation has a visible price and a separate confirmation; account/billing must be guardian-managed. OpenShorts rights/quota confirmation remains separate.
+- Public publishing/scheduling still requires a separate explicit confirmation. No live API calls, credit spend, physical-device tests or public posts are claimed.
+- Source commits: `1e5f972d3e51be7e900f366c0cfa0f818e73c0b8`, `aeae31c40985c6eb94b1d6a0d48e1baf83db7b26`, `63b8e5a087691d1fb4a026e0d3507d775fc36dcf`. Main unchanged; PR #2 remains Draft/unmerged. See `SESSION_15_FULL_AUTOMATION_2026-11-17.md`.
+
+---
+
 ## Session 14 — True AI video generation — 2026-11-17
 
 - Source module/test/workflow commit: `80ff55616063aeb139a6c5887d780364359730c7`; main app SecureStorage wiring commit: `8df3fd2b09bc601e2fca152ba3bce0b68ec8561f`.

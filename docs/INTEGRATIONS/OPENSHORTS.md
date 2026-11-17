@@ -24,3 +24,8 @@ https://mcp.openshorts.app/mcp
 
 ## Protocol
 The client performs the stateless JSON-RPC MCP initialize handshake, sends notifications/initialized, reads tools/list, then invokes tools/call. It expects the official Streamable HTTP JSON response format.
+
+
+## AI Studio full automation handoff
+
+AI Studio can chain a free/local-model script into Runway Multi-Shot Video and then, after separate video-rights and quota confirmation, into OpenShorts clipping and captions. OpenShorts job status and clip list are polled automatically while AI Studio is foregrounded. Polling pauses while hidden and resumes on return. The app persists provider job IDs and avoids blindly retrying uncertain submissions. Public publishing/scheduling continues to require its own explicit confirmation.
