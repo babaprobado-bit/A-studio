@@ -40,8 +40,12 @@ const processCall=calls.find(call=>call.body.method==='tools/call');
 assert.equal(processCall.authorization,'Bearer '+key);
 assert.equal(processCall.body.params.name,'process_video');
 assert.equal(processCall.body.params.arguments.confirm_rights,true);
-assert.throws(()=>callOpenShortsTool({apiKey:key,name:'publish_clip',fetchImpl:fakeFetch}),/etkin değil/);
+const published=await callOpenShortsTool({apiKey:key,name:'publish_clip',arguments:{job_id:'job-test-1',clip_index:0,platforms:['youtube'],title:'Test',description:'Test description'},fetchImpl:fakeFetch});
+assert.equal(published.job_id,'job-test-1');
+const publishCall=calls.filter(call=>call.body.method==='tools/call').at(-1);
+assert.equal(publishCall.body.params.name,'publish_clip');
+assert.deepEqual(publishCall.body.params.arguments.platforms,['youtube']);
 
 const failedFetch=async()=>response({jsonrpc:'2.0',id:1,error:{code:-32000,message:'bad token '+key}});
 await assert.rejects(callOpenShortsTool({apiKey:key,name:'get_quota',fetchImpl:failedFetch}),error=>!error.message.includes(key)&&/API anahtarı gizlendi/.test(error.message));
-console.log('OpenShorts MCP tests passed: key validation, HTTPS source validation, MCP handshake, tool calls, publish exclusion and secret redaction.');
+console.log('OpenShorts MCP tests passed: key validation, HTTPS source validation, MCP handshake, tool calls, publish allowlist and secret redaction.');

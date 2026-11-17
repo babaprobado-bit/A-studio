@@ -18,7 +18,8 @@
     "test:ai-team": "node scripts/test-ai-team.mjs",
     "test:rea-companion-contract": "node scripts/test-rea-companion-contract.mjs",
     "test:openshorts": "node scripts/test-openshorts.mjs",
-    "test:chat-layout": "node scripts/test-chat-layout.mjs"
+    "test:chat-layout": "node scripts/test-chat-layout.mjs",
+    "test:social-studio": "node scripts/test-social-studio.mjs"
   },
   "dependencies": {
     "express": "^5.1.0",
