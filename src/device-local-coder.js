@@ -34,6 +34,46 @@ export const DEVICE_MODEL_CATALOG = Object.freeze([
   }
 ]);
 
+export const DEVICE_CHAT_LIMITS = Object.freeze({
+  maxMessages: 64,
+  maxMessageBytes: 65536,
+  maxTotalBytes: 131072
+});
+
+export function normalizeDeviceChatMessages(messages) {
+  if (!Array.isArray(messages) || messages.length < 1 || messages.length > DEVICE_CHAT_LIMITS.maxMessages) {
+    throw new Error('Yerel sohbet 1–64 mesaj içermeli.');
+  }
+  const normalized = [];
+  const encoder = new TextEncoder();
+  let totalBytes = 0;
+  for (const message of messages) {
+    if (!message || typeof message !== 'object' || Array.isArray(message)) {
+      throw new Error('Yerel sohbet mesaj biçimi geçersiz.');
+    }
+    const role = typeof message.role === 'string' ? message.role : 'user';
+    const content = typeof message.content === 'string' ? message.content : '';
+    if (!content.trim()) continue;
+    if (!['system', 'user', 'assistant'].includes(role)) {
+      throw new Error('Yerel sohbet mesaj rolü desteklenmiyor.');
+    }
+    if (content.length > DEVICE_CHAT_LIMITS.maxMessageBytes) {
+      throw new Error('Tek bir yerel sohbet mesajı izin verilen boyutu aşıyor.');
+    }
+    const byteLength = encoder.encode(content).byteLength;
+    if (byteLength > DEVICE_CHAT_LIMITS.maxMessageBytes) {
+      throw new Error('Tek bir yerel sohbet mesajı izin verilen boyutu aşıyor.');
+    }
+    totalBytes += byteLength;
+    if (totalBytes > DEVICE_CHAT_LIMITS.maxTotalBytes) {
+      throw new Error('Yerel sohbet toplam metin boyutu izin verilen sınırı aşıyor.');
+    }
+    normalized.push({ role, content });
+  }
+  if (!normalized.length) throw new Error('Yerel sohbet mesajı boş.');
+  return normalized;
+}
+
 const GIB = 1024 ** 3;
 const MIB = 1024 ** 2;
 
@@ -452,8 +492,9 @@ export class DeviceLocalCoder {
 
   async generate(messages, options = {}) {
     if (!this.native || !this.loadedFileName) throw new Error('Önce telefondaki bir GGUF modelini belleğe yükle.');
+    const safeMessages = normalizeDeviceChatMessages(messages);
     return this.plugin.chat({
-      messages,
+      messages: safeMessages,
       maxTokens: Math.max(64, Math.min(Number(options.maxTokens || 700), 1800)),
       temperature: Math.max(0, Math.min(Number(options.temperature ?? 0.25), 1.2))
     });

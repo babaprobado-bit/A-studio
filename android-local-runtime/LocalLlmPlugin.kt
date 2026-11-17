@@ -35,6 +35,10 @@ import java.util.concurrent.Executors
 import java.util.concurrent.CancellationException
 import java.util.concurrent.atomic.AtomicBoolean
 
+private const val MAX_CHAT_MESSAGES = 64
+private const val MAX_CHAT_MESSAGE_BYTES = 65536
+private const val MAX_CHAT_TOTAL_BYTES = 131072L
+
 /** Private, on-device GGUF storage and llama.kt inference bridge. */
 @CapacitorPlugin(name = "LocalLlm")
 class LocalLlmPlugin : Plugin() {
@@ -769,12 +773,28 @@ class LocalLlmPlugin : Plugin() {
     fun chat(call: PluginCall) {
         try {
             val input = call.getArray("messages") ?: throw IllegalArgumentException("Sohbet mesajları eksik.")
+            if (input.length() < 1 || input.length() > MAX_CHAT_MESSAGES) {
+                throw IllegalArgumentException("Yerel sohbet 1–64 mesaj içermeli.")
+            }
             val messages = ArrayList<ChatMessage>()
+            var totalBytes = 0L
             for (i in 0 until input.length()) {
                 val item = input.getJSONObject(i)
                 val role = item.optString("role", "user")
                 val content = item.optString("content", "")
-                if (content.isNotBlank() && role in setOf("system", "user", "assistant")) messages.add(ChatMessage(role, content))
+                if (content.isBlank()) continue
+                if (role !in setOf("system", "user", "assistant")) {
+                    throw IllegalArgumentException("Yerel sohbet mesaj rolü desteklenmiyor.")
+                }
+                val messageBytes = content.toByteArray(Charsets.UTF_8).size
+                if (messageBytes > MAX_CHAT_MESSAGE_BYTES) {
+                    throw IllegalArgumentException("Tek bir yerel sohbet mesajı izin verilen boyutu aşıyor.")
+                }
+                totalBytes += messageBytes.toLong()
+                if (totalBytes > MAX_CHAT_TOTAL_BYTES) {
+                    throw IllegalArgumentException("Yerel sohbet toplam metin boyutu izin verilen sınırı aşıyor.")
+                }
+                messages.add(ChatMessage(role, content))
             }
             if (messages.isEmpty()) throw IllegalArgumentException("Sohbet mesajı boş.")
             val maxTokens = (call.getInt("maxTokens") ?: 700).coerceIn(64, 1800)

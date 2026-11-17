@@ -1,3 +1,13 @@
+## Session 17 latest source checkpoint — 2026-11-17
+
+- Ollama endpoint policy now permits remote HTTPS and limits HTTP to localhost/loopback/RFC1918 IPv4; credentials, query/hash, public HTTP, link-local and CGNAT targets are rejected. Validation runs both when saving settings and immediately before `/api/chat`.
+- Android GGUF chat input is bounded in JS and Kotlin: 64 messages, 65,536 UTF-8 bytes per message, 131,072 bytes total. Unsupported roles and oversized prompts are rejected before inference.
+- Focused Node syntax and AI Team/Device Local Coder tests passed in the remote workspace. GitHub Actions for the resulting source commit must still be checked; no local npm/Vite or Kotlin/Gradle build is claimed.
+- The Android manifest still has broad `usesCleartextTraffic=true` for trusted-LAN Ollama. The new app-level Ollama guard does not eliminate that platform-wide residual permission.
+- Details: [Session 17 security hardening](SESSION_17_SECURITY_HARDENING_2026-11-17.md). Keep PR #2 Draft/unmerged; never alter `main`.
+
+---
+
 ## Session 16 latest source checkpoint — 2026-11-17
 
 - The visible Social Media Studio screen is replaced by **Creator Studio** with independent What If, In My Town and Clips modes.

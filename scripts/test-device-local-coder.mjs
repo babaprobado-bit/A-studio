@@ -1,12 +1,56 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { DEVICE_MODEL_CATALOG, DeviceLocalCoder, assessDeviceModel, chooseRecommendedDeviceModel, estimateMinimumAvailableRamBytes, formatModelBytes, normalizeModelSha256 } from '../src/device-local-coder.js';
+import { DEVICE_MODEL_CATALOG, DEVICE_CHAT_LIMITS, DeviceLocalCoder, assessDeviceModel, chooseRecommendedDeviceModel, estimateMinimumAvailableRamBytes, formatModelBytes, normalizeDeviceChatMessages, normalizeModelSha256 } from '../src/device-local-coder.js';
+
+assert.deepEqual(DEVICE_CHAT_LIMITS, { maxMessages: 64, maxMessageBytes: 65536, maxTotalBytes: 131072 });
+assert.deepEqual(normalizeDeviceChatMessages([
+  { role: 'system', content: 'system context' },
+  { role: 'user', content: '   ' },
+  { role: 'assistant', content: 'prior answer' },
+  { content: 'current request' }
+]), [
+  { role: 'system', content: 'system context' },
+  { role: 'assistant', content: 'prior answer' },
+  { role: 'user', content: 'current request' }
+]);
+assert.throws(() => normalizeDeviceChatMessages([]), /1–64/);
+assert.throws(() => normalizeDeviceChatMessages(Array.from({ length: 65 }, () => ({ role: 'user', content: 'x' }))), /1–64/);
+assert.throws(() => normalizeDeviceChatMessages([{ role: 'tool', content: 'not supported' }]), /rolü desteklenmiyor/);
+assert.throws(() => normalizeDeviceChatMessages([{ role: 'user', content: '😀'.repeat(16385) }]), /boyutu aşıyor/,
+  'the per-message limit must count UTF-8 bytes rather than JavaScript characters');
+assert.throws(() => normalizeDeviceChatMessages([
+  { role: 'user', content: 'a'.repeat(50000) },
+  { role: 'assistant', content: 'b'.repeat(50000) },
+  { role: 'user', content: 'c'.repeat(50000) }
+]), /toplam metin boyutu/);
+let forwardedDeviceMessages = null;
+const chatBoundaryClient = new DeviceLocalCoder(true, {
+  chat: async ({ messages }) => { forwardedDeviceMessages = messages; return { text: 'bounded reply' }; }
+});
+chatBoundaryClient.loadedFileName = 'bounded-test.gguf';
+assert.equal((await chatBoundaryClient.generate([{ role: 'user', content: 'bounded request' }])).text, 'bounded reply');
+assert.deepEqual(forwardedDeviceMessages, [{ role: 'user', content: 'bounded request' }]);
+await assert.rejects(
+  () => chatBoundaryClient.generate(Array.from({ length: 65 }, () => ({ role: 'user', content: 'x' }))),
+  /1–64/
+);
 
 const devicePanelMarkup = await readFile(new URL('../src/device-local-coder-panel.html', import.meta.url), 'utf8');
 const indexMarkup = await readFile(new URL('../index.html', import.meta.url), 'utf8');
 const mainSource = await readFile(new URL('../src/main.js', import.meta.url), 'utf8');
 const deviceLocalCoderSource = await readFile(new URL('../src/device-local-coder.js', import.meta.url), 'utf8');
 const nativeSource = await readFile(new URL('../android-local-runtime/LocalLlmPlugin.kt', import.meta.url), 'utf8');
+assert.ok(deviceLocalCoderSource.includes('normalizeDeviceChatMessages(messages)'),
+  'the JS bridge must normalize and bound messages before invoking the native plugin');
+assert.ok(deviceLocalCoderSource.includes('messages: safeMessages'),
+  'only normalized messages may cross the Capacitor bridge');
+assert.ok(nativeSource.includes('MAX_CHAT_MESSAGES = 64') && nativeSource.includes('MAX_CHAT_MESSAGE_BYTES = 65536') && nativeSource.includes('MAX_CHAT_TOTAL_BYTES = 131072L'),
+  'the native plugin must enforce matching chat limits independently');
+const nativeChatStart = nativeSource.indexOf('fun chat(call: PluginCall)');
+const nativeChatEnd = nativeSource.indexOf('@PluginMethod', nativeChatStart + 10);
+const nativeChatSource = nativeSource.slice(nativeChatStart, nativeChatEnd > nativeChatStart ? nativeChatEnd : undefined);
+assert.ok(nativeChatSource.indexOf('MAX_CHAT_MESSAGES') >= 0 && nativeChatSource.indexOf('toByteArray(Charsets.UTF_8)') >= 0 && nativeChatSource.indexOf('MAX_CHAT_TOTAL_BYTES') >= 0,
+  'native message count and UTF-8 byte limits must run before llama.kt inference');
 const providerDefaultsStart = mainSource.indexOf('const providers = {');
 const providerDefaultsEnd = mainSource.indexOf('const defaultSettings', providerDefaultsStart);
 const providerDefaults = mainSource.slice(providerDefaultsStart, providerDefaultsEnd);

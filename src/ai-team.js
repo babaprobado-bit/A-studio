@@ -18,6 +18,31 @@ export function confirmTeamLiveCalls(providerIds, confirmLive) {
   return confirmLive(uniqueIds.length) === true;
 }
 
+function isPrivateIpv4(hostname) {
+  if (!/^\d{1,3}(?:\.\d{1,3}){3}$/.test(hostname)) return false;
+  const octets = hostname.split('.').map(Number);
+  if (octets.some(value => !Number.isInteger(value) || value < 0 || value > 255)) return false;
+  const [a, b] = octets;
+  return a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168);
+}
+
+export function normalizeOllamaEndpoint(value) {
+  const input = String(value ?? '').trim();
+  if (!input) throw new Error('Ollama adresi boş olamaz.');
+  let url;
+  try { url = new URL(input); } catch { throw new Error('Geçerli bir Ollama URL adresi gir.'); }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new Error('Ollama yalnızca HTTP veya HTTPS kullanabilir.');
+  if (url.username || url.password || url.search || url.hash) {
+    throw new Error('Ollama adresine kullanıcı bilgisi, query veya hash ekleme.');
+  }
+  const hostname = url.hostname.toLowerCase();
+  const loopback = hostname === 'localhost' || hostname === '[::1]' || /^127(?:\.\d{1,3}){3}$/.test(hostname);
+  if (url.protocol === 'http:' && !loopback && !isPrivateIpv4(hostname)) {
+    throw new Error('Şifresiz HTTP yalnızca localhost veya özel yerel ağ IPv4 adreslerinde kullanılabilir. Uzak Ollama sunucusunda HTTPS kullan.');
+  }
+  return url.origin + url.pathname.replace(/\/+$/, '');
+}
+
 export function normalizeOpenAiEndpoint(value) {
   const input = String(value ?? '').trim();
   if (!input) throw new Error('Endpoint adresi boş olamaz.');

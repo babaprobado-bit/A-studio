@@ -2,7 +2,7 @@ import { Capacitor } from '@capacitor/core';
 import { connectOpenShorts, callOpenShortsTool, validateOpenShortsSourceUrl } from './openshorts-mcp.js';
 import { mountSocialStudio } from './social-studio.js';
 import { runApiLocalCoderSequence } from './local-coder-api.js';
-import { normalizeTeamSelection, normalizeOpenAiEndpoint, selectConfiguredTeam, confirmTeamLiveCalls, runParallelTeamCalls, runSequentialTeamCalls } from './ai-team.js';
+import { normalizeTeamSelection, normalizeOpenAiEndpoint, normalizeOllamaEndpoint, selectConfiguredTeam, confirmTeamLiveCalls, runParallelTeamCalls, runSequentialTeamCalls } from './ai-team.js';
 import { DeviceLocalCoder, DEVICE_MODEL_CATALOG, assessDeviceModel, chooseRecommendedDeviceModel, formatModelBytes } from './device-local-coder.js';
 import { Preferences } from '@capacitor/preferences';
 import { SecureStoragePlugin } from 'capacitor-secure-storage-plugin';
@@ -455,9 +455,9 @@ async function callProvider(id,prompt,history,options={}){
   }
   const systemPrompt=systemFor(id,prompt,options);
   if(id==='ollama'){
-    const url=(settings.ollamaUrl||'').trim().replace(/\/+$/,''); const model=(settings.ollamaModel||providerModel(id)).trim();
-    if(!url||!model)throw new Error('Ollama adresi ve model adı eksik.'); let parsed; try{parsed=new URL(url);}catch(_){throw new Error('Ollama adresi geçerli bir URL olmalı.');}
-    if(!['http:','https:'].includes(parsed.protocol))throw new Error('Ollama adresi http:// veya https:// ile başlamalı.');
+    const model=(settings.ollamaModel||providerModel(id)).trim();
+    if(!String(settings.ollamaUrl||'').trim()||!model)throw new Error('Ollama adresi ve model adı eksik.');
+    const url=normalizeOllamaEndpoint(settings.ollamaUrl);
     const messages=[{role:'system',content:systemPrompt}].concat(history.slice(-8).map(m=>({role:m.role,content:m.content}))).concat([{role:'user',content:prompt}]);
     const d=await fetchJson(url+'/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model,messages,stream:false,options:{temperature:0.4}})});
     const answer=d?.message?.content;if(!answer)throw new Error('Ollama yanıtında mesaj yok. Model adını ve sunucuyu kontrol et.');return answer;
@@ -1470,9 +1470,9 @@ async function importWorkspace(file){
   }catch(err){showToast('Yedek geri yüklenemedi: '+(err.message||'JSON dosyasını kontrol et.'));}
 }
 async function importProjects(file){try{const data=JSON.parse(await file.text());const incoming=Array.isArray(data)?data:data.projects;if(!Array.isArray(incoming))throw new Error('JSON içinde projects dizisi bulunamadı.');for(const p of incoming){if(typeof p?.name==='string'&&typeof p?.notes==='string'){projectList.push({id:crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random()),name:p.name.slice(0,100),notes:p.notes.slice(0,20000),updated:p.updated||new Date().toISOString()});}}if(!getActiveProject()&&projectList.length)activeProjectId=projectList[0].id;await Promise.all([setPref(DB.projects,projectList),setPref(DB.activeProject,activeProjectId)]);renderProjects();updateDashboard();showToast('Proje yedeği içe aktarıldı.');}catch(e){showToast('İçe aktarma başarısız: '+(e.message||'JSON dosyasını kontrol et.'));}}
-async function saveOllama(){settings.ollamaUrl=$('ollamaUrl').value.trim();settings.ollamaModel=$('ollamaModel').value.trim()||providers.ollama.model;settings.models.ollama=settings.ollamaModel;await setPref(DB.settings,settings);renderProviderCards();updateDashboard();showToast('Ollama ayarları kaydedildi.');}
+async function saveOllama(){const rawUrl=$('ollamaUrl').value.trim();try{settings.ollamaUrl=rawUrl?normalizeOllamaEndpoint(rawUrl):'';}catch(error){showToast('Ollama adresi güvenlik kontrolünden geçmedi: '+error.message);return false;}settings.ollamaModel=$('ollamaModel').value.trim()||providers.ollama.model;settings.models.ollama=settings.ollamaModel;await setPref(DB.settings,settings);renderProviderCards();updateDashboard();showToast('Ollama ayarları kaydedildi.');return true;}
 async function testProvider(id){if(settings.demoMode){showToast('Önce Demo modunu kapat; bu test tek gerçek API isteği gönderebilir.');return;}try{const result=await callProvider(id,'Yanıt olarak sadece OK yaz.',[]);showToast('Bağlantı yanıt verdi: '+result.slice(0,70));}catch(e){showToast('Bağlantı testi başarısız: '+(e.message||'Hata'));}}
-async function testOllama(){await saveOllama();if(settings.demoMode){showToast('Demo modu açık. Gerçek yerel test için Demo modunu kapat.');return;}try{const result=await callProvider('ollama','Yanıt olarak sadece OK yaz.',[]);showToast('Ollama yanıt verdi: '+result.slice(0,70));}catch(e){showToast('Ollama testi başarısız: '+(e.message||'Hata'));}}
+async function testOllama(){if(!await saveOllama())return;if(settings.demoMode){showToast('Demo modu açık. Gerçek yerel test için Demo modunu kapat.');return;}try{const result=await callProvider('ollama','Yanıt olarak sadece OK yaz.',[]);showToast('Ollama yanıt verdi: '+result.slice(0,70));}catch(e){showToast('Ollama testi başarısız: '+(e.message||'Hata'));}}
 async function saveProviderCard(id){
   settings.models[id]=$('model-'+id).value.trim()||providers[id].model;
   if(id==='custom'){

@@ -2,8 +2,23 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   normalizeTeamSelection, getTeamStageDetails, selectConfiguredTeam,
-  confirmTeamLiveCalls, runParallelTeamCalls, runSequentialTeamCalls
+  confirmTeamLiveCalls, runParallelTeamCalls, runSequentialTeamCalls, normalizeOllamaEndpoint
 } from '../src/ai-team.js';
+
+assert.equal(normalizeOllamaEndpoint('http://192.168.1.20:11434/'), 'http://192.168.1.20:11434');
+assert.equal(normalizeOllamaEndpoint('http://10.4.5.6:11434'), 'http://10.4.5.6:11434');
+assert.equal(normalizeOllamaEndpoint('http://172.31.9.9:11434'), 'http://172.31.9.9:11434');
+assert.equal(normalizeOllamaEndpoint('http://127.2.3.4:11434'), 'http://127.2.3.4:11434');
+assert.equal(normalizeOllamaEndpoint('http://localhost:11434'), 'http://localhost:11434');
+assert.equal(normalizeOllamaEndpoint('http://[::1]:11434'), 'http://[::1]:11434');
+assert.equal(normalizeOllamaEndpoint('https://ollama.example.com:11434/'), 'https://ollama.example.com:11434');
+for (const blocked of [
+  'http://8.8.8.8:11434', 'http://example.com:11434', 'http://169.254.169.254:11434',
+  'http://172.15.0.1:11434', 'http://172.32.0.1:11434', 'http://192.167.1.1:11434',
+  'http://100.64.0.1:11434', 'http://[fd00::1]:11434', 'ftp://192.168.1.2:11434',
+  'http://user:pass@192.168.1.2:11434', 'http://192.168.1.2:11434?token=example',
+  'http://192.168.1.2:11434/#fragment'
+]) assert.throws(() => normalizeOllamaEndpoint(blocked), undefined, blocked);
 
 const providerIds=['openai','anthropic','gemini','deepseek','groq','openrouter','huggingface','custom','ollama','device'];
 assert.deepEqual(normalizeTeamSelection(providerIds,providerIds),providerIds,
@@ -109,6 +124,18 @@ assert.deepEqual(failedPipelineTrace,['openai','anthropic'],
 const main=readFileSync(new URL('../src/main.js',import.meta.url),'utf8');
 const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
 const pkg=JSON.parse(readFileSync(new URL('../package.json',import.meta.url),'utf8'));
+assert.ok(main.includes('normalizeOllamaEndpoint(settings.ollamaUrl)'),
+  'Ollama endpoints must be normalized before any prompt or shared context is sent');
+const ollamaBlockStart=main.indexOf("if(id==='ollama'){");
+const ollamaGuardIndex=main.indexOf('normalizeOllamaEndpoint(settings.ollamaUrl)',ollamaBlockStart);
+const ollamaRequestIndex=main.indexOf("fetchJson(url+'/api/chat'",ollamaBlockStart);
+assert.ok(ollamaBlockStart>=0&&ollamaGuardIndex>ollamaBlockStart&&ollamaRequestIndex>ollamaGuardIndex,
+  'the Ollama HTTP policy must run before the provider request');
+assert.match(main,/async function testOllama\(\)\{if\(!await saveOllama\(\)\)return;/,
+  'the Ollama connection test must stop when an unsafe endpoint is rejected');
+assert.match(main,/async function saveOllama\(\)\{const rawUrl=\$\('ollamaUrl'\)\.value\.trim\(\);try\{settings\.ollamaUrl=rawUrl\?normalizeOllamaEndpoint\(rawUrl\):'';/,
+  'unsafe Ollama endpoints must not be persisted as valid connection settings');
+
 
 assert.ok(!main.includes('slice(0,4)')&&!main.includes('slice(0, 4)'),
   'no four-member team cap may remain');

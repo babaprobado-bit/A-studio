@@ -1,3 +1,15 @@
+## Session 17 — Ollama transport and GGUF chat-boundary hardening — 2026-11-17
+
+- `src/ai-team.js` exports `normalizeOllamaEndpoint()`: remote HTTPS is allowed; cleartext HTTP is restricted to localhost/loopback/RFC1918 IPv4. Credentials, query/hash, public HTTP, IPv4 link-local, CGNAT and private IPv6 are rejected.
+- `src/main.js` validates Ollama settings before persistence and revalidates before the shared `/api/chat` request path, so Team, chat and Local Coder do not bypass the policy.
+- `src/device-local-coder.js` and `LocalLlmPlugin.kt` enforce the same native chat budget: 64 messages, 65,536 UTF-8 bytes/message, 131,072 bytes total; only system/user/assistant roles are forwarded.
+- `scripts/test-ai-team.mjs` and `scripts/test-device-local-coder.mjs` cover endpoint policy, request ordering, UTF-8 byte sizing, role/count/aggregate limits and JS-to-native forwarding.
+- Remote Node checks passed. The Device Local Coder suite used a temporary test-only Capacitor stub/fake plugin. No npm/Vite build, Kotlin/Gradle build, real Ollama request or physical-device test is claimed.
+- Residual: both Android workflows still set `android:usesCleartextTraffic=true` for trusted-LAN Ollama. App-level endpoint validation narrows Ollama requests but does not make the manifest permission host-scoped.
+- All 10 AI Team engines, Skills Library, free-only provider gates, GGUF catalogue and REA mock-only boundary are preserved. See `SESSION_17_SECURITY_HARDENING_2026-11-17.md`.
+
+---
+
 ## Session 16 — Creator Studio replacement — 2026-11-17
 
 - Replaced the visible Social Media Studio product surface with **Creator Studio** and three mutually exclusive modes: What If, In My Town and Clips.

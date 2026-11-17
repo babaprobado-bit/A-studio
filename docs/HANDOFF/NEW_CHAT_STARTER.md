@@ -1,3 +1,9 @@
+# AI Studio — Session 17 continuation starter
+
+Read `docs/HANDOFF/README.md`, `docs/HANDOFF/PROJECT_STATE.md`, and `docs/HANDOFF/SESSION_17_SECURITY_HARDENING_2026-11-17.md`. Session 17 hardens Ollama HTTP targets and adds matching JS/Kotlin UTF-8 chat budgets for native GGUF. Recheck the feature branch, PR #2 open/Draft/head/base and `main` before any write. Verify Demo and Native GGUF CI/artifacts for the new source commit. Keep all 10 AI Team engines, free-only provider gates, Skills, GGUF and REA mock-only boundaries. Do not claim device inference or app-wide cleartext removal; Android `usesCleartextTraffic=true` remains a documented trusted-LAN residual.
+
+---
+
 # AI Studio — Session 16 continuation starter
 
 Read docs/HANDOFF/README.md, docs/HANDOFF/PROJECT_STATE.md, and docs/HANDOFF/SESSION_16_CREATOR_STUDIO_2026-11-17.md. The visible Social Media Studio UI has been replaced by three independent Creator modes: What If, In My Town and Clips. The standard AI chat is the default app screen. What If and In My Town script/video generation must not be combined with each other or automatically routed into Clips. Clips remains a separate authorized-source/OpenShorts workflow. The old publishing UI is hidden. Verify current branch/PR/CI before continuing; keep PR #2 open/Draft/unmerged and never touch main. Any paid Runway account and billing must be parent/guardian-managed. No real provider calls, credits, device tests or public posts are claimed.
