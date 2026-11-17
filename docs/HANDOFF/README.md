@@ -1,3 +1,5 @@
+> **Latest checkpoint (2026-11-17):** Session 18 added Ollama special-use IP and redirect hardening, recorded the 13-provider free-tier audit, and captured Demo/Native CI status. See `SESSION_18_OLLAMA_SECURITY_AND_PROVIDER_AUDIT_2026-11-17.md`. Code commit: `acb74e2ed3c26299a27cb863bfe0f2c43912d46e`. PR #2 remains open Draft; `main` is unchanged.
+
 ## Session 17 latest source checkpoint — 2026-11-17
 
 - Ollama endpoint policy now permits remote HTTPS and limits HTTP to localhost/loopback/RFC1918 IPv4; credentials, query/hash, public HTTP, link-local and CGNAT targets are rejected. Validation runs both when saving settings and immediately before `/api/chat`.

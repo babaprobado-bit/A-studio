@@ -1,3 +1,5 @@
+> **Latest checkpoint (2026-11-17):** Session 18 added Ollama special-use IP and redirect hardening, recorded the 13-provider free-tier audit, and captured Demo/Native CI status. See `SESSION_18_OLLAMA_SECURITY_AND_PROVIDER_AUDIT_2026-11-17.md`. Code commit: `acb74e2ed3c26299a27cb863bfe0f2c43912d46e`. PR #2 remains open Draft; `main` is unchanged.
+
 ## Session 17 — Ollama transport and GGUF chat-boundary hardening — 2026-11-17
 
 - `src/ai-team.js` exports `normalizeOllamaEndpoint()`: remote HTTPS is allowed; cleartext HTTP is restricted to localhost/loopback/RFC1918 IPv4. Credentials, query/hash, public HTTP, IPv4 link-local, CGNAT and private IPv6 are rejected.
