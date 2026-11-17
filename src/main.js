@@ -28,6 +28,7 @@ const DB = {
   skills: 'ai-studio-skills-v1'
 };
 const nativeApp = Capacitor.isNativePlatform();
+const MAX_OPENROUTER_CHAT_MODELS = 4;
 const deviceLocalCoder = new DeviceLocalCoder(nativeApp);
 let deviceLocalState = null;
 let openShortsToolNames = new Set();
@@ -1441,7 +1442,7 @@ async function importWorkspace(file){
     if(nextSettings.models.openrouter==='openai/gpt-5-mini')nextSettings.models.openrouter='openrouter/free';
     nextSettings.swarmMaxAgents=Number.isFinite(Number(nextSettings.swarmMaxAgents))?Math.max(2,Math.min(10,Math.floor(Number(nextSettings.swarmMaxAgents)))):3;
     nextSettings.swarmConcurrency=Number.isFinite(Number(nextSettings.swarmConcurrency))?Math.max(1,Math.min(4,Math.floor(Number(nextSettings.swarmConcurrency)))):2;
-    nextSettings.openrouterChatModels=Array.isArray(nextSettings.openrouterChatModels)?[...new Set(nextSettings.openrouterChatModels.filter(id=>typeof id==='string'&&(id.trim().toLowerCase()==='openrouter/free'||id.trim().toLowerCase().endsWith(':free'))))].slice(0,4):['openrouter/free'];
+    nextSettings.openrouterChatModels=Array.isArray(nextSettings.openrouterChatModels)?[...new Set(nextSettings.openrouterChatModels.filter(id=>typeof id==='string'&&(id.trim().toLowerCase()==='openrouter/free'||id.trim().toLowerCase().endsWith(':free'))))].slice(0,MAX_OPENROUTER_CHAT_MODELS):['openrouter/free'];
     if(!nextSettings.openrouterChatModels.length)nextSettings.openrouterChatModels=['openrouter/free'];
     nextSettings.enabledPromptPluginIds=Array.isArray(nextSettings.enabledPromptPluginIds)?[...new Set(nextSettings.enabledPromptPluginIds.filter(id=>typeof id==='string'))].slice(0,34):undefined;
     nextSettings.cloudflareAccountId=typeof nextSettings.cloudflareAccountId==='string'&&/^[a-f0-9]{32}$/i.test(nextSettings.cloudflareAccountId)?nextSettings.cloudflareAccountId:'';
