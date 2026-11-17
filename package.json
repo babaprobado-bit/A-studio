@@ -19,7 +19,8 @@
     "test:rea-companion-contract": "node scripts/test-rea-companion-contract.mjs",
     "test:openshorts": "node scripts/test-openshorts.mjs",
     "test:chat-layout": "node scripts/test-chat-layout.mjs",
-    "test:social-studio": "node scripts/test-social-studio.mjs"
+    "test:social-studio": "node scripts/test-social-studio.mjs",
+    "test:runway-video": "node scripts/test-runway-video.mjs"
   },
   "dependencies": {
     "express": "^5.1.0",

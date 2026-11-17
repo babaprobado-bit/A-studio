@@ -5,6 +5,7 @@ export const SOCIAL_PLATFORMS = Object.freeze([
 ]);
 
 const PLATFORM_IDS = new Set(SOCIAL_PLATFORMS.map((platform) => platform.id));
+const RUNWAY_RATIOS_SAFE = new Set(['720:1280', '1280:720']);
 const text = (value, max = 4000) => String(value ?? '').trim().slice(0, max);
 
 export function buildSocialPrompt({ topic, platforms, tone = 'energetic', language = 'Turkish', duration = 30, audience = '' }) {
@@ -83,6 +84,20 @@ export function normalizeSocialQueue(value) {
     sourceUrl: text(item.sourceUrl, 2048),
     jobId: text(item.jobId, 160),
     clips: Array.isArray(item.clips) ? item.clips.slice(0, 30) : [],
+    aiVideo: item.aiVideo && typeof item.aiVideo === 'object' ? {
+      provider: 'runway',
+      model: text(item.aiVideo.model, 40) || 'gen4.5',
+      taskId: text(item.aiVideo.taskId, 100),
+      status: text(item.aiVideo.status, 30).toUpperCase(),
+      promptText: text(item.aiVideo.promptText, 1000),
+      ratio: RUNWAY_RATIOS_SAFE.has(text(item.aiVideo.ratio, 20)) ? text(item.aiVideo.ratio, 20) : '720:1280',
+      duration: Math.max(2, Math.min(10, Number(item.aiVideo.duration) || 5)),
+      estimatedCostUsd: Number.isFinite(Number(item.aiVideo.estimatedCostUsd)) ? Math.max(0, Number(item.aiVideo.estimatedCostUsd)) : null,
+      videoUrl: text(item.aiVideo.videoUrl, 2048),
+      failure: text(item.aiVideo.failure, 500),
+      actualCostCredits: Number.isFinite(Number(item.aiVideo.actualCostCredits)) ? Math.max(0, Number(item.aiVideo.actualCostCredits)) : null,
+      createdAt: text(item.aiVideo.createdAt, 40)
+    } : null,
     publishRequests: Array.isArray(item.publishRequests) ? item.publishRequests.slice(0, 30) : [],
     createdAt: text(item.createdAt, 40) || new Date().toISOString(),
     updatedAt: text(item.updatedAt, 40) || new Date().toISOString()

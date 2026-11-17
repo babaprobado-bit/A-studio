@@ -56,6 +56,8 @@ jobs:
           node --check src/shared-vault-context.js
           node --check src/social-studio.js
           node --check src/social-studio-core.js
+          node --check scripts/test-runway-video.mjs
+          node --check src/runway-video.js
           node --check src/openshorts-mcp.js
           node --check server/workshop-smoke-test.js
           node --check scripts/test-ai-team.mjs
@@ -73,6 +75,7 @@ jobs:
       - name: Test Social Media Studio and OpenShorts publishing
         run: |
           npm run test:social-studio
+          npm run test:runway-video
           npm run test:openshorts
       - name: Test Skill Library
         run: |

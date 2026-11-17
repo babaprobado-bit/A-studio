@@ -54,7 +54,8 @@ app.use(helmet({
       defaultSrc: ["'self'"],
       scriptSrc: ["'self'"],
       styleSrc: ["'self'"],
-      imgSrc: ["'self'", 'data:'],
+      imgSrc: ["'self'", 'data:', 'https://*.cloudfront.net'],
+      mediaSrc: ["'self'", 'blob:', 'https://*.cloudfront.net'],
       fontSrc: ["'self'", 'data:'],
       connectSrc: [
         "'self'",
@@ -65,6 +66,8 @@ app.use(helmet({
         'https://api.groq.com',
         'https://openrouter.ai',
         'https://mcp.openshorts.app',
+        'https://api.dev.runwayml.com',
+        'https://*.cloudfront.net',
         'http:'
       ],
       formAction: ["'self'"],

@@ -4,6 +4,7 @@ import {
   SOCIAL_PLATFORMS, buildSocialPrompt, normalizeSocialDraft,
   normalizeSocialQueue, normalizeSocialClips, buildSocialPublishArgs
 } from './social-studio-core.js';
+import { estimateRunwayVideoCost, createRunwayVideo, getRunwayVideoTask } from './runway-video.js';
 import './social-studio.css';
 
 const STORAGE_KEY = 'ai-studio-social-studio-v1';
@@ -14,10 +15,11 @@ const platformName = (id) => SOCIAL_PLATFORMS.find((platform) => platform.id ===
 const statusNames = {
   script_ready: 'Senaryo hazır', processing: 'Video işleniyor', review: 'Kontrol bekliyor',
   publish_request_sent: 'Yayın isteği gönderildi', schedule_request_sent: 'Zamanlama isteği gönderildi',
+  ai_video_generating: 'AI video oluşturuluyor', ai_video_ready: 'AI video hazır',
   failed: 'İşlem başarısız'
 };
 
-export async function mountSocialStudio({ generateText, openShorts, go, notify = () => {}, getAiMode = () => 'AI sağlayıcısı' }) {
+export async function mountSocialStudio({ generateText, openShorts, videoKeyStore = {}, go, notify = () => {}, getAiMode = () => 'AI sağlayıcısı' }) {
   if ($('social')) return;
   const main = document.querySelector('main');
   const nav = document.querySelector('.bottom-nav');
@@ -43,7 +45,7 @@ export async function mountSocialStudio({ generateText, openShorts, go, notify =
   screen.className = 'screen social-screen'; screen.id = 'social';
   screen.innerHTML = `
     <div class="page-title social-title"><div class="eyebrow">AI CONTENT WORKFLOW</div><h1>Social Media Studio</h1><p>Fikirden senaryoya, dikey videodan yayın kuyruğuna tek akış. İçeriği önce sen kontrol edersin.</p></div>
-    <div class="social-flow-strip" aria-label="İçerik üretim aşamaları"><span>1 · Fikir</span><i>›</i><span>2 · AI senaryo</span><i>›</i><span>3 · Video</span><i>›</i><span>4 · Onay</span><i>›</i><span>5 · Yayın</span></div>
+    <div class="social-flow-strip" aria-label="İçerik üretim aşamaları"><span>1 · Fikir</span><i>›</i><span>2 · AI senaryo</span><i>›</i><span>3 · Sıfırdan AI video</span><i>›</i><span>4 · Klip / altyazı</span><i>›</i><span>5 · Onay / yayın</span></div>
     <div class="social-top-grid">
       <section class="panel social-panel">
         <div class="section-head"><div><div class="eyebrow">01 / CONTENT BRIEF</div><h2>Video fikri</h2></div><span class="pill">AI destekli</span></div>
@@ -74,9 +76,26 @@ export async function mountSocialStudio({ generateText, openShorts, go, notify =
         <div class="row-actions"><button type="button" id="socialSaveDraft" class="btn secondary">Taslağı kaydet</button><button type="button" id="socialNewDraft" class="btn ghost small">Yeni taslak</button><span class="grow"></span><span class="fineprint">Her alan düzenlenebilir.</span></div>
       </section>
     </div>
-    <section class="panel social-panel social-video-panel">
-      <div class="section-head"><div><div class="eyebrow">03 / VIDEO PRODUCTION</div><h2>Dikey videoyu üret</h2></div><span class="pill" id="socialOpenShortsBadge">OpenShorts kontrol ediliyor</span></div>
-      <p class="muted">Uzun videonu YouTube bağlantısıyla veya doğrudan video URL'siyle ver. OpenShorts kaynak videodaki iyi anları bulur, 9:16 klipler ve altyazılar oluşturur.</p>
+    <section class="panel social-panel social-ai-video-panel" id="socialAIVideoPanel">
+      <div class="section-head"><div><div class="eyebrow">03 / TEXT-TO-VIDEO · IMAGE-TO-VIDEO</div><h2>Sıfırdan AI video üret</h2></div><span class="pill" id="socialRunwayBadge">AI motoru kontrol ediliyor</span></div>
+      <p class="muted">Bir sahne tarif et; AI yeni bir video oluştursun. İstersen ilk kare olarak bir görsel de ver. Bu, mevcut videodan klip kesme işleminden ayrıdır.</p>
+      <label class="field-label" for="socialRunwayKey">Runway Dev API anahtarı · yalnızca ebeveyn/vasinin yönettiği hesap</label>
+      <div class="social-key-row"><input class="input" id="socialRunwayKey" type="password" maxlength="500" autocomplete="new-password" placeholder="Anahtar uygulamada gizli saklanır"><button type="button" id="socialRunwaySaveKey" class="btn secondary small">Güvenli kaydet</button><button type="button" id="socialRunwayDeleteKey" class="btn ghost small danger-text">Anahtarı sil</button></div>
+      <p class="fineprint">Anahtar sohbet geçmişine veya sosyal medya kuyruğuna yazılmaz. Android'de Secure Storage kullanılır; web önizlemesinde yalnızca açık oturum belleğinde tutulur. Üretim krediyle ücretlendirilir; Runway Dev hesabında önceden var olan promosyon kredisi yoksa ücret doğar.</p>
+      <label class="field-label" for="socialAIVideoPrompt">Videoda görmek istediğin sahne</label>
+      <textarea class="input" id="socialAIVideoPrompt" rows="4" maxlength="1000" placeholder="Örn. Yağmurlu neon bir şehirde yürüyen sevimli robot, sinematik takip kamerası, gerçekçi ışıklar..."></textarea>
+      <div class="social-two-col">
+        <div><label class="field-label" for="socialAIVideoImage">İlk kare görseli (isteğe bağlı)</label><input class="input" id="socialAIVideoImage" type="file" accept="image/png,image/jpeg,image/webp"><small class="fineprint">Görselden videoya dönüştürür. PNG/JPG/WebP, en fazla 4 MB. Sadece kullanma hakkın olan ve paylaşımı güvenli bir görsel seç.</small></div>
+        <div><label class="field-label" for="socialAIVideoRatio">Kadraj</label><select class="input" id="socialAIVideoRatio"><option value="720:1280" selected>Dikey 9:16 · Shorts / Reels</option><option value="1280:720">Yatay 16:9</option><option value="960:960">Kare 1:1</option></select><label class="field-label" for="socialAIVideoDuration">Süre</label><select class="input" id="socialAIVideoDuration"><option value="5" selected>5 saniye</option><option value="8">8 saniye</option><option value="10">10 saniye</option></select></div>
+      </div>
+      <div class="social-video-cost" id="socialAIVideoCost">Tahmini ücret: 5 saniye için $0.60 USD</div>
+      <label class="social-check social-guardian-consent"><input type="checkbox" id="socialRunwayGuardianApproved"><span>Bu API hesabı ve faturalandırma ebeveynim/vasim tarafından yönetiliyor; bu üretime onay verdi. Referans görseli kullanma hakkım var.</span></label>
+      <div class="row-actions"><button type="button" id="socialAIVideoGenerate" class="btn primary" disabled>AI ile videoyu oluştur ✦</button><button type="button" id="socialAIVideoCheck" class="btn ghost small" disabled>Üretim durumunu kontrol et</button><span class="grow"></span><span id="socialAIVideoStatus" class="fineprint" role="status">API bağlantısı kontrol ediliyor…</span></div>
+      <div id="socialAIVideoResult" class="social-ai-video-result" aria-live="polite"></div>
+    </section>
+    <section class="panel social-panel social-video-panel" id="socialVideoProduction">
+      <div class="section-head"><div><div class="eyebrow">04 / VIDEO WORKFLOW</div><h2>Mevcut videodan klip çıkar</h2></div><span class="pill" id="socialOpenShortsBadge">OpenShorts kontrol ediliyor</span></div>
+      <p class="muted">Kendi videonu veya yukarıda ürettiğin AI videoyu gönder. OpenShorts dikey klipler, altyazılar ve paylaşım için içerik hazırlar.</p>
       <label class="field-label" for="socialSourceUrl">Kaynak video HTTPS bağlantısı</label><input class="input" id="socialSourceUrl" type="url" maxlength="2048" placeholder="https://youtu.be/... veya doğrudan .mp4 bağlantısı">
       <label class="openshorts-rights"><input type="checkbox" id="socialRightsConfirm"><span>Bu videonun sahibiyim veya videoyu işleme ve kliplerini yayımlama iznim var.</span></label>
       <div class="social-two-col"><div><label class="field-label" for="socialClipCount">Hedef klip sayısı</label><select class="input" id="socialClipCount"><option value="3" selected>3 klip</option><option value="5">5 klip</option><option value="8">8 klip</option></select></div><div class="social-tool-note"><strong>Otomatik adımlar</strong><span>AI an seçimi · 9:16 kadraj · altyazı · açılış kancası</span></div></div>
@@ -85,7 +104,7 @@ export async function mountSocialStudio({ generateText, openShorts, go, notify =
       <div id="socialClipResults" class="social-clip-grid" aria-live="polite"></div>
     </section>
     <section class="panel social-panel" id="socialPublishPanel">
-      <div class="section-head"><div><div class="eyebrow">04 / REVIEW & PUBLISH</div><h2>Önizle, onayla, zamanla</h2></div><span class="pill">İnsan onayı gerekli</span></div>
+      <div class="section-head"><div><div class="eyebrow">05 / REVIEW & PUBLISH</div><h2>Önizle, onayla, zamanla</h2></div><span class="pill">İnsan onayı gerekli</span></div>
       <p class="muted" id="socialPublishSummary">Yayınlamak için önce işlenmiş kliplerden birini seç.</p>
       <div class="field-label">Yayınlanacak platformlar</div>
       <div class="social-platforms">${SOCIAL_PLATFORMS.map((platform) => `<label class="social-check"><input type="checkbox" data-social-publish-platform="${platform.id}"><span>${platform.label}</span></label>`).join('')}</div>
@@ -97,10 +116,10 @@ export async function mountSocialStudio({ generateText, openShorts, go, notify =
       <div class="row-actions"><button type="button" id="socialPublishConfirm" class="btn primary" disabled>Onayla ve yayınla / zamanla</button><span class="grow"></span><span id="socialPublishStatus" class="fineprint" role="status"></span></div>
     </section>
     <section class="panel social-panel">
-      <div class="section-head"><div><div class="eyebrow">05 / CONTENT CALENDAR</div><h2>İçerik kuyruğu</h2></div><span class="pill" id="socialQueueCount">0 taslak</span></div>
+      <div class="section-head"><div><div class="eyebrow">06 / CONTENT CALENDAR</div><h2>İçerik kuyruğu</h2></div><span class="pill" id="socialQueueCount">0 taslak</span></div>
       <div id="socialQueueList" class="social-queue-list"><p class="fineprint">Henüz kayıtlı içerik yok.</p></div>
     </section>
-    <div class="notice compact"><strong>Üretim sınırı:</strong> Bu sürüm AI ile senaryo/sahne planı hazırlar ve verdiğin kaynak videodan Shorts/Reels klipleri çıkarır. Metinden sıfırdan AI oyunculu UGC video üretimi, OpenShorts'un ayrı AI Shorts servisine ve harici video/voice sağlayıcılarına bağlıdır; bu entegrasyonda o servis varmış gibi gösterilmez. Yayınlama isteği de platform sonucu doğrulanmadan “yayında” sayılmaz.</div>
+    <div class="notice compact"><strong>Üretim ve maliyet:</strong> Sıfırdan metin/görselden video üretimi Runway Gen-4.5 API ile yapılır ve ücretlidir; 5 saniye yaklaşık $0.60, 10 saniye yaklaşık $1.20. Üretimden önce maliyet ayrıca gösterilir ve onay sorulur. Sonrasında istersen OpenShorts ile altyazı/klip ve yayın akışına geçersin. Runway Gen-4.5 2–10 saniyelik sessiz görsel klipler üretir; seslendirme/konuşma ayrı aşamadır. Çıktı bağlantıları 24–48 saatte sona erebilir, videoyu zamanında indir.</div>
   `;
   const toolsScreen = $('tools');
   main.insertBefore(screen, toolsScreen || null);
@@ -109,6 +128,8 @@ export async function mountSocialStudio({ generateText, openShorts, go, notify =
   let activeDraftId = '';
   let activeClipIndex = null;
   let busy = false;
+  let runwayKey = '';
+  let runwayAvailable = true;
 
   const activeDraft = () => drafts.find((draft) => draft.id === activeDraftId) || null;
   const setStatus = (message, tone = 'info') => {
@@ -137,7 +158,28 @@ export async function mountSocialStudio({ generateText, openShorts, go, notify =
     }).join('');
   };
   const renderAiMode = () => {
-    $('socialAiMode').textContent = `Seçili: ${getAiMode()}. Demo kapalı ve ücretsiz/yerel model hazır olmalı.`;
+    $('socialAiMode').textContent = `Seçili: ${getAiMode()}. Senaryo için ücretsiz/yerel model kullanılır.`;
+  };
+  const renderRunwayState = () => {
+    $('socialRunwayBadge').textContent = runwayAvailable ? (runwayKey ? 'Gen-4.5 hazır · ücretli' : 'Runway motoru hazır · anahtar gerekli') : 'Runway servisi kapalı';
+    $('socialRunwayBadge').className = 'pill ' + (runwayAvailable ? 'live' : '');
+    $('socialAIVideoGenerate').disabled = !runwayAvailable || !runwayKey || busy;
+    $('socialAIVideoCheck').disabled = !activeDraft()?.aiVideo?.taskId || busy;
+    $('socialRunwaySaveKey').disabled = !runwayAvailable;
+    $('socialRunwayDeleteKey').disabled = !runwayKey || busy;
+  };
+  const renderGeneratedVideo = (video) => {
+    const out = $('socialAIVideoResult');
+    if (!video) { out.innerHTML = ''; return; }
+    const status = String(video.status || 'UNKNOWN').toUpperCase();
+    if (status !== 'SUCCEEDED' || !video.videoUrl) {
+      out.innerHTML = `<p class="openshorts-status" data-tone="${status === 'FAILED' ? 'error' : 'info'}">AI video: ${escapeHtml(status)}${video.failure ? ` · ${escapeHtml(video.failure)}` : ''}</p>`;
+      return;
+    }
+    let safeUrl = '';
+    try { const url = new URL(video.videoUrl); if (url.protocol === 'https:' && /\.mp4(?:$|\?)/i.test(url.href)) safeUrl = url.href; } catch {}
+    if (!safeUrl) { out.textContent = 'Runway video bağlantısı geçerli bir HTTPS MP4 bağlantısı değil.'; return; }
+    out.innerHTML = `<article class="social-ai-video-card"><video controls playsinline preload="metadata" src="${escapeHtml(safeUrl)}"></video><div class="social-ai-video-actions"><a class="btn secondary small" href="${escapeHtml(safeUrl)}" target="_blank" rel="noopener noreferrer">Videoyu indir / aç ↗</a><button type="button" class="btn primary small" data-social-use-ai-video>OpenShorts klip ve yayın akışına aktar</button></div><p class="fineprint">Runway video bağlantıları geçicidir (yaklaşık 24–48 saat). Videoyu cihazına indir. Yayın için OpenShorts adımında ayrıca hak onayı ve kota kontrolü gerekir.</p></article>`;
   };
   const fillEditor = (draft) => {
     $('socialDraftTitle').value = draft?.title || '';
@@ -150,7 +192,10 @@ export async function mountSocialStudio({ generateText, openShorts, go, notify =
     selectedDraftPlatforms(draft?.platforms || selectedBriefPlatforms());
     $('socialDraftBadge').textContent = draft ? statusNames[draft.status] || 'Kayıtlı taslak' : 'Yeni taslak';
     $('socialSourceUrl').value = draft?.sourceUrl || '';
+    $('socialAIVideoPrompt').value = draft?.aiVideo?.promptText || '';
     $('socialCheckJob').disabled = !draft?.jobId || busy;
+    $('socialAIVideoCheck').disabled = !draft?.aiVideo?.taskId || busy;
+    renderGeneratedVideo(draft?.aiVideo || null);
     renderClips(draft?.clips || []);
     renderQueue();
   };
@@ -158,7 +203,7 @@ export async function mountSocialStudio({ generateText, openShorts, go, notify =
     let draft = activeDraft();
     const now = new Date().toISOString();
     if (!draft) {
-      draft = { id: makeId(), createdAt: now, status: 'script_ready', clips: [], publishRequests: [], jobId: '', sourceUrl: '' };
+      draft = { id: makeId(), createdAt: now, status: 'script_ready', clips: [], aiVideo: null, publishRequests: [], jobId: '', sourceUrl: '' };
       drafts.unshift(draft); activeDraftId = draft.id;
     }
     draft.title = $('socialDraftTitle').value.trim().slice(0, 100) || 'Yeni kısa video';
@@ -226,11 +271,127 @@ export async function mountSocialStudio({ generateText, openShorts, go, notify =
   });
   $('socialNewDraft').addEventListener('click', () => {
     activeDraftId = ''; activeClipIndex = null;
-    ['socialTopic', 'socialAudience', 'socialDraftTitle', 'socialHook', 'socialVoiceover', 'socialScenes', 'socialCaption', 'socialHashtags', 'socialCta', 'socialSourceUrl'].forEach((id) => { $(id).value = ''; });
+    ['socialTopic', 'socialAudience', 'socialDraftTitle', 'socialHook', 'socialVoiceover', 'socialScenes', 'socialCaption', 'socialHashtags', 'socialCta', 'socialSourceUrl', 'socialAIVideoPrompt'].forEach((id) => { $(id).value = ''; });
     selectedDraftPlatforms(['tiktok', 'instagram', 'youtube']);
-    $('socialDraftBadge').textContent = 'Yeni taslak'; $('socialClipResults').innerHTML = '';
+    $('socialDraftBadge').textContent = 'Yeni taslak'; $('socialClipResults').innerHTML = ''; $('socialAIVideoImage').value = ''; $('socialAIVideoResult').innerHTML = ''; $('socialAIVideoStatus').textContent = 'Yeni taslak. Üretim için tekrar onay gerekir.';
     $('socialPublishSummary').textContent = 'Yayınlamak için önce işlenmiş kliplerden birini seç.';
     $('socialPublishConfirm').disabled = true; renderQueue(); setStatus('Yeni içerik taslağı hazır.');
+  });
+
+  const updateRunwayEstimate = () => {
+    try {
+      const estimate = estimateRunwayVideoCost(Number($('socialAIVideoDuration').value));
+      $('socialAIVideoCost').textContent = `Runway Gen-4.5 · $0.12/sn · tahmini toplam $${estimate.usd.toFixed(2)} USD (${estimate.credits} kredi)`;
+    } catch (error) { $('socialAIVideoCost').textContent = error.message; }
+  };
+  const readImageFile = (file) => new Promise((resolve, reject) => {
+    if (!file) return resolve('');
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) return reject(new Error('İlk kare yalnızca PNG, JPG veya WebP olabilir.'));
+    if (file.size <= 0 || file.size > 4 * 1024 * 1024) return reject(new Error('İlk kare görseli en fazla 4 MB olabilir.'));
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(new Error('Görsel okunamadı.'));
+    reader.readAsDataURL(file);
+  });
+
+  $('socialRunwaySaveKey').addEventListener('click', async () => {
+    const key = $('socialRunwayKey').value.trim();
+    if (!key) { notify('Runway API anahtarını gir.'); return; }
+    if (!runwayAvailable) { notify('Video üretim sunucusu henüz etkinleştirilmemiş.'); return; }
+    try {
+      await videoKeyStore.save(key);
+      runwayKey = key;
+      $('socialRunwayKey').value = '';
+      $('socialAIVideoStatus').textContent = videoKeyStore.isNative ? 'API anahtarı Android Secure Storage alanına kaydedildi.' : 'Web önizlemesinde anahtar yalnızca bu sekme açıkken bellekte tutuluyor.';
+      renderRunwayState();
+      notify('Runway anahtarı kaydedildi.');
+    } catch (error) { notify(error.message || 'Runway anahtarı kaydedilemedi.'); }
+  });
+  $('socialRunwayDeleteKey').addEventListener('click', async () => {
+    if (!runwayKey || busy) return;
+    if (!confirm('Runway API anahtarı bu cihazın güvenli deposundan silinsin mi?')) return;
+    try {
+      await videoKeyStore.remove(); runwayKey = '';
+      $('socialRunwayKey').value = '';
+      $('socialAIVideoStatus').textContent = 'Runway anahtarı bu cihazdan silindi.';
+      renderRunwayState();
+    } catch (error) { notify(error.message || 'Runway anahtarı silinemedi.'); }
+  });
+  $('socialAIVideoDuration').addEventListener('change', updateRunwayEstimate);
+
+  $('socialAIVideoGenerate').addEventListener('click', async () => {
+    if (busy) return;
+    try {
+      if (!runwayAvailable) throw new Error('Runway video servisi sunucu tarafında etkin değil.');
+      if (!runwayKey) throw new Error('Önce ebeveyn/vasinin yönettiği Runway anahtarını güvenli depoya kaydet.');
+      if (!$('socialRunwayGuardianApproved').checked) throw new Error('Ücretli üretim için ebeveyn/vasinin yönetim ve onay koşulu işaretlenmeli.');
+      const promptText = $('socialAIVideoPrompt').value.trim();
+      if (!promptText) throw new Error('AI videoda görmek istediğin sahneyi tarif et.');
+      const duration = Number($('socialAIVideoDuration').value);
+      const ratio = $('socialAIVideoRatio').value;
+      const imageDataUrl = await readImageFile($('socialAIVideoImage').files?.[0]);
+      const estimate = estimateRunwayVideoCost(duration);
+      const mode = imageDataUrl ? 'Görselden videoya' : 'Metinden videoya';
+      const ok = confirm(`${mode} · Runway Gen-4.5\n\nSüre: ${duration} saniye\nKadraj: ${ratio}\nTahmini ücret: $${estimate.usd.toFixed(2)} USD (${estimate.credits} kredi)\n\nBu ücretsiz değildir. Sağlayıcı son maliyeti belirler. Hesap ve faturalandırma ebeveyn/vasinin yönetimindeyse devam et. Devam edilsin mi?`);
+      if (!ok) return;
+      busy = true; $('socialAIVideoGenerate').disabled = true; $('socialAIVideoCheck').disabled = true;
+      $('socialAIVideoStatus').textContent = 'Runway üretim işi gönderiliyor…';
+      const created = await createRunwayVideo({ apiKey: runwayKey, promptText, ratio, duration, imageDataUrl });
+      const draft = updateEditorRecord();
+      draft.aiVideo = {
+        provider: 'runway', model: created.model, taskId: created.taskId,
+        status: created.status || 'PENDING', promptText, ratio, duration,
+        estimatedCostUsd: estimate.usd, videoUrl: '', createdAt: new Date().toISOString()
+      };
+      draft.status = 'ai_video_generating'; draft.updatedAt = new Date().toISOString();
+      await saveState(); fillEditor(draft);
+      $('socialAIVideoStatus').textContent = `Üretim kuyruğa alındı · görev ${created.taskId}. Durumu kontrol etmek için en az 5 saniye bekle.`;
+      notify('AI video üretim işi başlatıldı.');
+    } catch (error) { $('socialAIVideoStatus').textContent = error.message || 'AI video üretilemedi.'; }
+    finally { busy = false; renderRunwayState(); }
+  });
+
+  $('socialAIVideoCheck').addEventListener('click', async () => {
+    const draft = activeDraft();
+    if (busy || !draft?.aiVideo?.taskId) return;
+    const lastPolledAt = Date.parse(draft.aiVideo.lastPolledAt || '');
+    if (Number.isFinite(lastPolledAt) && Date.now() - lastPolledAt < 5000) {
+      $('socialAIVideoStatus').textContent = 'Runway görev durumunu en fazla 5 saniyede bir kontrol et. Biraz bekle.';
+      return;
+    }
+    busy = true; $('socialAIVideoCheck').disabled = true;
+    try {
+      draft.aiVideo.lastPolledAt = new Date().toISOString();
+      await saveState();
+      const result = await getRunwayVideoTask({ apiKey: runwayKey, taskId: draft.aiVideo.taskId });
+      draft.aiVideo.status = result.status;
+      draft.aiVideo.videoUrl = result.videoUrl || '';
+      draft.aiVideo.failure = result.failure || '';
+      if (result.costCredits != null) draft.aiVideo.actualCostCredits = result.costCredits;
+      if (result.status === 'SUCCEEDED' && result.videoUrl) {
+        draft.status = 'ai_video_ready';
+        $('socialAIVideoStatus').textContent = 'AI video hazır. Önizle ve videoyu indir.';
+      } else if (['FAILED', 'CANCELED'].includes(result.status)) {
+        draft.status = 'failed';
+        $('socialAIVideoStatus').textContent = `AI video üretimi ${result.status.toLowerCase()}: ${result.failure || 'sağlayıcı ayrıntı vermedi.'}`;
+      } else {
+        $('socialAIVideoStatus').textContent = `Runway durumu: ${result.status}. Yeniden kontrol etmeden önce en az 5 saniye bekle.`;
+      }
+      draft.updatedAt = new Date().toISOString(); await saveState(); fillEditor(draft);
+    } catch (error) { $('socialAIVideoStatus').textContent = error.message || 'AI video durumu alınamadı.'; }
+    finally { busy = false; renderRunwayState(); }
+  });
+
+  $('socialAIVideoResult').addEventListener('click', async (event) => {
+    const button = event.target.closest('[data-social-use-ai-video]');
+    if (!button) return;
+    const draft = activeDraft();
+    if (!draft?.aiVideo?.videoUrl) return;
+    $('socialSourceUrl').value = draft.aiVideo.videoUrl;
+    draft.sourceUrl = draft.aiVideo.videoUrl; draft.updatedAt = new Date().toISOString();
+    await saveState();
+    $('socialVideoProduction').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setStatus('Üretilen AI video kaynak olarak eklendi. Hak onayını verip OpenShorts klip/altyazı adımını başlatabilirsin.', 'success');
   });
 
   $('socialProcessVideo').addEventListener('click', async () => {
@@ -351,6 +512,12 @@ export async function mountSocialStudio({ generateText, openShorts, go, notify =
     const stored = await Preferences.get({ key: STORAGE_KEY });
     if (stored.value) drafts = normalizeSocialQueue(JSON.parse(stored.value)?.drafts);
   } catch { drafts = []; }
+  try { runwayKey = String(await videoKeyStore.get() || ''); } catch { runwayKey = ''; }
+  $('socialAIVideoStatus').textContent = runwayKey
+    ? (videoKeyStore.isNative ? 'Runway Gen-4.5 anahtarı Android Secure Storage alanında. Her üretim ayrıca maliyet onayı ister.' : 'Runway anahtarı bu web oturumunun belleğinde. Sekme kapanınca kaybolur; her üretim ayrıca maliyet onayı ister.')
+    : 'Runway Gen-4.5 hazır. Ebeveyn/vasinin yönettiği API anahtarını güvenli şekilde ekle. Web önizlemesinde bağlantı CORS kurallarına bağlı olabilir.';
+  updateRunwayEstimate();
+  renderRunwayState();
   renderAiMode(); renderQueue();
   if (drafts.length) {
     activeDraftId = drafts[0].id;

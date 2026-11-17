@@ -12,12 +12,20 @@ on:
       - 'scripts/patch-android-local-runtime.py'
       - '.github/workflows/build-android-local-coder.yml'
       - 'src/main.js'
+      - 'src/social-studio.js'
+      - 'src/social-studio-core.js'
+      - 'src/runway-video.js'
+      - 'src/openshorts-mcp.js'
+      - 'scripts/test-social-studio.mjs'
+      - 'scripts/test-runway-video.mjs'
+      - 'scripts/test-openshorts.mjs'
       - 'src/ai-team.js'
       - 'scripts/test-ai-team.mjs'
       - 'server/workshop-smoke-test.js'
       - 'index.html'
       - 'src/skill-library.js'
       - 'package.json'
+      - 'capacitor.config.json'
 
 permissions:
   contents: read
@@ -71,12 +79,15 @@ jobs:
         run: |
           node --check src/social-studio.js
           node --check src/social-studio-core.js
+          node --check scripts/test-runway-video.mjs
+          node --check src/runway-video.js
           node --check src/openshorts-mcp.js
           node --check scripts/test-social-studio.mjs
           node --check scripts/test-openshorts.mjs
           npm run test:workshop
           npm run test:chat-layout
           npm run test:social-studio
+          npm run test:runway-video
           npm run test:openshorts
           npm run test:site
           npm run test:skills
