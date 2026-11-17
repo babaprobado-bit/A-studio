@@ -1,4 +1,13 @@
-> **Latest checkpoint (2026-11-17):** Session 18 added Ollama special-use IP and redirect hardening, recorded the 13-provider free-tier audit, and captured Demo/Native CI status. See `SESSION_18_OLLAMA_SECURITY_AND_PROVIDER_AUDIT_2026-11-17.md`. Code commit: `acb74e2ed3c26299a27cb863bfe0f2c43912d46e`. PR #2 remains open Draft; `main` is unchanged.
+> **Latest checkpoint (2026-11-17):** Session 19 restores a separate **Social Media** management tab inside Creator Studio. It adds local draft planning, future date/time, platform targets, notes, ready-for-review status, and caption copying; it does not connect accounts or publish/schedule externally. Node syntax and Social Studio regression tests passed; fresh Demo/Native APK CI is pending. See `SESSION_19_SOCIAL_MEDIA_MANAGER_2026-11-17.md`. PR #2 remains open Draft; `main` is unchanged.
+
+
+## Session 19 latest source checkpoint — 2026-11-17
+
+- Added a separate Social Media tab inside Creator Studio. It manages local content drafts, target platforms, planned date/time, notes, ready-for-review state and caption copying.
+- What If, In My Town and Clips remain separate. The planner is local-only; no account connections, publishing, external scheduling or background job was added.
+- Regression and syntax tests passed in the remote Node workspace. Fresh Demo/Native APK CI is pending after commit. See [Session 19 Social Media manager handoff](SESSION_19_SOCIAL_MEDIA_MANAGER_2026-11-17.md).
+
+---
 
 ## Session 17 latest source checkpoint — 2026-11-17
 

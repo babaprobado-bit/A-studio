@@ -88,6 +88,17 @@ export function normalizeSocialQueue(value) {
     hashtags: Array.isArray(item.hashtags) ? item.hashtags.slice(0, 15).map((tag) => text(tag, 60)) : [],
     cta: text(item.cta, 240),
     platforms: Array.isArray(item.platforms) ? [...new Set(item.platforms.filter((id) => PLATFORM_IDS.has(id)))] : [],
+    socialPlan: (() => {
+      const plan = item.socialPlan && typeof item.socialPlan === 'object' ? item.socialPlan : {};
+      const plannedAt = text(plan.plannedAt, 40);
+      const validDate = plannedAt && Number.isFinite(Date.parse(plannedAt)) ? plannedAt : '';
+      const requestedStatus = ['draft', 'planned', 'ready', 'archived'].includes(plan.status) ? plan.status : 'draft';
+      return {
+        status: requestedStatus === 'planned' && !validDate ? 'draft' : requestedStatus,
+        plannedAt: validDate,
+        note: text(plan.note, 240)
+      };
+    })(),
     status: text(item.status, 40) || 'script_ready',
     sourceUrl: text(item.sourceUrl, 2048),
     jobId: text(item.jobId, 160),

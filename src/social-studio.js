@@ -47,13 +47,14 @@ export async function mountSocialStudio({ generateText, openShorts, videoKeyStor
   screen.className = 'screen social-screen'; screen.id = 'social';
   screen.innerHTML = `
     <div class="page-title social-title"><div class="eyebrow">AI STUDIO · CREATOR</div><h1>Creator Studio</h1><p>Üç ayrı üretim alanı. Her format kendi senaryo akışında çalışır.</p></div>
-    <div class="creator-mode-tabs" role="tablist" aria-label="İçerik türü">
+    <div class="creator-mode-tabs" role="tablist" aria-label="Creator Studio bölümleri">
       <button type="button" class="creator-mode-tab active" data-creator-mode="what_if" role="tab" aria-selected="true">✦ What If</button>
       <button type="button" class="creator-mode-tab" data-creator-mode="in_my_town" role="tab" aria-selected="false">⌂ In My Town</button>
       <button type="button" class="creator-mode-tab" data-creator-mode="clips" role="tab" aria-selected="false">▣ Clips</button>
+      <button type="button" class="creator-mode-tab" data-creator-section="social" role="tab" aria-selected="false">◉ Social Media</button>
     </div>
     <p class="creator-mode-description" id="creatorModeDescription">What If: seçtiğin şey belirlediğin aralıklarla iki katına çıkar.</p>
-    <div class="social-flow-strip" aria-label="Üretim aşamaları"><span>1 · Fikir</span><i>›</i><span>2 · AI senaryo</span><i>›</i><span>3 · Çok sahneli video</span></div>
+    <div class="social-flow-strip" data-creator-production aria-label="Üretim aşamaları"><span>1 · Fikir</span><i>›</i><span>2 · AI senaryo</span><i>›</i><span>3 · Çok sahneli video</span></div>
     <div class="social-top-grid" data-creator-story>
       <section class="panel social-panel">
         <div class="section-head"><div><div class="eyebrow">01 / VIDEO BRIEF</div><h2 id="creatorBriefTitle">What If senaryosu</h2></div><span class="pill">AI destekli</span></div>
@@ -132,6 +133,36 @@ export async function mountSocialStudio({ generateText, openShorts, videoKeyStor
       <div class="openshorts-status" id="socialVideoStatus" role="status" aria-live="polite">Önce AI senaryosunu kaydet, sonra kaynak videonu ekle.</div>
       <div id="socialClipResults" class="social-clip-grid" aria-live="polite"></div>
     </section>
+    <section class="creator-social-hub" id="creatorSocialHub" hidden aria-labelledby="creatorSocialTitle">
+      <div class="page-title creator-social-heading"><div class="eyebrow">AI STUDIO · SOCIAL MEDIA</div><h2 id="creatorSocialTitle">Social Media Studio</h2><p>Platform hedeflerini, içerik taslaklarını ve yerel yayın takvimini tek yerden düzenle.</p></div>
+      <div class="creator-social-stats" aria-live="polite">
+        <article class="creator-social-stat"><span>Toplam içerik</span><strong id="socialPlanTotal">0</strong></article>
+        <article class="creator-social-stat"><span>Planlandı</span><strong id="socialPlanPlanned">0</strong></article>
+        <article class="creator-social-stat"><span>Kontrole hazır</span><strong id="socialPlanReady">0</strong></article>
+      </div>
+      <section class="panel social-panel creator-social-planner">
+        <div class="section-head"><div><div class="eyebrow">01 / CONTENT PLANNER</div><h2>İçerik planlayıcı</h2></div><span class="pill">Cihazda saklanır</span></div>
+        <label class="field-label" for="socialPlannerDraft">Düzenlenecek içerik</label><select class="input" id="socialPlannerDraft"><option value="">Önce bir taslak oluştur</option></select>
+        <label class="field-label" for="socialPlannerDate">Planlanan tarih ve saat</label><input class="input" id="socialPlannerDate" type="datetime-local">
+        <div class="field-label">Hedef platformlar</div><div class="creator-social-targets" id="socialPlannerPlatforms">${SOCIAL_PLATFORMS.map((platform) => `<label class="social-check"><input type="checkbox" data-social-plan-platform="${platform.id}"><span>${platform.label}</span></label>`).join('')}</div>
+        <label class="field-label" for="socialPlannerNote">Plan notu</label><textarea class="input" id="socialPlannerNote" rows="2" maxlength="240" placeholder="Örn. Kapak görselini ve açıklamayı son kez kontrol et."></textarea>
+        <div class="row-actions"><button type="button" class="btn primary" id="socialPlannerSave">Takvime ekle</button><button type="button" class="btn secondary" id="socialPlannerReady">Kontrole hazır</button><button type="button" class="btn ghost" id="socialPlannerCopy">Metni kopyala</button></div>
+        <p class="fineprint" id="socialPlannerStatus" role="status" aria-live="polite">Bu takvim yereldir; platformda yayınlama veya otomatik gönderim yapmaz.</p>
+      </section>
+      <section class="panel social-panel">
+        <div class="section-head"><div><div class="eyebrow">02 / CHANNELS</div><h2>Platform hedefleri</h2></div><span class="pill">Bağlantı gerektirmez</span></div>
+        <div class="creator-social-channels">
+          <article><strong>TikTok</strong><span>Dikey kısa video · 9:16</span></article>
+          <article><strong>Instagram Reels</strong><span>Dikey kısa video · 9:16</span></article>
+          <article><strong>YouTube Shorts</strong><span>Dikey kısa video · Shorts</span></article>
+        </div>
+      </section>
+      <section class="panel social-panel">
+        <div class="section-head"><div><div class="eyebrow">03 / EDITORIAL CALENDAR</div><h2>İçerik takvimi</h2></div><span class="pill" id="socialPlanListCount">0 kayıt</span></div>
+        <div class="creator-social-plan-list" id="socialPlanList"><p class="fineprint">Henüz planlanan içerik yok.</p></div>
+      </section>
+      <p class="fineprint creator-social-safety">Taslaklar ve plan tarihleri yalnızca bu uygulamanın yerel deposunda tutulur. Hesap bağlama, herkese açık paylaşım ve otomatik yayınlama bu bölümde yapılmaz. Paylaşmadan önce özel bilgileri ve konumları kontrol et.</p>
+    </section>
     <section class="panel social-panel" id="socialPublishPanel" hidden>
       <div class="section-head"><div><div class="eyebrow">05 / REVIEW & PUBLISH</div><h2>Önizle, onayla, zamanla</h2></div><span class="pill">İnsan onayı gerekli</span></div>
       <p class="muted" id="socialPublishSummary">Yayınlamak için önce işlenmiş kliplerden birini seç.</p>
@@ -144,7 +175,7 @@ export async function mountSocialStudio({ generateText, openShorts, videoKeyStor
       <p class="fineprint">Herkese açık paylaşım yapmadan önce özel bilgileri ve konumunu kaldır; platform yaş kurallarına uy ve gerekiyorsa ebeveyn/vasinin onayını al.</p>
       <div class="row-actions"><button type="button" id="socialPublishConfirm" class="btn primary" disabled>Onayla ve yayınla / zamanla</button><span class="grow"></span><span id="socialPublishStatus" class="fineprint" role="status"></span></div>
     </section>
-    <section class="panel social-panel">
+    <section class="panel social-panel" id="socialCreatorLibrary" data-creator-library>
       <div class="section-head"><div><div class="eyebrow">CREATOR LIBRARY</div><h2>Taslaklar ve çıktılar</h2></div><span class="pill" id="socialQueueCount">0 taslak</span></div>
       <div id="socialQueueList" class="social-queue-list"><p class="fineprint">Henüz kayıtlı içerik yok.</p></div>
     </section>
@@ -164,6 +195,7 @@ export async function mountSocialStudio({ generateText, openShorts, videoKeyStor
   const AUTOMATION_MAX_RUNWAY_POLLS = 90;
   const AUTOMATION_MAX_OPENSHORTS_POLLS = 90;
   let activeCreatorMode = 'what_if';
+  let activeCreatorSection = 'what_if';
   const creatorModeCopy = {
     what_if: { title: 'What If senaryosu', description: 'What If: seçtiğin şey belirlediğin aralıklarla iki katına çıkar.' },
     in_my_town: { title: 'In My Town senaryosu', description: 'In My Town: kurgusal kasabada geçen bağımsız hikâye. What If formatıyla karıştırılmaz.' },
@@ -187,11 +219,15 @@ export async function mountSocialStudio({ generateText, openShorts, videoKeyStor
   const setCreatorMode = (mode) => {
     activeCreatorMode = normalizeCreatorMode(mode);
     const copy = creatorModeCopy[activeCreatorMode];
-    document.querySelectorAll('[data-creator-mode]').forEach((button) => {
-      const selected = button.dataset.creatorMode === activeCreatorMode;
+    activeCreatorSection = activeCreatorMode;
+    document.querySelectorAll('[data-creator-mode], [data-creator-section]').forEach((button) => {
+      const selected = button.dataset.creatorMode === activeCreatorMode || button.dataset.creatorSection === activeCreatorSection;
       button.classList.toggle('active', selected);
       button.setAttribute('aria-selected', String(selected));
     });
+    $('creatorSocialHub').hidden = true;
+    $('socialCreatorLibrary').hidden = false;
+    document.querySelector('[data-creator-production]').hidden = false;
     $('creatorModeDescription').textContent = copy.description;
     $('creatorBriefTitle').textContent = copy.title;
     $('creatorWhatIfFields').hidden = activeCreatorMode !== 'what_if';
@@ -205,7 +241,25 @@ export async function mountSocialStudio({ generateText, openShorts, videoKeyStor
     $('socialRunAutomation').textContent = activeCreatorMode === 'in_my_town' ? 'In My Town videosunu oluştur ⚡' : 'What If videosunu oluştur ⚡';
     if (activeCreatorMode !== 'clips') getCreatorDraftData();
   };
-  document.querySelectorAll('[data-creator-mode]').forEach((button) => button.addEventListener('click', () => setCreatorMode(button.dataset.creatorMode)));
+  const setCreatorSection = (section) => {
+    if (section !== 'social') { setCreatorMode(section); return; }
+    activeCreatorSection = 'social';
+    document.querySelectorAll('[data-creator-mode], [data-creator-section]').forEach((button) => {
+      const selected = button.dataset.creatorSection === 'social';
+      button.classList.toggle('active', selected);
+      button.setAttribute('aria-selected', String(selected));
+    });
+    document.querySelectorAll('[data-creator-story]').forEach((panel) => { panel.hidden = true; });
+    $('socialVideoProduction').hidden = true;
+    $('socialPublishPanel').hidden = true;
+    $('socialCreatorLibrary').hidden = true;
+    document.querySelector('[data-creator-production]').hidden = true;
+    $('creatorSocialHub').hidden = false;
+    $('creatorModeDescription').textContent = 'Social Media Studio: içeriklerini platformlara göre düzenle ve yerel takvimini yönet.';
+    renderSocialHub();
+  };
+  document.querySelectorAll('[data-creator-mode]').forEach((button) => button.addEventListener('click', () => setCreatorSection(button.dataset.creatorMode)));
+  document.querySelectorAll('[data-creator-section]').forEach((button) => button.addEventListener('click', () => setCreatorSection(button.dataset.creatorSection)));
 
   const activeDraft = () => drafts.find((draft) => draft.id === activeDraftId) || null;
   const setStatus = (message, tone = 'info') => {
@@ -255,15 +309,66 @@ export async function mountSocialStudio({ generateText, openShorts, videoKeyStor
       return false;
     }
   };
+  const socialPlanStatusLabels = { draft: 'Taslak', planned: 'Takvimde', ready: 'Kontrole hazır', archived: 'Arşivlendi' };
+  const formatLocalDateTime = (value) => {
+    const date = new Date(value);
+    return Number.isFinite(date.getTime()) ? date.toLocaleString() : 'Tarih belirtilmedi';
+  };
+  const fillSocialPlanner = (draft = activeDraft()) => {
+    const select = $('socialPlannerDraft');
+    select.innerHTML = drafts.length
+      ? drafts.map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.title)}</option>`).join('')
+      : '<option value="">Önce bir taslak oluştur</option>';
+    select.disabled = !drafts.length;
+    if (draft) {
+      select.value = draft.id;
+      const plan = draft.socialPlan || { status: 'draft', plannedAt: '', note: '' };
+      $('socialPlannerDate').value = plan.plannedAt && Number.isFinite(Date.parse(plan.plannedAt))
+        ? new Date(plan.plannedAt).getFullYear() + '-' + String(new Date(plan.plannedAt).getMonth() + 1).padStart(2, '0') + '-' + String(new Date(plan.plannedAt).getDate()).padStart(2, '0') + 'T' + String(new Date(plan.plannedAt).getHours()).padStart(2, '0') + ':' + String(new Date(plan.plannedAt).getMinutes()).padStart(2, '0')
+        : '';
+      $('socialPlannerNote').value = plan.note || '';
+      document.querySelectorAll('[data-social-plan-platform]').forEach((input) => { input.checked = draft.platforms.includes(input.dataset.socialPlanPlatform); });
+      $('socialPlannerStatus').textContent = plan.status === 'planned' ? `Takvimde: ${formatLocalDateTime(plan.plannedAt)}` : (socialPlanStatusLabels[plan.status] || 'Taslak');
+    } else {
+      $('socialPlannerDate').value = '';
+      $('socialPlannerNote').value = '';
+      document.querySelectorAll('[data-social-plan-platform]').forEach((input) => { input.checked = false; });
+      $('socialPlannerStatus').textContent = 'Planlamak için önce bir Creator taslağı oluştur.';
+    }
+  };
+  const renderSocialHub = () => {
+    const planned = drafts.filter((item) => item.socialPlan?.status === 'planned' && item.socialPlan?.plannedAt);
+    const ready = drafts.filter((item) => item.socialPlan?.status === 'ready');
+    $('socialPlanTotal').textContent = String(drafts.length);
+    $('socialPlanPlanned').textContent = String(planned.length);
+    $('socialPlanReady').textContent = String(ready.length);
+    $('socialPlanListCount').textContent = `${planned.length + ready.length} plan`;
+    const entries = drafts.filter((item) => item.socialPlan?.status !== 'archived');
+    $('socialPlanList').innerHTML = entries.length ? entries.map((draft) => {
+      const plan = draft.socialPlan || { status: 'draft', plannedAt: '', note: '' };
+      const targets = draft.platforms.map(platformName).join(' · ') || 'Platform seçilmedi';
+      const time = plan.status === 'planned' && plan.plannedAt ? formatLocalDateTime(plan.plannedAt) : (socialPlanStatusLabels[plan.status] || 'Taslak');
+      return `<article class="creator-social-plan-card"><div class="creator-social-plan-main"><strong>${escapeHtml(draft.title)}</strong><span>${escapeHtml(targets)} · ${escapeHtml(time)}</span><p>${escapeHtml(plan.note || draft.caption || draft.topic || 'Henüz plan notu yok')}</p></div><div class="creator-social-plan-actions"><button type="button" class="btn secondary small" data-social-plan-open="${escapeHtml(draft.id)}">Düzenle</button><button type="button" class="btn ghost small" data-social-plan-copy="${escapeHtml(draft.id)}">Metni kopyala</button></div></article>`;
+    }).join('') : '<p class="fineprint">Henüz içerik yok. What If, In My Town veya Clips bölümünde içerik oluşturup burada planlayabilirsin.</p>';
+    const selected = drafts.find((item) => item.id === $('socialPlannerDraft').value) || activeDraft() || drafts[0] || null;
+    fillSocialPlanner(selected);
+  };
   const renderQueue = () => {
     $('socialQueueCount').textContent = `${drafts.length} kayıt`;
-    if (!drafts.length) { $('socialQueueList').innerHTML = '<p class="fineprint">Henüz kayıtlı içerik yok. Önce bir AI senaryosu üret.</p>'; return; }
+    if (!drafts.length) {
+      $('socialQueueList').innerHTML = '<p class="fineprint">Henüz kayıtlı içerik yok. Önce bir AI senaryosu üret.</p>';
+      renderSocialHub();
+      return;
+    }
     $('socialQueueList').innerHTML = drafts.map((draft) => {
       const state = statusNames[draft.status] || draft.status || 'Taslak';
       const modeLabels = { what_if: 'What If', in_my_town: 'In My Town', clips: 'Clips' };
       const formatLabel = modeLabels[draft.creatorMode] || 'What If';
-      return `<article class="social-queue-card ${draft.id === activeDraftId ? 'selected' : ''}"><div class="social-queue-card-main"><strong>${escapeHtml(draft.title)}</strong><small>${escapeHtml(platforms)} · ${escapeHtml(state)}</small><p>${escapeHtml(draft.hook || draft.topic || 'Henüz kısa açıklama yok')}</p></div><div class="social-queue-actions"><button type="button" class="btn secondary small" data-social-select="${escapeHtml(draft.id)}">Aç</button><button type="button" class="btn ghost small danger-text" data-social-delete="${escapeHtml(draft.id)}">Sil</button></div></article>`;
+      const platforms = draft.platforms.map(platformName).join(' · ') || 'Platform seçilmedi';
+      const planLabel = socialPlanStatusLabels[draft.socialPlan?.status] || 'Taslak';
+      return `<article class="social-queue-card ${draft.id === activeDraftId ? 'selected' : ''}"><div class="social-queue-card-main"><strong>${escapeHtml(draft.title)}</strong><small>${escapeHtml(formatLabel)} · ${escapeHtml(platforms)} · ${escapeHtml(state)} · ${escapeHtml(planLabel)}</small><p>${escapeHtml(draft.hook || draft.topic || 'Henüz kısa açıklama yok')}</p></div><div class="social-queue-actions"><button type="button" class="btn secondary small" data-social-select="${escapeHtml(draft.id)}">Aç</button><button type="button" class="btn ghost small danger-text" data-social-delete="${escapeHtml(draft.id)}">Sil</button></div></article>`;
     }).join('');
+    renderSocialHub();
   };
   const renderAiMode = () => {
     $('socialAiMode').textContent = `Seçili: ${getAiMode()}. Senaryo için ücretsiz/yerel model kullanılır.`;
@@ -322,7 +427,7 @@ export async function mountSocialStudio({ generateText, openShorts, videoKeyStor
     let draft = activeDraft();
     const now = new Date().toISOString();
     if (!draft) {
-      draft = { id: makeId(), createdAt: now, status: 'script_ready', clips: [], aiVideo: null, pipeline: null, publishRequests: [], jobId: '', sourceUrl: '' };
+      draft = { id: makeId(), createdAt: now, status: 'script_ready', clips: [], aiVideo: null, pipeline: null, publishRequests: [], socialPlan: { status: 'draft', plannedAt: '', note: '' }, jobId: '', sourceUrl: '' };
       drafts.unshift(draft); activeDraftId = draft.id;
     }
     draft.title = $('socialDraftTitle').value.trim().slice(0, 100) || 'Yeni kısa video';
@@ -620,6 +725,7 @@ export async function mountSocialStudio({ generateText, openShorts, videoKeyStor
         jobId: '',
         clips: [],
         publishRequests: [],
+        socialPlan: { status: 'draft', plannedAt: '', note: '' },
         pipeline: null,
         createdAt: now,
         updatedAt: now
@@ -732,7 +838,7 @@ export async function mountSocialStudio({ generateText, openShorts, videoKeyStor
       const now = new Date().toISOString();
       const draft = {
         id: makeId(), ...generated, topic: creatorData.topic, creatorMode: creatorData.creatorMode, creatorSettings: creatorData.creatorSettings, platforms,
-        status: 'script_ready', sourceUrl: '', jobId: '', clips: [], publishRequests: [],
+        status: 'script_ready', sourceUrl: '', jobId: '', clips: [], publishRequests: [], socialPlan: { status: 'draft', plannedAt: '', note: '' },
         createdAt: now, updatedAt: now
       };
       drafts.unshift(draft); activeDraftId = draft.id;
@@ -966,6 +1072,75 @@ export async function mountSocialStudio({ generateText, openShorts, videoKeyStor
       notify(isScheduled ? 'Zamanlama isteği gönderildi.' : 'Yayınlama isteği gönderildi.');
     } catch (error) { $('socialPublishStatus').textContent = error.message || 'Yayınlama isteği başarısız.'; }
     finally { busy = false; $('socialPublishConfirm').disabled = activeClipIndex === null || !openShorts.available('publish_clip'); }
+  });
+
+  const getSocialPlanDraft = () => drafts.find((item) => item.id === $('socialPlannerDraft').value) || null;
+  const socialPlanPlatforms = () => [...document.querySelectorAll('[data-social-plan-platform]:checked')].map((input) => input.dataset.socialPlanPlatform);
+  const copySocialDraftText = async (draft) => {
+    if (!draft) throw new Error('Önce kopyalanacak bir taslak seç.');
+    const text = [draft.title, draft.caption, (draft.hashtags || []).join(' '), draft.cta].filter(Boolean).join('\n\n');
+    if (!text.trim()) throw new Error('Bu taslakta kopyalanacak açıklama metni yok.');
+    try {
+      if (globalThis.navigator?.clipboard?.writeText) await globalThis.navigator.clipboard.writeText(text);
+      else {
+        const area = document.createElement('textarea'); area.value = text; area.setAttribute('readonly', '');
+        area.style.position = 'fixed'; area.style.opacity = '0'; document.body.append(area); area.select();
+        const copied = document.execCommand('copy'); area.remove();
+        if (!copied) throw new Error('Pano erişimi kullanılamıyor.');
+      }
+      $('socialPlannerStatus').textContent = 'Başlık, açıklama ve hashtagler panoya kopyalandı.';
+    } catch (error) { $('socialPlannerStatus').textContent = error.message || 'Metin kopyalanamadı.'; throw error; }
+  };
+  $('socialPlannerDraft').addEventListener('change', () => fillSocialPlanner(getSocialPlanDraft()));
+  $('socialPlannerSave').addEventListener('click', async () => {
+    const draft = getSocialPlanDraft();
+    if (!draft) { $('socialPlannerStatus').textContent = 'Önce bir içerik taslağı oluştur.'; return; }
+    const selectedPlatforms = socialPlanPlatforms();
+    if (!selectedPlatforms.length) { $('socialPlannerStatus').textContent = 'En az bir hedef platform seç.'; return; }
+    const localValue = $('socialPlannerDate').value;
+    const date = localValue ? new Date(localValue) : null;
+    if (!date || !Number.isFinite(date.getTime())) { $('socialPlannerStatus').textContent = 'Takvime eklemek için geçerli bir tarih ve saat seç.'; return; }
+    if (date.getTime() <= Date.now()) { $('socialPlannerStatus').textContent = 'Planlama tarihi gelecekte olmalı.'; return; }
+    draft.platforms = selectedPlatforms;
+    draft.socialPlan = { status: 'planned', plannedAt: date.toISOString(), note: String($('socialPlannerNote').value || '').trim().slice(0, 240) };
+    draft.updatedAt = new Date().toISOString();
+    if (!(await saveState())) return;
+    renderQueue();
+    $('socialPlannerStatus').textContent = `Yerel takvime eklendi: ${date.toLocaleString()}. Platforma gönderim yapılmadı.`;
+  });
+  $('socialPlannerReady').addEventListener('click', async () => {
+    const draft = getSocialPlanDraft();
+    if (!draft) { $('socialPlannerStatus').textContent = 'Önce bir içerik taslağı oluştur.'; return; }
+    const selectedPlatforms = socialPlanPlatforms();
+    if (!selectedPlatforms.length) { $('socialPlannerStatus').textContent = 'En az bir hedef platform seç.'; return; }
+    draft.platforms = selectedPlatforms;
+    draft.socialPlan = { status: 'ready', plannedAt: '', note: String($('socialPlannerNote').value || '').trim().slice(0, 240) };
+    draft.updatedAt = new Date().toISOString();
+    if (!(await saveState())) return;
+    renderQueue();
+    $('socialPlannerStatus').textContent = 'İçerik kontrol listesine hazır olarak kaydedildi. Yayınlama yapılmadı.';
+  });
+  $('socialPlannerCopy').addEventListener('click', async () => {
+    try { await copySocialDraftText(getSocialPlanDraft()); } catch (error) { notify(error.message || 'Metin kopyalanamadı.'); }
+  });
+  $('socialPlanList').addEventListener('click', async (event) => {
+    const copyButton = event.target.closest('[data-social-plan-copy]');
+    if (copyButton) {
+      const draft = drafts.find((item) => item.id === copyButton.dataset.socialPlanCopy);
+      try { await copySocialDraftText(draft); } catch (error) { notify(error.message || 'Metin kopyalanamadı.'); }
+      return;
+    }
+    const openButton = event.target.closest('[data-social-plan-open]');
+    if (openButton) {
+      const draft = drafts.find((item) => item.id === openButton.dataset.socialPlanOpen);
+      if (!draft) return;
+      activeDraftId = draft.id;
+      $('socialTopic').value = draft.topic || '';
+      selectedDraftPlatforms(draft.platforms);
+      fillEditor(draft);
+      setCreatorSection(draft.creatorMode || 'what_if');
+      screen.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   });
 
   $('socialQueueList').addEventListener('click', async (event) => {

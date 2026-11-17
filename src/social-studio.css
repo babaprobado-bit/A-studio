@@ -70,7 +70,7 @@
 @media(max-width:520px) { .social-automation-launch .social-two-col { grid-template-columns:1fr; } }
 
 /* Creator Studio: separate modes for What If, In My Town and Clips. */
-.creator-mode-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin:12px 0 8px}
+.creator-mode-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin:12px 0 8px}
 .creator-mode-tab{min-width:0;padding:11px 7px;border:1px solid var(--line);border-radius:12px;background:#111a2b;color:var(--muted);font-size:12px;font-weight:800}
 .creator-mode-tab.active{border-color:#7768bb;background:linear-gradient(135deg,#302852,#17273b);color:#f1edff;box-shadow:inset 0 0 0 1px #9c8be955}
 .creator-mode-description{margin:0 2px 12px;color:var(--muted);font-size:11px}
@@ -78,3 +78,34 @@
 #creatorWhatIfFields .fineprint,#creatorTownFields .fineprint{margin-bottom:0}
 #socialPublishPanel[hidden],[data-creator-story][hidden],[data-creator-clips][hidden]{display:none!important}
 @media(max-width:370px){.creator-mode-tabs{gap:4px}.creator-mode-tab{font-size:10px;padding:10px 3px}}
+
+
+/* Social Media management: local editorial planner, not an auto-publisher. */
+.creator-social-hub{display:grid;gap:12px;margin:12px 0 18px}
+.creator-social-heading{margin:4px 2px 0}
+.creator-social-heading h2{margin:3px 0 5px;font-size:21px}
+.creator-social-heading p{margin:0;color:var(--muted);font-size:11px}
+.creator-social-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.creator-social-stat{display:grid;gap:5px;min-width:0;padding:12px;border:1px solid var(--line);border-radius:12px;background:#0b1323}
+.creator-social-stat span{color:var(--muted);font-size:10px}
+.creator-social-stat strong{font-size:21px}
+.creator-social-targets{display:flex;flex-wrap:wrap;gap:7px;margin:4px 0 12px}
+.creator-social-channels{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.creator-social-channels article{display:grid;gap:5px;min-width:0;padding:12px;border:1px solid var(--line);border-radius:12px;background:#0b1323}
+.creator-social-channels strong{font-size:11px;overflow-wrap:anywhere}
+.creator-social-channels span{font-size:9px;color:var(--muted)}
+.creator-social-plan-list{display:grid;gap:8px}
+.creator-social-plan-card{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:12px;border:1px solid var(--line);border-radius:12px;background:#0b1323}
+.creator-social-plan-main{min-width:0;display:grid;gap:5px}
+.creator-social-plan-main strong{font-size:12px;overflow-wrap:anywhere}
+.creator-social-plan-main span{font-size:9px;color:var(--muted)}
+.creator-social-plan-main p{margin:0;font-size:10px;color:#cbd5eb;overflow-wrap:anywhere}
+.creator-social-plan-actions{display:flex;flex-shrink:0;flex-wrap:wrap;gap:5px}
+.creator-social-safety{margin:0;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:#0b1323}
+#creatorSocialHub[hidden],[data-creator-library][hidden],[data-creator-production][hidden]{display:none!important}
+@media(max-width:520px){
+ .creator-social-channels{grid-template-columns:1fr}
+ .creator-social-plan-card{flex-direction:column}
+ .creator-social-plan-actions{width:100%}
+}
+@media(max-width:390px){.creator-mode-tabs{gap:4px}.creator-mode-tab{font-size:9px;padding:10px 2px}.creator-social-stats{gap:5px}.creator-social-stat{padding:9px}.creator-social-stat strong{font-size:18px}}

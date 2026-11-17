@@ -1,4 +1,17 @@
-> **Latest checkpoint (2026-11-17):** Session 18 added Ollama special-use IP and redirect hardening, recorded the 13-provider free-tier audit, and captured Demo/Native CI status. See `SESSION_18_OLLAMA_SECURITY_AND_PROVIDER_AUDIT_2026-11-17.md`. Code commit: `acb74e2ed3c26299a27cb863bfe0f2c43912d46e`. PR #2 remains open Draft; `main` is unchanged.
+> **Latest checkpoint (2026-11-17):** Session 19 restores a separate **Social Media** management tab inside Creator Studio. It adds local draft planning, future date/time, platform targets, notes, ready-for-review status, and caption copying; it does not connect accounts or publish/schedule externally. Node syntax and Social Studio regression tests passed; fresh Demo/Native APK CI is pending. See `SESSION_19_SOCIAL_MEDIA_MANAGER_2026-11-17.md`. PR #2 remains open Draft; `main` is unchanged.
+
+
+
+## Session 19 — Social Media management returns inside Creator Studio — 2026-11-17
+
+- Added a fourth independent Social Media tab while preserving What If, In My Town and Clips.
+- Local content planner saves future planned date/time, target platforms, plan notes and ready-for-review status in the existing draft queue; it also lists planned/ready content and copies caption text.
+- This is a local planner only: no account connection, analytics API, public post, external scheduling request or background publisher.
+- Added backward-compatible queue normalization for planning metadata and fixed an undefined platform-label variable in existing queue cards.
+- Node syntax checks, Social Studio regression suite and UI contract checks passed. Fresh Demo/Native GitHub Actions builds are pending for this commit; no physical-device test is claimed.
+- See `SESSION_19_SOCIAL_MEDIA_MANAGER_2026-11-17.md`. Keep PR #2 open/Draft and leave `main` unchanged.
+
+---
 
 ## Session 17 — Ollama transport and GGUF chat-boundary hardening — 2026-11-17
 

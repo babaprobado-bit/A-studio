@@ -1,4 +1,9 @@
-> **Latest checkpoint (2026-11-17):** Session 18 added Ollama special-use IP and redirect hardening, recorded the 13-provider free-tier audit, and captured Demo/Native CI status. See `SESSION_18_OLLAMA_SECURITY_AND_PROVIDER_AUDIT_2026-11-17.md`. Code commit: `acb74e2ed3c26299a27cb863bfe0f2c43912d46e`. PR #2 remains open Draft; `main` is unchanged.
+# AI Studio — Session 19 continuation starter
+
+Read `docs/HANDOFF/README.md`, `docs/HANDOFF/PROJECT_STATE.md`, and `docs/HANDOFF/SESSION_19_SOCIAL_MEDIA_MANAGER_2026-11-17.md` first. Creator Studio now has four independent tabs: What If, In My Town, Clips, and Social Media. The new Social Media area is a local planner for drafts, platform targets, future date/time, notes, ready-for-review status and caption copying. It does not connect accounts, publish, externally schedule, or run a background publisher. Existing three Creator workflows and the AI chat landing screen must remain intact. Run Demo and Native GGUF GitHub Actions builds for the new source and verify artifacts before claiming APK success. Keep PR #2 open/Draft/unmerged; never modify `main`. Continue preserving all ten AI Team engines, Skills, Local Coder, GGUF, Ollama and REA's mock-only boundary.
+
+---
+
 
 # AI Studio — Session 17 continuation starter
 
