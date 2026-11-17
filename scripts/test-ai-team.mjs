@@ -12,10 +12,22 @@ assert.equal(normalizeOllamaEndpoint('http://127.2.3.4:11434'), 'http://127.2.3.
 assert.equal(normalizeOllamaEndpoint('http://localhost:11434'), 'http://localhost:11434');
 assert.equal(normalizeOllamaEndpoint('http://[::1]:11434'), 'http://[::1]:11434');
 assert.equal(normalizeOllamaEndpoint('https://ollama.example.com:11434/'), 'https://ollama.example.com:11434');
+assert.equal(normalizeOllamaEndpoint('https://192.168.1.20:11434'), 'https://192.168.1.20:11434',
+  'private IPv4 Ollama hosts may still use HTTPS');
+assert.equal(normalizeOllamaEndpoint('https://[::1]:11434'), 'https://[::1]:11434',
+  'IPv6 loopback remains available for a local Ollama service');
+assert.equal(normalizeOllamaEndpoint('https://[2606:4700:4700::1111]:11434'), 'https://[2606:4700:4700::1111]:11434',
+  'public global-unicast IPv6 remains available over HTTPS');
 for (const blocked of [
   'http://8.8.8.8:11434', 'http://example.com:11434', 'http://169.254.169.254:11434',
   'http://172.15.0.1:11434', 'http://172.32.0.1:11434', 'http://192.167.1.1:11434',
   'http://100.64.0.1:11434', 'http://[fd00::1]:11434', 'ftp://192.168.1.2:11434',
+  'https://169.254.169.254:11434', 'https://100.64.0.1:11434',
+  'https://[fd00::1]:11434', 'https://[fe80::1]:11434', 'https://[ff02::1]:11434',
+  'https://[::]:11434', 'https://[2001:db8::1]:11434', 'https://[2001:2::1]:11434',
+  'https://[2001:10::1]:11434', 'https://[2002:c000:0201::1]:11434',
+  'https://[::ffff:192.168.1.20]:11434', 'https://192.0.2.1:11434',
+  'https://198.18.0.1:11434', 'https://224.0.0.1:11434', 'https://0.0.0.0:11434',
   'http://user:pass@192.168.1.2:11434', 'http://192.168.1.2:11434?token=example',
   'http://192.168.1.2:11434/#fragment'
 ]) assert.throws(() => normalizeOllamaEndpoint(blocked), undefined, blocked);
@@ -126,6 +138,8 @@ const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
 const pkg=JSON.parse(readFileSync(new URL('../package.json',import.meta.url),'utf8'));
 assert.ok(main.includes('normalizeOllamaEndpoint(settings.ollamaUrl)'),
   'Ollama endpoints must be normalized before any prompt or shared context is sent');
+assert.ok(main.includes("fetchJson(url+'/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},redirect:'error',body:JSON.stringify"),
+  'Ollama requests must reject redirects so an allowed HTTPS host cannot redirect to an unvalidated IP target');
 const ollamaBlockStart=main.indexOf("if(id==='ollama'){");
 const ollamaGuardIndex=main.indexOf('normalizeOllamaEndpoint(settings.ollamaUrl)',ollamaBlockStart);
 const ollamaRequestIndex=main.indexOf("fetchJson(url+'/api/chat'",ollamaBlockStart);

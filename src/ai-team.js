@@ -18,12 +18,78 @@ export function confirmTeamLiveCalls(providerIds, confirmLive) {
   return confirmLive(uniqueIds.length) === true;
 }
 
-function isPrivateIpv4(hostname) {
-  if (!/^\d{1,3}(?:\.\d{1,3}){3}$/.test(hostname)) return false;
+function parseIpv4Octets(hostname) {
+  if (!/^\d{1,3}(?:\.\d{1,3}){3}$/.test(hostname)) return null;
   const octets = hostname.split('.').map(Number);
-  if (octets.some(value => !Number.isInteger(value) || value < 0 || value > 255)) return false;
+  return octets.every(value => Number.isInteger(value) && value >= 0 && value <= 255) ? octets : null;
+}
+
+function isPrivateIpv4(octets) {
+  if (!Array.isArray(octets)) return false;
   const [a, b] = octets;
   return a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168);
+}
+
+function isDisallowedSpecialIpv4(octets) {
+  if (!Array.isArray(octets)) return false;
+  const [a, b, c] = octets;
+  return a === 0
+    || (a === 169 && b === 254) // link-local
+    || (a === 100 && b >= 64 && b <= 127) // carrier-grade NAT
+    || (a === 192 && b === 0 && (c === 0 || c === 2)) // IETF special / TEST-NET-1
+    || (a === 192 && b === 88 && c === 99) // deprecated 6to4 relay
+    || (a === 198 && (b === 18 || b === 19)) // benchmarking
+    || (a === 198 && b === 51 && c === 100) // TEST-NET-2
+    || (a === 203 && b === 0 && c === 113) // TEST-NET-3
+    || a >= 224; // multicast and reserved
+}
+
+function parseIpv6Words(hostname) {
+  if (!hostname.startsWith('[') || !hostname.endsWith(']')) return null;
+  let address = hostname.slice(1, -1).toLowerCase();
+  if (!address.includes(':') || address.includes('%')) return null;
+  if (address.includes('.')) {
+    const lastColon = address.lastIndexOf(':');
+    const octets = parseIpv4Octets(address.slice(lastColon + 1));
+    if (!octets) return null;
+    const high = ((octets[0] << 8) | octets[1]).toString(16);
+    const low = ((octets[2] << 8) | octets[3]).toString(16);
+    address = address.slice(0, lastColon) + ':' + high + ':' + low;
+  }
+
+  let words;
+  if (address.includes('::')) {
+    const parts = address.split('::');
+    if (parts.length !== 2) return null;
+    const left = parts[0] ? parts[0].split(':') : [];
+    const right = parts[1] ? parts[1].split(':') : [];
+    const missing = 8 - left.length - right.length;
+    if (missing < 1) return null;
+    words = [...left, ...Array(missing).fill('0'), ...right];
+  } else {
+    words = address.split(':');
+    if (words.length !== 8) return null;
+  }
+  if (words.length !== 8 || words.some(word => !/^[a-f0-9]{1,4}$/.test(word))) return null;
+  return words.map(word => Number.parseInt(word, 16));
+}
+
+function isLoopbackIpv6(words) {
+  return Array.isArray(words) && words.slice(0, 7).every(word => word === 0) && words[7] === 1;
+}
+
+function isDisallowedSpecialIpv6(words) {
+  if (!Array.isArray(words) || isLoopbackIpv6(words)) return false;
+  const [first, second] = words;
+  const uniqueLocal = (first & 0xfe00) === 0xfc00;
+  const linkLocal = (first & 0xffc0) === 0xfe80;
+  const multicast = (first & 0xff00) === 0xff00;
+  const documentation = first === 0x2001 && second === 0x0db8;
+  const benchmarking = first === 0x2001 && second === 0x0002;
+  const orchid = first === 0x2001 && ((second & 0xfff0) === 0x0010 || (second & 0xfff0) === 0x0020);
+  const transition = first === 0x2001 && second === 0x0000 || first === 0x2002;
+  const globalUnicast = (first & 0xe000) === 0x2000;
+  return uniqueLocal || linkLocal || multicast || documentation || benchmarking || orchid || transition || !globalUnicast;
 }
 
 export function normalizeOllamaEndpoint(value) {
@@ -35,9 +101,18 @@ export function normalizeOllamaEndpoint(value) {
   if (url.username || url.password || url.search || url.hash) {
     throw new Error('Ollama adresine kullanıcı bilgisi, query veya hash ekleme.');
   }
+
   const hostname = url.hostname.toLowerCase();
-  const loopback = hostname === 'localhost' || hostname === '[::1]' || /^127(?:\.\d{1,3}){3}$/.test(hostname);
-  if (url.protocol === 'http:' && !loopback && !isPrivateIpv4(hostname)) {
+  const ipv4 = parseIpv4Octets(hostname);
+  const ipv6 = parseIpv6Words(hostname);
+  if ((ipv4 && isDisallowedSpecialIpv4(ipv4)) || (ipv6 && isDisallowedSpecialIpv6(ipv6))) {
+    throw new Error('Ollama adresinde link-local, CGNAT, multicast veya özel amaçlı IP adresleri kullanılamaz.');
+  }
+
+  const loopback = hostname === 'localhost'
+    || Boolean(ipv4 && ipv4[0] === 127)
+    || isLoopbackIpv6(ipv6);
+  if (url.protocol === 'http:' && !loopback && !isPrivateIpv4(ipv4)) {
     throw new Error('Şifresiz HTTP yalnızca localhost veya özel yerel ağ IPv4 adreslerinde kullanılabilir. Uzak Ollama sunucusunda HTTPS kullan.');
   }
   return url.origin + url.pathname.replace(/\/+$/, '');
