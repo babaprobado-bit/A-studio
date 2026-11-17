@@ -1662,6 +1662,7 @@ async function init(){
       return callProvider(providerId,prompt,[]);
     },
     openShorts:{available:name=>openShortsToolNames.has(name),call:(name,args)=>requireOpenShortsTool(name,args)},
+    videoKeyStore:{isNative:nativeApp,get:()=>getSecret('runway'),save:key=>saveSecret('runway',key),remove:()=>deleteSecret('runway')},
     go,notify:showToast,getAiMode:()=>settings.demoMode?'Demo açık':($('chatProvider').selectedOptions[0]?.textContent||'Seçili AI modeli')
   });renderSkillLibrary();renderReuseCatalog();renderSnippetVault();renderAgentActivity();loadActiveCodeFile();syncModeUI();updateDashboard();$('compareSelectionCount').textContent=settings.team.length+' ajan seçili';
   syncLocalCoderEngineUI();await refreshDeviceLocalModels(true);
