@@ -154,7 +154,8 @@ export async function mountSocialStudio({ generateText, openShorts, videoKeyStor
     if (node) node.textContent = String(message || '');
   };
   const renderAutomationState = () => {
-    const draft = activeDraft();
+    const activePipelineStages = ['runway_submitting', 'runway_polling', 'openshorts_submitting', 'openshorts_polling'];
+    const draft = drafts.find((item) => activePipelineStages.includes(item.pipeline?.stage)) || activeDraft();
     const stage = draft?.pipeline?.stage || '';
     const labels = {
       runway_submitting: 'Runway isteği gönderiliyor…',
@@ -323,6 +324,8 @@ export async function mountSocialStudio({ generateText, openShorts, videoKeyStor
             draft.status = 'ai_video_ready';
             pipeline.stage = 'awaiting_clip_approval';
             pipeline.lastError = '';
+            activeDraftId = draft.id;
+            fillEditor(draft);
             $('socialSourceUrl').value = task.videoUrl;
           } else if (['FAILED', 'CANCELED'].includes(task.status)) {
             draft.status = 'failed';
@@ -345,6 +348,10 @@ export async function mountSocialStudio({ generateText, openShorts, videoKeyStor
             draft.status = draft.clips.length ? 'review' : 'failed';
             pipeline.stage = draft.clips.length ? 'review' : 'needs_attention';
             pipeline.lastError = draft.clips.length ? '' : 'OpenShorts tamamlandı ancak klip listesi boş döndü.';
+            if (draft.clips.length) {
+              activeDraftId = draft.id;
+              fillEditor(draft);
+            }
           } else if (['failed', 'canceled', 'cancelled', 'error'].includes(state)) {
             draft.status = 'failed';
             pipeline.stage = 'failed';
@@ -906,6 +913,17 @@ export async function mountSocialStudio({ generateText, openShorts, videoKeyStor
     if (stored.value) drafts = normalizeSocialQueue(JSON.parse(stored.value)?.drafts);
   } catch { drafts = []; }
   try { runwayKey = String(await videoKeyStore.get() || ''); } catch { runwayKey = ''; }
+
+  // A persisted *_submitting stage may represent a provider request whose response was lost.
+  // Never replay it automatically; the user must inspect the provider/account first.
+  for (const item of drafts) {
+    if (['runway_submitting', 'openshorts_submitting'].includes(item.pipeline?.stage)) {
+      item.pipeline.stage = 'needs_attention';
+      item.pipeline.lastError = 'Uygulama servis isteği sırasında kapandı. İş başlamış olabilir; çift ücret/kota kullanımını önlemek için otomatik tekrar yapılmadı.';
+    }
+  }
+  if (drafts.some((item) => item.pipeline?.stage === 'needs_attention')) await saveState();
+
   $('socialAIVideoStatus').textContent = runwayKey
     ? (videoKeyStore.isNative ? 'Runway Gen-4.5 anahtarı Android Secure Storage alanında. Her üretim ayrıca maliyet onayı ister.' : 'Runway anahtarı bu web oturumunun belleğinde. Sekme kapanınca kaybolur; her üretim ayrıca maliyet onayı ister.')
     : 'Runway Gen-4.5 hazır. Ebeveyn/vasinin yönettiği API anahtarını güvenli şekilde ekle. Web önizlemesinde bağlantı CORS kurallarına bağlı olabilir.';
@@ -917,6 +935,20 @@ export async function mountSocialStudio({ generateText, openShorts, videoKeyStor
     $('socialTopic').value = drafts[0].topic || '';
     fillEditor(drafts[0]);
   } else selectedDraftPlatforms(['tiktok', 'instagram', 'youtube']);
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      if (automationTimer) clearTimeout(automationTimer);
+      automationTimer = null;
+      return;
+    }
+    const resumable = drafts.find((item) => isSocialAutomationPolling(item.pipeline?.stage));
+    if (resumable) scheduleAutomationPoll(resumable.id, 1000);
+  });
+  const resumableAutomation = drafts.find((item) => isSocialAutomationPolling(item.pipeline?.stage));
+  if (resumableAutomation) scheduleAutomationPoll(resumableAutomation.id, 1500);
+  renderAutomationState();
+
   const available = ['process_video', 'get_job_status', 'list_clips', 'get_quota', 'publish_clip'].filter((name) => openShorts.available(name));
   $('socialOpenShortsBadge').textContent = available.includes('publish_clip') ? 'Klip + yayınlama hazır' : (available.length ? 'Klip üretimi hazır · yayınlama aracı yok' : 'Bağlı değil');
   $('socialOpenShortsBadge').className = 'pill ' + (available.length ? 'safe' : '');
