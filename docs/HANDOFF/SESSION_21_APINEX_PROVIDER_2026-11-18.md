@@ -21,6 +21,17 @@
 - Existing Power Hub 34 prompt templates, 13-entry ranked provider directory, OpenRouter free-only rules, GGUF, Ollama, Skills and Creator Studio flows are preserved.
 - CI is required after this commit; no physical-device test or live APInex request is claimed.
 
+## Final build and artifact
+## Final Native GGUF APK result — 2026-11-18
+- Final source-code commit used for the APK: `cd0ec2f36c508cfc16a26f7fe839e62ac66ae6e2`.
+- Native workflow run `44250970061` completed successfully: https://github.com/babaprobado-bit/A-studio/actions/runs/44250970061
+- Native artifact: `AI-Studio-1.1.5-Full-Native-GGUF-APK`, artifact ID `14406301468`, 18,220,599 bytes ZIP, expires 2026-12-02.
+- ZIP digest: `sha256:1e7e477ccad378193b1a69a7267bf1c2b0182121aa19ddccc8380e6a242c6bb6`.
+- Extracted APK: 54,558,668 bytes. APK SHA-256: `f6959c09973685b8d1807efb41a3b917febaca64cd4510e5d6d7e9c4c91f2b90`.
+- APK integrity test passed. Confirmed embedded native engine `lib/arm64-v8a/libllamakt.so`, Capacitor web assets, Android manifest and DEX payload.
+- Native build, regression suite, APK packaging and artifact upload all succeeded. APK contains ARM64 native library; compatible devices must support arm64-v8a.
+- No physical-device installation/inference test was performed. CI success does not prove on-device model compatibility or airplane-mode acceptance.
+
 ## Repository guardrails
 - Repository: `babaprobado-bit/A-studio`
 - Branch: `feature/android-offline-skills-v1`

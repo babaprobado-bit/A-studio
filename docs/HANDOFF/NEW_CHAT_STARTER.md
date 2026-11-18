@@ -1,5 +1,11 @@
 # AI Studio — Session 21 continuation starter
 
+Read `docs/HANDOFF/README.md`, `docs/HANDOFF/PROJECT_STATE.md`, and `docs/HANDOFF/SESSION_21_APINEX_PROVIDER_2026-11-18.md` first. Latest full Native GGUF APK built successfully from code commit `cd0ec2f`; workflow `44250970061`, artifact `14406301468`. Verify current APK artifact and SHA from Session 21 handoff. APK is ARM64 (`arm64-v8a`) and has not been physically tested. APInex remains an optional provider restricted to lowercase `free/*` IDs. Keep PR #2 open/Draft/unmerged and never touch `main`.
+
+---
+
+# AI Studio — Session 21 continuation starter
+
 Read `docs/HANDOFF/README.md`, `docs/HANDOFF/PROJECT_STATE.md`, and `docs/HANDOFF/SESSION_21_APINEX_PROVIDER_2026-11-18.md` first. APInex is an optional OpenAI-compatible API gateway restricted to `free/*` model IDs, with an authenticated free-model list and explicit third-party routing disclosure. It is excluded from the default ten AI Team engines. Check the latest Native GGUF Actions and inspect the Native artifact; a Demo APK is not the full app. Keep PR #2 open/Draft/unmerged and never touch `main`.
 
 ---
