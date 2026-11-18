@@ -21,7 +21,8 @@
     "test:chat-layout": "node scripts/test-chat-layout.mjs",
     "test:social-studio": "node scripts/test-social-studio.mjs",
     "test:runway-video": "node scripts/test-runway-video.mjs",
-    "test:ai-power-hub": "node scripts/test-ai-power-hub.mjs"
+    "test:ai-power-hub": "node scripts/test-ai-power-hub.mjs",
+    "test:plugin-marketplace": "node scripts/test-plugin-marketplace.mjs"
   },
   "dependencies": {
     "express": "^5.1.0",

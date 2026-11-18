@@ -15,6 +15,7 @@ import { buildSharedProjectContext } from './project-context.js';
 import { buildSharedVaultContext } from './shared-vault-context.js';
 import { encryptWorkspaceBackup, decryptWorkspaceBackup } from './encrypted-backup.js';
 import { SKILL_CATALOG, SKILL_PROFILES, parseSkillMarkdown, normalizeSkill, prepareSkillImportQueue, buildStageSkillContext, getProfileSkillIds, createSkillBackupState, restoreSkillBackupState, MAX_SELECTED_SKILLS, MAX_CUSTOM_SKILLS, MAX_STAGE_SKILL_CHARS } from './skill-library.js';
+import { PLUGIN_REPOSITORY_CATALOG, getPluginRepositoryArchiveUrl, getPluginRepositoryById, isAllowedPluginRepositoryDownload } from './plugin-marketplace.js';
 
 const $ = (id) => document.getElementById(id);
 const DB = {
@@ -27,7 +28,8 @@ const DB = {
   snippets: 'ai-studio-snippet-v1',
   activity: 'ai-studio-agent-activity-v1',
   codeFiles: 'ai-studio-code-files-v1',
-  skills: 'ai-studio-skills-v1'
+  skills: 'ai-studio-skills-v1',
+  pluginDownloads: 'ai-studio-plugin-repo-downloads-v1'
 };
 const nativeApp = Capacitor.isNativePlatform();
 const MAX_OPENROUTER_CHAT_MODELS = 4;
@@ -72,6 +74,8 @@ let deepThinkNext = false;
 let projectList = [];
 let activeProjectId = '';
 let userPlugins = [];
+let downloadedPluginRepoIds = [];
+let activePluginLibraryTab = 'store';
 let reusableSnippets = [];
 let agentActivity = [];
 let sharedVaultItems = [];
@@ -508,11 +512,49 @@ function closeSidebar(){
 function closeChatMoreMenu(){$('chatMoreMenu')?.classList.add('hidden');$('chatMoreToggle')?.setAttribute('aria-expanded','false');}
 function renderComposerPlugins(){
   const out=$('composerPluginList');if(!out)return;
-  if(!userPlugins.length){out.innerHTML='<div class="composer-plugin-empty">Henüz özel eklenti yok. Yeni bir eklenti tanımlayarak buraya ekleyebilirsin.</div>';return;}
+  if(!userPlugins.length){out.innerHTML='<div class="composer-plugin-empty">Henüz kişisel prompt eklentin yok. Repo Mağazası sekmesinde 32 kaynak bulunuyor.</div>';return;}
   out.innerHTML=userPlugins.map((plugin,index)=>'<button type="button" class="composer-plugin-option" data-compose-plugin="'+index+'"><span class="composer-plugin-symbol">◇</span><span><strong>'+esc(plugin.name)+'</strong><small>'+esc(plugin.prompt.slice(0,110))+'</small></span><span class="composer-plugin-arrow">›</span></button>').join('');
 }
+function setPluginLibraryTab(tab){
+  activePluginLibraryTab=tab==='saved'?'saved':'store';
+  const store=$('pluginMarketplacePanel'),saved=$('promptPluginPanel');
+  store?.classList.toggle('hidden',activePluginLibraryTab!=='store');
+  saved?.classList.toggle('hidden',activePluginLibraryTab!=='saved');
+  document.querySelectorAll('[data-plugin-tab]').forEach(button=>{
+    const selected=button.dataset.pluginTab===activePluginLibraryTab;
+    button.classList.toggle('active',selected);
+    button.setAttribute('aria-selected',String(selected));
+  });
+}
+function renderPluginMarketplace(){
+  const list=$('pluginMarketplaceList');if(!list)return;
+  const query=($('pluginMarketplaceSearch')?.value||'').trim().toLocaleLowerCase('tr');
+  const type=$('pluginMarketplaceType')?.value||'all';
+  const entries=PLUGIN_REPOSITORY_CATALOG.filter(item=>item.repository)
+    .filter(item=>type==='all'||item.group===type)
+    .filter(item=>!query||[item.name,item.repository,item.description,item.kind].join(' ').toLocaleLowerCase('tr').includes(query));
+  const rea=getPluginRepositoryById('rea-companion');
+  const featured=$('pluginMarketplaceFeatured');
+  if(featured&&rea){
+    featured.innerHTML='<article class="plugin-store-featured"><div class="plugin-store-featured-top"><span class="plugin-store-priority">ÖNCELİKLİ · REA</span><span class="plugin-store-state">Masaüstü companion</span></div><h3>'+esc(rea.name)+'</h3><p>'+esc(rea.description)+'</p><p class="plugin-store-warning">Durum: henüz bağlanmadı. Bu kart gerçek bir REA bağlantısı veya Android içinde REA çalıştırıldığı anlamına gelmez.</p><div class="plugin-store-actions"><a class="plugin-store-download" href="'+esc(rea.docsUrl)+'" target="_blank" rel="noopener noreferrer">REA kurulum rehberi</a><a class="plugin-store-source" href="'+esc(rea.packageUrl)+'" target="_blank" rel="noopener noreferrer">npm paketi</a></div></article>';
+  }
+  if(!entries.length){
+    list.innerHTML='<div class="composer-plugin-empty">Bu aramada eşleşen repo bulunamadı.</div>';
+  }else{
+    list.innerHTML=entries.map(item=>{
+      const archive=getPluginRepositoryArchiveUrl(item.id);
+      const opened=downloadedPluginRepoIds.includes(item.id);
+      const kindLabel=({skill:'Skill',plugin:'Plugin / Agent',mcp:'MCP Sunucusu',cli:'CLI',desktop:'Masaüstü Uygulaması',memory:'Hafıza / Bağlam',collection:'Kaynak Koleksiyonu',router:'Model Router'})[item.kind]||'Araç';
+      const note=item.community?'Topluluk kaynağı':(item.desktopRequired?'PC / masaüstü gerekir':'Kaynak ZIP olarak indirilebilir');
+      return '<article class="plugin-store-card"><div class="plugin-store-card-head"><div><h3>'+esc(item.name)+'</h3><small>'+esc(item.repository)+'</small></div><span class="plugin-store-kind">'+esc(kindLabel)+'</span></div><p>'+esc(item.description)+'</p><div class="plugin-store-card-meta"><span>'+esc(note)+'</span>'+(opened?'<span class="plugin-store-opened">İndirme bağlantısı açıldı</span>':'')+'</div><div class="plugin-store-actions"><a class="plugin-store-download" data-plugin-download="'+esc(item.id)+'" href="'+esc(archive)+'" target="_blank" rel="noopener noreferrer">ZIP indir</a><a class="plugin-store-source" href="'+esc(item.sourceUrl)+'" target="_blank" rel="noopener noreferrer">Kaynak</a>'+(item.kind==='skill'?'<button class="plugin-store-import" type="button" data-plugin-import-skill="'+esc(item.id)+'">SKILL.md içe aktar</button>':'')+'</div></article>';
+    }).join('');
+  }
+  const notice=$('pluginStoreNotice');
+  if(notice)notice.textContent=entries.length+' / 32 GitHub kaynağı gösteriliyor. ZIP dosyaları bu mağazanın sabit izin listesinden açılır; indirilen araçların kodu AI Studio içinde otomatik çalıştırılmaz.';
+}
 function openComposerPluginDialog(){
-  $('composerPlusMenu')?.classList.add('hidden');$('plusMenuToggle')?.setAttribute('aria-expanded','false');renderComposerPlugins();
+  $('composerPlusMenu')?.classList.add('hidden');$('plusMenuToggle')?.setAttribute('aria-expanded','false');
+  renderComposerPlugins();renderPluginMarketplace();setPluginLibraryTab('store');
   const dialog=$('composerPluginDialog');if(dialog&&!dialog.open)dialog.showModal();
 }
 function chatContext(){return chatHistory.slice(-10).filter(m=>m.role==='user'||m.role==='assistant').map(m=>({role:m.role,content:m.content}));}
@@ -1610,8 +1652,18 @@ async function clearAllLocal(){if(!confirm('Proje notları, sohbet, özel eklent
 function copyText(text){if(navigator.clipboard?.writeText){navigator.clipboard.writeText(text).then(()=>showToast('Kopyalandı.')).catch(()=>fallbackCopy(text));}else fallbackCopy(text);}
 function fallbackCopy(text){const t=document.createElement('textarea');t.value=text;t.style.position='fixed';t.style.opacity='0';document.body.append(t);t.select();try{document.execCommand('copy');showToast('Kopyalandı.');}catch(_){showToast('Kopyalanamadı; dosya olarak dışa aktarabilirsin.');}t.remove();}
 document.addEventListener('click',async e=>{
+  const pluginTab=e.target.closest('[data-plugin-tab]');if(pluginTab){setPluginLibraryTab(pluginTab.dataset.pluginTab);return;}
+  const repositoryDownload=e.target.closest('[data-plugin-download]');
+  if(repositoryDownload){
+    const id=repositoryDownload.dataset.pluginDownload,expected=getPluginRepositoryArchiveUrl(id);
+    if(!expected||!isAllowedPluginRepositoryDownload(id,repositoryDownload.getAttribute('href'))){e.preventDefault();showToast('Bu kaynak mağazanın izin listesinde değil.');return;}
+    if(!downloadedPluginRepoIds.includes(id)){downloadedPluginRepoIds.push(id);void setPref(DB.pluginDownloads,downloadedPluginRepoIds);renderPluginMarketplace();}
+    return;
+  }
+  const skillImportFromStore=e.target.closest('[data-plugin-import-skill]');
+  if(skillImportFromStore){const item=getPluginRepositoryById(skillImportFromStore.dataset.pluginImportSkill);if(item?.group==='skill'){$('composerPluginDialog')?.close();go('tools');showToast('İndirdiğin arşivden bir SKILL.md dosyası çıkarıp seç.');$('skillImportFiles')?.click();}return;}
   const focusPlugins=e.target.closest('[data-focus-plugins]');
-  if(focusPlugins){go('tools');closeSidebar();setTimeout(()=>$('pluginForm')?.scrollIntoView({behavior:'smooth',block:'start'}),120);return;}
+  if(focusPlugins){closeSidebar();go('chat');openComposerPluginDialog();return;}
   const thread=e.target.closest('[data-chat-thread]');if(thread){await switchChatThread(thread.dataset.chatThread);return;}
   const composerPlugin=e.target.closest('[data-compose-plugin]');
   if(composerPlugin){const plugin=userPlugins[Number(composerPlugin.dataset.composePlugin)];if(plugin){$('chatInput').value=plugin.prompt.replace('{{gorev}}','[Görevini buraya yaz]');$('chatInput').focus();$('composerPluginDialog')?.close();go('chat');showToast(plugin.name+' eklentisi mesaja eklendi.');}return;}
@@ -1677,6 +1729,9 @@ $('chatSearchInput').addEventListener('input',renderSidebarChats);
 $('chatMoreToggle').addEventListener('click',()=>{const menu=$('chatMoreMenu');menu.classList.toggle('hidden');$('chatMoreToggle').setAttribute('aria-expanded',String(!menu.classList.contains('hidden')));});
 $('plusMenuToggle').addEventListener('click',()=>{const menu=$('composerPlusMenu');menu.classList.toggle('hidden');$('plusMenuToggle').setAttribute('aria-expanded',String(!menu.classList.contains('hidden')));closeChatMoreMenu();});
 $('closeComposerPluginDialog').addEventListener('click',()=>$('composerPluginDialog').close());
+$('pluginMarketplaceSearch').addEventListener('input',renderPluginMarketplace);
+$('pluginMarketplaceType').addEventListener('change',renderPluginMarketplace);
+$('openPluginMarketplaceFromTools')?.addEventListener('click',openComposerPluginDialog);
 $('openPluginManagerFromComposer').addEventListener('click',()=>{$('composerPluginDialog').close();go('tools');setTimeout(()=>$('pluginForm')?.scrollIntoView({behavior:'smooth',block:'start'}),120);});
 $('chatFileInput').addEventListener('change',async e=>{
   const file=e.target.files?.[0];if(!file)return;
@@ -1823,7 +1878,7 @@ async function init(){
     for(const [id,paidDefault] of Object.entries({openai:'gpt-5-mini',anthropic:'claude-sonnet-5',deepseek:'deepseek-chat',groq:'llama-3.3-70b-versatile',huggingface:'openai/gpt-oss-120b:fastest'})){if(settings.models[id]===paidDefault)settings.models[id]='';}
     if(settings.models.openrouter==='openai/gpt-5-mini')settings.models.openrouter='openrouter/free';if(!isFreeApinexModelId(settings.models.apinex))settings.models.apinex=APINEX_DEFAULT_FREE_MODEL;const savedTeam=Array.isArray(settings.team)?settings.team:null;settings.team=normalizeTeamSelection(settings.team||defaultSettings.team,Object.keys(providers));if(savedTeam&&settings.team.includes('openai')&&settings.team.includes('anthropic')&&settings.team.includes('gemini')&&settings.team.includes('deepseek')&&settings.team.includes('groq')&&settings.team.includes('openrouter')&&settings.team.includes('huggingface')&&settings.team.includes('custom')&&settings.team.includes('ollama')&&!settings.team.includes('device'))settings.team.push('device');settings.customEndpoint=typeof settings.customEndpoint==='string'?settings.customEndpoint.slice(0,500):'';if(settings.customEndpoint){try{settings.customEndpoint=normalizeOpenAiEndpoint(settings.customEndpoint);}catch(_){settings.customEndpoint='';}}settings.vaultBaseUrl=typeof settings.vaultBaseUrl==='string'?settings.vaultBaseUrl.slice(0,500):'';settings.localCoderEngine=['device','api'].includes(settings.localCoderEngine)?settings.localCoderEngine:'ollama';settings.localCoderApiProvider=providers[settings.localCoderApiProvider]&&settings.localCoderApiProvider!=='ollama'?settings.localCoderApiProvider:'openai';if(settings.ollamaUrl==='http://192.168.1.100:11434')settings.ollamaUrl='';}catch(_){}
   if(!nativeApp){showToast('Tarayıcıda API anahtarları yalnızca açık oturumda tutulur.');}
-  await initKeys();await initOpenShortsKey(); projectList=await getPref(DB.projects,[]);activeProjectId=await getPref(DB.activeProject,'');chatHistory=await getPref(DB.chat,[]);const savedThreadState=await getPref(DB.threads,{});chatThreads=Array.isArray(savedThreadState?.items)?savedThreadState.items:[];activeChatThreadId=typeof savedThreadState?.activeId==='string'?savedThreadState.activeId:'';userPlugins=await getPref(DB.plugins,[]);const storedSkills=await getPref(DB.skills,{});customSkills=(Array.isArray(storedSkills?.customSkills)?storedSkills.customSkills:[]).map(skill=>normalizeSkill(skill)).filter(Boolean).slice(-100);skillLibrary=[...SKILL_CATALOG,...customSkills];skillProfileId=storedSkills?.profileId==='custom'?'custom':(SKILL_PROFILES[storedSkills?.profileId]?storedSkills.profileId:'karpathy');const validSkillIds=new Set(skillLibrary.map(skill=>skill.id));selectedSkillIds=(Array.isArray(storedSkills?.selectedSkillIds)?storedSkills.selectedSkillIds:[]).filter(id=>validSkillIds.has(id)).slice(0,MAX_SELECTED_SKILLS);if(!selectedSkillIds.length)selectedSkillIds=getProfileSkillIds(skillProfileId);reusableSnippets=await getPref(DB.snippets,[]);agentActivity=await getPref(DB.activity,[]);codeFiles=normalizeCodeFileList(await getPref(DB.codeFiles,[]),true);if(!codeFiles.length)codeFiles=[makeCodeFile()];activeCodeFileId=codeFiles[0].id;await setPref(DB.codeFiles,codeFiles);
+  await initKeys();await initOpenShortsKey(); projectList=await getPref(DB.projects,[]);activeProjectId=await getPref(DB.activeProject,'');chatHistory=await getPref(DB.chat,[]);const savedThreadState=await getPref(DB.threads,{});chatThreads=Array.isArray(savedThreadState?.items)?savedThreadState.items:[];downloadedPluginRepoIds=(await getPref(DB.pluginDownloads,[])).filter(id=>getPluginRepositoryById(id)?.repository);activeChatThreadId=typeof savedThreadState?.activeId==='string'?savedThreadState.activeId:'';userPlugins=await getPref(DB.plugins,[]);const storedSkills=await getPref(DB.skills,{});customSkills=(Array.isArray(storedSkills?.customSkills)?storedSkills.customSkills:[]).map(skill=>normalizeSkill(skill)).filter(Boolean).slice(-100);skillLibrary=[...SKILL_CATALOG,...customSkills];skillProfileId=storedSkills?.profileId==='custom'?'custom':(SKILL_PROFILES[storedSkills?.profileId]?storedSkills.profileId:'karpathy');const validSkillIds=new Set(skillLibrary.map(skill=>skill.id));selectedSkillIds=(Array.isArray(storedSkills?.selectedSkillIds)?storedSkills.selectedSkillIds:[]).filter(id=>validSkillIds.has(id)).slice(0,MAX_SELECTED_SKILLS);if(!selectedSkillIds.length)selectedSkillIds=getProfileSkillIds(skillProfileId);reusableSnippets=await getPref(DB.snippets,[]);agentActivity=await getPref(DB.activity,[]);codeFiles=normalizeCodeFileList(await getPref(DB.codeFiles,[]),true);if(!codeFiles.length)codeFiles=[makeCodeFile()];activeCodeFileId=codeFiles[0].id;await setPref(DB.codeFiles,codeFiles);
   if(!Array.isArray(projectList))projectList=[];if(!projectList.some(p=>p&&p.id===activeProjectId))activeProjectId=projectList[0]?.id||'';await setPref(DB.activeProject,activeProjectId);if(!Array.isArray(chatHistory))chatHistory=[];if(!Array.isArray(userPlugins))userPlugins=[];if(!Array.isArray(reusableSnippets))reusableSnippets=[];if(!Array.isArray(agentActivity))agentActivity=[];
   await ensureChatThreads();renderProviderCards();renderProjects();renderChat();renderSidebarChats();renderBuiltinTools();renderPlugins();renderComposerPlugins();renderOpenShortsPanel();await mountSocialStudio({
     generateText:async prompt=>{
@@ -1843,7 +1898,7 @@ async function init(){
     getSecret,saveSecret,deleteSecret,isDemo:()=>settings.demoMode,notify:showToast,
     logActivity:logAgentActivity,go,getDeviceInfo:()=>deviceLocalState?.device||null,nativeApp,getSystemPrompt:()=>settings.systemPrompt
   });
-  renderSkillLibrary();renderReuseCatalog();renderSnippetVault();renderAgentActivity();loadActiveCodeFile();syncModeUI();updateDashboard();$('compareSelectionCount').textContent=settings.team.length+' ajan seçili';
+  renderSkillLibrary();renderPluginMarketplace();renderReuseCatalog();renderSnippetVault();renderAgentActivity();loadActiveCodeFile();syncModeUI();updateDashboard();$('compareSelectionCount').textContent=settings.team.length+' ajan seçili';
   syncLocalCoderEngineUI();await refreshDeviceLocalModels(true);
   if(!nativeApp){$('nativeVaultPanel')?.classList.add('hidden');await loadSharedVault({quiet:true});}else{$('sharedVaultPanel')?.classList.add('hidden');$('nativeVaultPanel')?.classList.remove('hidden');await loadNativeVault({quiet:true});}
 }

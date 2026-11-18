@@ -7,6 +7,8 @@ on:
     paths:
       - 'src/device-local-coder.js'
       - 'src/rea-companion-contract.js'
+      - 'src/plugin-marketplace.js'
+      - 'scripts/test-plugin-marketplace.mjs'
       - 'scripts/test-rea-companion-contract.mjs'
       - 'android-local-runtime/**'
       - 'scripts/patch-android-local-runtime.py'
@@ -93,6 +95,7 @@ jobs:
           node --check scripts/test-openshorts.mjs
           npm run test:workshop
           npm run test:chat-layout
+          npm run test:plugin-marketplace
           npm run test:social-studio
           npm run test:runway-video
           npm run test:openshorts
@@ -102,6 +105,8 @@ jobs:
           npm run test:ai-team
           npm run test:device-local-coder
           npm run test:rea-companion-contract
+          node --check src/plugin-marketplace.js
+          node --check scripts/test-plugin-marketplace.mjs
           node --check src/agent-swarm.js
           node --check src/plugin-catalog.js
           node --check src/openrouter-chat.js

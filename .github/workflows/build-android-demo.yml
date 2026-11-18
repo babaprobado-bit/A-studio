@@ -54,6 +54,8 @@ jobs:
           node --check src/device-local-coder.js
           node --check src/apinex-provider.js
           node --check src/rea-companion-contract.js
+          node --check src/plugin-marketplace.js
+          node --check scripts/test-plugin-marketplace.mjs
           node --check src/shared-vault-context.js
           node --check src/social-studio.js
           node --check src/social-studio-automation.js
@@ -72,8 +74,10 @@ jobs:
         run: npm run build
       - name: Test Local Coder and reuse workspace
         run: npm run test:workshop
-      - name: Test AI chat layout
-        run: npm run test:chat-layout
+      - name: Test AI chat layout and curated plugin marketplace
+        run: |
+          npm run test:chat-layout
+          npm run test:plugin-marketplace
       - name: Test Social Media Studio and OpenShorts publishing
         run: |
           npm run test:social-studio

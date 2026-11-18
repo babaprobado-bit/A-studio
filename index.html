@@ -143,6 +143,7 @@
       </section>
 
       <section class="screen" id="tools">
+        <section class="panel plugin-store-entry"><div class="section-head"><div><div class="eyebrow">CURATED PLUGIN STORE</div><h2>REA + 32 GitHub deposu</h2></div><button id="openPluginMarketplaceFromTools" class="btn primary small" type="button">Mağazayı aç</button></div><p class="fineprint">İndirmeler yalnızca eklenti mağazasındaki sabit kaynak listesinden açılır. Skill, MCP ve masaüstü araçlarının kurulum biçimleri farklıdır.</p></section>
         <div class="page-title"><div class="eyebrow">TOOLBOX / PROMPT PLUGINS</div><h1>Araçlar ve eklentiler</h1><p>Hazır görev şablonları kullan, kendi prompt eklentilerini oluştur veya kod parçalarını dışa aktar.</p></div>
         <section class="panel openshorts-panel" id="openShortsPanel">
           <div class="section-head">
@@ -343,10 +344,30 @@
       </section>
     </main>
     <dialog id="composerPluginDialog" class="composer-plugin-dialog" aria-labelledby="composerPluginTitle">
-      <div class="composer-plugin-head"><div><div class="eyebrow">PLUGIN LIBRARY</div><h2 id="composerPluginTitle">Eklenti seç</h2></div><button type="button" id="closeComposerPluginDialog" class="icon-button" aria-label="Eklenti penceresini kapat">×</button></div>
-      <p class="muted">Seçtiğin eklentinin talimatı mesaj kutusuna eklenir. Göndermeden önce düzenleyebilirsin.</p>
-      <div id="composerPluginList" class="composer-plugin-list"></div>
-      <button type="button" id="openPluginManagerFromComposer" class="plugin-create-button">＋ Yeni eklenti tanımla</button>
+      <div class="composer-plugin-head"><div><div class="eyebrow">AI STUDIO PLUGIN STORE</div><h2 id="composerPluginTitle">Eklenti mağazası</h2></div><button type="button" id="closeComposerPluginDialog" class="icon-button" aria-label="Eklenti penceresini kapat">×</button></div>
+      <div class="plugin-library-tabs" role="tablist" aria-label="Eklenti bölümleri">
+        <button type="button" class="plugin-library-tab active" data-plugin-tab="store" role="tab" aria-selected="true">Repo mağazası · 33</button>
+        <button type="button" class="plugin-library-tab" data-plugin-tab="saved" role="tab" aria-selected="false">Prompt eklentilerim</button>
+      </div>
+      <section id="pluginMarketplacePanel" class="plugin-marketplace-panel" role="tabpanel">
+        <div id="pluginMarketplaceFeatured"></div>
+        <div class="plugin-store-controls">
+          <label class="sr-only" for="pluginMarketplaceSearch">Eklenti ara</label>
+          <input id="pluginMarketplaceSearch" class="input" type="search" placeholder="32 repo içinde ara..." autocomplete="off">
+          <label class="sr-only" for="pluginMarketplaceType">Repo türü</label>
+          <select id="pluginMarketplaceType" class="input">
+            <option value="all">Tüm türler</option><option value="skill">Skills</option><option value="plugin">Plugins / Agents</option><option value="mcp">MCP sunucuları</option><option value="cli">CLI / Masaüstü</option><option value="collection">Koleksiyonlar</option><option value="memory">Hafıza / Bağlam</option>
+          </select>
+        </div>
+        <div id="pluginMarketplaceList" class="plugin-marketplace-list"></div>
+        <p id="pluginStoreNotice" class="plugin-store-notice" role="status">33 kaynak yükleniyor…</p>
+        <p class="plugin-store-safety">İndirme, kaynağın GitHub ZIP arşivini açar. Skill türündeki paketlerden SKILL.md dosyalarını ayrıca içe aktarabilirsin. MCP, CLI ve masaüstü araçları Android APK içinde çalıştırılmaz; kendi resmî kurulum adımlarını gerektirir. Kaynak kodunu indirip incelemeden çalıştırma.</p>
+      </section>
+      <section id="promptPluginPanel" class="hidden" role="tabpanel">
+        <p class="muted">Kendi prompt eklentilerin burada görünür. Seçince talimatı sohbet kutusuna eklenir.</p>
+        <div id="composerPluginList" class="composer-plugin-list"></div>
+        <button type="button" id="openPluginManagerFromComposer" class="plugin-create-button">＋ Prompt eklentisi oluştur / düzenle</button>
+      </section>
     </dialog>
     <nav class="bottom-nav hidden" aria-hidden="true" aria-label="Ana gezinme"></nav>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>

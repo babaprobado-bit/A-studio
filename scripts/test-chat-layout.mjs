@@ -13,7 +13,9 @@ const requiredIds = [
   'chatForm', 'chatInput', 'teamRun', 'pipelineRun', 'exportChat', 'clearChat',
   'sidebarToggleBtn', 'appSidebar', 'chatThreadList', 'newChatBtn',
   'plusMenuToggle', 'composerPlusMenu', 'composerPluginDialog',
-  'composerPluginList', 'pluginForm', 'chatFileInput'
+  'composerPluginList', 'pluginMarketplacePanel', 'pluginMarketplaceList',
+  'pluginMarketplaceFeatured', 'pluginMarketplaceSearch', 'pluginMarketplaceType',
+  'pluginForm', 'chatFileInput'
 ];
 for (const id of requiredIds) {
   assert.match(html, new RegExp('id="' + id + '"'), 'Missing chat control: ' + id);
@@ -35,4 +37,6 @@ assert.match(main, /function persistChatThreads\(\)/, 'Conversation threads must
 assert.match(main, /function renderComposerPlugins\(\)/, 'Saved plugins must be selectable from the composer');
 assert.match(main, /requestSubmit\(\)/, 'Enter must submit the chat form');
 assert.match(main, /settings\.team/, 'Existing AI Team selection logic must remain');
-console.log('Chat layout contract passed: message history, anchored composer, accessible controls and AI Team hooks are present.');
+assert.ok(main.includes('function renderPluginMarketplace()'), 'Curated repository marketplace must render inside plugin selection');
+assert.ok(main.includes('isAllowedPluginRepositoryDownload'), 'Repository downloads must use the fixed allowlist');
+console.log('Chat layout contract passed: message history, anchored composer, accessible controls, marketplace and AI Team hooks are present.');
