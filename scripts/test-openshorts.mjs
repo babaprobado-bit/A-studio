@@ -47,11 +47,13 @@ assert.equal(calls.filter(call=>call.body.method==='tools/call').at(-1).body.par
 const recut=await callOpenShortsTool({apiKey:key,name:'recut_clip',arguments:{job_id:'job-test-1',clip_index:0,segments:[{start:1,end:8}],snap_to_words:true,reapply_captions:true},fetchImpl:fakeFetch});
 assert.equal(recut.job_id,'job-test-1');
 assert.equal(calls.filter(call=>call.body.method==='tools/call').at(-1).body.params.name,'recut_clip');
-const published=await callOpenShortsTool({apiKey:key,name:'publish_clip',arguments:{job_id:'job-test-1',clip_index:0,platforms:['youtube'],title:'Test',description:'Test description'},fetchImpl:fakeFetch});
+const published=await callOpenShortsTool({apiKey:key,name:'publish_clip',arguments:{job_id:'job-test-1',clip_index:0,platforms:['youtube','tiktok','instagram'],title:'Test',description:'Test description',scheduled_date:'2026-11-20T09:00:00.000Z',timezone:'Europe/Istanbul'},fetchImpl:fakeFetch});
 assert.equal(published.job_id,'job-test-1');
 const publishCall=calls.filter(call=>call.body.method==='tools/call').at(-1);
 assert.equal(publishCall.body.params.name,'publish_clip');
-assert.deepEqual(publishCall.body.params.arguments.platforms,['youtube']);
+assert.deepEqual(publishCall.body.params.arguments.platforms,['youtube','tiktok','instagram']);
+assert.equal(publishCall.body.params.arguments.scheduled_date,'2026-11-20T09:00:00.000Z');
+assert.equal(publishCall.body.params.arguments.timezone,'Europe/Istanbul');
 
 const failedFetch=async()=>response({jsonrpc:'2.0',id:1,error:{code:-32000,message:'bad token '+key}});
 await assert.rejects(callOpenShortsTool({apiKey:key,name:'get_quota',fetchImpl:failedFetch}),error=>!error.message.includes(key)&&/API anahtarı gizlendi/.test(error.message));

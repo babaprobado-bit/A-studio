@@ -384,6 +384,18 @@ export const SKILL_CATALOG = Object.freeze([
     "builtIn": true
   },
   {
+    "id": "vidiq-discovery",
+    "name": "vidIQ Video Discovery",
+    "group": "Video",
+    "stage": "plan",
+    "description": "Find candidate YouTube videos and Shorts with real trend evidence before sending permitted sources to OpenShorts.",
+    "content": "Use vidIQ MCP tools only when they are genuinely connected and available. Search candidate YouTube videos/Shorts with vidiq_trending_videos, vidiq_outliers or vidiq_youtube_search. Compare view velocity, outlier score, publish date and topical fit; return source URLs and explain why they were selected. Discovery is not permission to reuse: only send a video to OpenShorts when the user owns it or confirms processing/reuse permission. Public competitor videos can be research references only. If vidIQ is not connected, do not invent search results; state that OAuth connection is required. OpenShorts clips the submitted source; it does not discover the source video.",
+    "source": "Official vidIQ MCP documentation and AI Studio workflow summary",
+    "sourceUrl": "https://vidiq.com/mcp/",
+    "version": "1",
+    "builtIn": true
+  },
+  {
     "id": "openshorts-workflow",
     "name": "OpenShorts Video Workflow",
     "group": "Video",
@@ -399,6 +411,7 @@ export const SKILL_CATALOG = Object.freeze([
   }
 ]);
 export const SKILL_PROFILES = Object.freeze({
+  'creator-automation': { name: 'Creator Automation', description: 'vidIQ ile video keşfi ve OpenShorts ile klip üretimi/yayınlama.', skillIds: ['vidiq-discovery','openshorts-workflow'] },
   openshorts: { name: 'OpenShorts Video', description: 'OpenShorts ile izinli videodan klip üretme, altyazı düzenleme ve güvenli yeniden kesme akışı.', skillIds: ['openshorts-workflow'] },
   karpathy: { name: 'Karpathy Guidelines', description: 'Tek temel kalite kuralı.', skillIds: ['karpathy-guidelines'] },
   superpowers: {

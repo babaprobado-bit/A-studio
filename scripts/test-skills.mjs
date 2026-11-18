@@ -9,10 +9,10 @@ import {
 import { encryptWorkspaceBackup, decryptWorkspaceBackup } from '../src/encrypted-backup.js';
 import { webcrypto } from 'node:crypto';
 
-assert.equal(SKILL_CATALOG.length, 39, 'starter pack adds the OpenShorts workflow Skill');
+assert.equal(SKILL_CATALOG.length, 40, 'starter pack adds vidIQ discovery and OpenShorts workflow Skills');
 assert.equal(SKILL_CATALOG.filter(skill => skill.group === 'Superpowers').length, 15);
 assert.equal(SKILL_CATALOG.filter(skill => skill.group === 'Caveman').length, 22);
-for (const id of ['karpathy','superpowers','superpowers-development','planning','review','caveman','caveman-short','balanced','openshorts']) {
+for (const id of ['karpathy','superpowers','superpowers-development','planning','review','caveman','caveman-short','balanced','openshorts','creator-automation']) {
   assert.ok(SKILL_PROFILES[id], 'missing profile: ' + id);
   assert.ok(SKILL_PROFILES[id].skillIds.length <= MAX_SELECTED_SKILLS, 'profile exceeds eight Skills: ' + id);
   assert.equal(getProfileSkillIds(id).length, SKILL_PROFILES[id].skillIds.length);
@@ -20,6 +20,8 @@ for (const id of ['karpathy','superpowers','superpowers-development','planning',
 assert.deepEqual(getProfileSkillIds('karpathy'), ['karpathy-guidelines']);
 assert.equal(getProfileSkillIds('balanced').length, MAX_SELECTED_SKILLS);
 assert.deepEqual(getProfileSkillIds('openshorts'), ['openshorts-workflow']);
+assert.deepEqual(getProfileSkillIds('creator-automation'), ['vidiq-discovery','openshorts-workflow']);
+assert.ok(SKILL_CATALOG.some(skill => skill.id === 'vidiq-discovery' && /vidiq_trending_videos/.test(skill.content)));
 const openshortsSkill = SKILL_CATALOG.find(skill => skill.id === 'openshorts-workflow');
 assert.ok(openshortsSkill && openshortsSkill.builtIn && openshortsSkill.license === 'MIT');
 assert.match(openshortsSkill.content, /does not search the internet/i);

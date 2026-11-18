@@ -260,6 +260,7 @@ function renderOpenShortsPanel(){
   $('openshortsQuotaRefresh').disabled=!openShortsToolNames.has('get_quota')||openShortsBusy;
   $('openshortsCheckStatus').disabled=!openShortsJobId||!openShortsToolNames.has('get_job_status')||openShortsBusy;
   $('openshortsJobId').textContent=openShortsJobId||'Henüz iş yok';
+  $('openshortsClips')?.querySelectorAll('[data-openshorts-publish]').forEach(button=>{button.disabled=!openShortsToolNames.has('publish_clip')||openShortsBusy;});
   if(!connected)setOpenShortsStatus('Bağlanmak için API anahtarını gir.','info');
   else if(!openShortsToolNames.size)setOpenShortsStatus('Anahtar bu cihazda kayıtlı. OpenShorts bağlantısını doğrula.','info');
 }
@@ -276,9 +277,53 @@ function renderOpenShortsClips(clips){
     const title=esc(clip?.title||clip?.youtube_title||('Klip '+(index+1)));
     const duration=Number.isFinite(Number(clip?.duration_seconds))?Math.max(0,Number(clip.duration_seconds))+' sn':'Süre bilgisi yok';
     let link='';
-    try{const url=new URL(String(clip?.video_url||''));if(url.protocol==='https:')link='<a class="btn secondary small" href="'+esc(url.toString())+'" target="_blank" rel="noopener noreferrer">Klibi aç / indir ↗</a>';}catch(_){}
-    return '<article class="openshorts-clip"><div><strong>'+title+'</strong><small>'+esc(duration)+'</small></div>'+link+'</article>';
+    try{const url=new URL(String(clip?.video_url||clip?.download_url||''));if(url.protocol==='https:')link='<a class="btn ghost small" href="'+esc(url.toString())+'" target="_blank" rel="noopener noreferrer">Klibi aç / indir ↗</a>';}catch(_){}
+    return '<article class="openshorts-clip"><div><strong>'+title+'</strong><small>'+esc(duration)+'</small></div><div class="row-actions">'+link+'<button class="btn secondary small" type="button" data-openshorts-publish="'+index+'" '+(!openShortsToolNames.has('publish_clip')||openShortsBusy?'disabled':'')+'>Gönder / zamanla</button></div></article>';
   }).join('');
+}
+async function publishOpenShortsClip(clipIndex){
+  if(openShortsBusy)return;
+  if(!openShortsJobId)throw new Error('Önce bir OpenShorts videosu işle ve kliplerini hazırla.');
+  const platforms=[
+    ['openshortsPlatformYoutube','youtube','YouTube Shorts'],
+    ['openshortsPlatformTiktok','tiktok','TikTok'],
+    ['openshortsPlatformInstagram','instagram','Instagram Reels']
+  ].filter(([id])=>$(id)?.checked);
+  if(!platforms.length)throw new Error('En az bir yayın platformu seç.');
+  const selected=platforms.map(item=>item[1]);
+  const title=$('openshortsPublishTitle').value.trim();
+  const description=$('openshortsPublishCaption').value.trim();
+  const scheduleRaw=$('openshortsPublishAt').value;
+  let scheduledDate='';
+  if(scheduleRaw){
+    const schedule=new Date(scheduleRaw);
+    if(Number.isNaN(schedule.getTime())||schedule.getTime()<=Date.now())throw new Error('Zamanlama gelecekte bir tarih ve saat olmalı.');
+    scheduledDate=schedule.toISOString();
+  }
+  const when=scheduledDate?'Zaman: '+new Date(scheduledDate).toLocaleString():'Şimdi gönderilecek';
+  const confirmation='Klip '+(clipIndex+1)+' şu platformlara gönderilecek: '+platforms.map(item=>item[2]).join(', ')+'.\n'+when+'\n'+(title?'Başlık: '+title+'\n':'')+(description?'Açıklama: '+description+'\n':'')+'Bu işlem herkese açık paylaşım başlatabilir. Onaylıyor musun?';
+  if(!confirm(confirmation))return;
+  openShortsBusy=true;renderOpenShortsPanel();
+  setOpenShortsStatus('Klip seçilen sosyal hesaplara gönderiliyor / zamanlanıyor…');
+  try{
+    const args={job_id:openShortsJobId,clip_index:clipIndex,platforms:selected};
+    if(title)args.title=title;
+    if(description)args.description=description;
+    if(scheduledDate){
+      args.scheduled_date=scheduledDate;
+      args.timezone=Intl.DateTimeFormat().resolvedOptions().timeZone||'Europe/Istanbul';
+    }
+    const result=await requireOpenShortsTool('publish_clip',args);
+    const state=String(result?.status||result?.state||'istek alındı');
+    const requestId=result?.request_id||result?.requestId||'';
+    setOpenShortsStatus('OpenShorts yayınlama yanıtı: '+state+(requestId?' · İstek: '+String(requestId):'')+'. Platform hesaplarındaki son durumu kontrol et.','success');
+    showToast('OpenShorts yayınlama isteğini aldı.');
+  }catch(error){
+    setOpenShortsStatus(error.message||'Klip yayınlama isteği başarısız.','error');
+  }finally{
+    openShortsBusy=false;
+    renderOpenShortsPanel();
+  }
 }
 async function connectOpenShortsUi(){
   if(openShortsBusy)return;
@@ -1675,6 +1720,7 @@ $('openshortsQuotaRefresh').addEventListener('click',()=>refreshOpenShortsQuota(
 $('openshortsProcess').addEventListener('click',()=>startOpenShortsJob(false));
 $('openshortsForceLowQuality').addEventListener('click',()=>startOpenShortsJob(true));
 $('openshortsCheckStatus').addEventListener('click',checkOpenShortsJob);
+$('openshortsClips').addEventListener('click',event=>{const button=event.target.closest('[data-openshorts-publish]');if(!button)return;const index=Number(button.dataset.openshortsPublish);if(!Number.isInteger(index)||index<0)return;publishOpenShortsClip(index).catch(error=>setOpenShortsStatus(error.message||'Yayınlama başlatılamadı.','error'));});
 $('skillProfileSelect').addEventListener('change',e=>applySkillProfile(e.target.value));
 $('skillImportBtn').addEventListener('click',()=>$('skillImportFiles').click());
 $('skillImportFiles').addEventListener('change',async e=>{if(e.target.files?.length)await importSkillFiles(e.target.files);e.target.value='';});
