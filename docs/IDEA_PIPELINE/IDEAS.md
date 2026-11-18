@@ -1,0 +1,150 @@
+# AI Studio — Idea Pipeline
+
+**Generated:** 2026-11-18  
+**Repository:** `babaprobado-bit/A-studio`  
+**Branch snapshot:** `feature/android-offline-skills-v1` @ `98e743d6aba1d567e5fc1f0e9dc4afe5d3f60b58`  
+**PR:** #2 — open, Draft, base `main`  
+**Main snapshot:** `aab010319b6500002844bd24b11da85dd9ca3b00`
+
+This file contains proposals only. Nothing below is implemented by this commit.
+
+## Guardrails for every idea
+
+- Keep all work on `feature/android-offline-skills-v1`; keep PR #2 open and Draft; never write to or merge into `main`.
+- Preserve all ten default AI Team engines and the existing free-only model gates. Never silently fall back to a paid model.
+- Do not store API keys, tokens, passwords or other secrets in Git, idea records, logs or backups.
+- No arbitrary PC shell execution, unrestricted filesystem access, or unattended public publishing.
+- Any external write, publish, billable generation or destructive action needs a clear user approval step.
+- Treat provider quotas and availability as unknown unless the provider actually reports them.
+
+## Prioritized ideas
+
+### IDEA-REA-001 — Live REA Companion pairing and read-only bridge
+
+- **Priority:** P0
+- **Status:** NEW
+- **Estimated scope:** XL
+- **Why it is new:** `src/rea-companion-contract.js` already validates protocol v1 and the read-only operations `project.overview`, `files.inspect` and `symbols.search`. The plugin catalog and marketplace still identify REA as contract/mock-only; the live companion connection is not implemented.
+- **User benefit:** Use the user's desktop REA project-analysis capability from AI Studio without giving a phone app unrestricted access to the computer.
+- **Technical approach:** Add an optional desktop companion host for the REA process. Pair it with a short-lived one-time code, register projects explicitly, issue revocable short-lived sessions, and require the user to select paths for each request. Reuse the existing exact-schema validators, path allowlist, byte/time limits and disclosure response. Start read-only; do not add shell, arbitrary file writes, or automatic forwarding to another model provider.
+- **Dependencies:** REA CLI/host process, a documented companion transport, Android secure session storage, and the existing REA contract module.
+- **Risks:** Local-network exposure, pairing replay, path disclosure and malicious project content. Mitigate with origin/host checks, nonces, rate limits, explicit project/path selection, bounded responses and a visible disconnect/revoke control.
+- **Acceptance criteria:** A paired project can return overview, selected-file inspection and symbol-search results; unregistered projects and unselected paths are rejected; expired/revoked sessions stop working; no shell or write operation is exposed.
+
+### IDEA-AUTO-001 — GitHub-backed three-stage Project Idea Pipeline
+
+- **Priority:** P0
+- **Status:** NEW
+- **Estimated scope:** XL
+- **Why it is new:** The README explicitly lists unattended agents that continuously invent tasks as not implemented. GitHub is still marked planned in the connector registry; the current Power Hub Swarm is a bounded, user-started run rather than a persistent scheduled pipeline.
+- **User benefit:** Make the requested idea → review → implementation cycle visible and manageable inside AI Studio, with every idea traceable to a GitHub record.
+- **Technical approach:** Add three separate jobs: (1) generator creates uniquely identified ideas, (2) reviewer checks duplication, architecture, risks and readiness, and (3) executor works only on READY items. Use an Android WorkManager schedule with visible last-run/next-run state; Android background execution is best-effort, not an exact-minute guarantee. Use downloaded GGUF for offline generation when available; defer cloud-only work until connectivity returns. Write only through a narrowly scoped GitHub integration to a configured feature branch. Require approval before code changes; use GitHub Actions for build/test evidence rather than running arbitrary PC shell commands.
+- **Dependencies:** GitHub OAuth/device authorization and secure token storage, WorkManager, a versioned idea schema, existing AI Team/Swarm and local GGUF paths.
+- **Risks:** Background scheduling drift, token exposure, duplicate ideas and incorrect autonomous changes. Mitigate with idempotent IDs, deduplication, branch allowlists, bounded work budgets, a run log, cancellation and approval gates.
+- **Acceptance criteria:** The three stages have separate states and outputs; a failed stage does not silently skip ahead; only READY ideas enter execution; all writes stay on the configured feature branch; the user can pause, inspect and revoke the integration.
+
+### IDEA-OPENSHORTS-001 — Local video upload and approved clip recutting
+
+- **Priority:** P1
+- **Status:** NEW
+- **Estimated scope:** L
+- **Why it is new:** `src/openshorts-mcp.js` recognizes optional `create_upload` and `recut_clip` tools, but the Creator Studio Clips UI currently accepts a source URL and does not expose local-file upload or recutting controls.
+- **User benefit:** Process a video already on the device and refine an existing clip without finding a public HTTPS URL first.
+- **Technical approach:** Add a bounded Android file picker and upload-progress state. Show upload/recut controls only when the connected MCP server advertises the exact optional tool. Validate file type and size against the server's documented limits, check quota before upload, retain the existing rights-confirmation step, and require a separate preview/approval before each recut. Keep What If, In My Town and Clips as independent modes.
+- **Dependencies:** OpenShorts server support for `create_upload` and `recut_clip`, documented limits, Capacitor file access and existing quota/status polling.
+- **Risks:** Large uploads, private media disclosure, unsupported formats, quota use and rights violations. Mitigate with size/type checks, clear destination disclosure, explicit rights confirmation and no automatic publishing.
+- **Acceptance criteria:** Unsupported tools remain hidden; upload failure is recoverable; quota is checked before upload; recut requires user approval; source files are not silently retained in app storage.
+
+### IDEA-PROVIDER-001 — Free-provider health and observed-quota ledger
+
+- **Priority:** P1
+- **Status:** NEW
+- **Estimated scope:** M
+- **Why it is new:** AI Studio has a ranked provider directory, manual connection tests and APInex free-model refresh, but no shared provider-health/cooldown ledger or consistent record of observed rate-limit responses.
+- **User benefit:** See which free providers are currently responding and avoid repeatedly sending requests to a provider that is failing or rate-limited.
+- **Technical approach:** Record provider/model, last success, latency, response class, observed `Retry-After` and locally counted requests. Display reported quota separately from estimated local usage; show “unknown” when the provider gives no trustworthy quota data. Add a user-configurable cooldown and an explicit free-provider fallback list. Preserve APInex `free/*`, OpenRouter `:free` and all existing allowlists; never select a paid model automatically.
+- **Dependencies:** Existing provider adapters, connection-test path, APInex model refresh and local settings storage.
+- **Risks:** Providers may omit or change headers; local counters are not authoritative billing data. Mitigate by labeling evidence and estimates clearly, never inventing numeric quotas, and keeping keys out of the ledger.
+- **Acceptance criteria:** A provider's health state is based on actual responses; 429/cooldown behavior is tested; unknown quota remains unknown; fallback uses only user-enabled free routes.
+
+### IDEA-SWARM-001 — AI Swarm run history and safe replay
+
+- **Priority:** P1
+- **Status:** NEW
+- **Estimated scope:** M
+- **Why it is new:** The Power Hub displays the current Swarm board and results, while the existing unified activity history covers chat, team calls, pipelines, comparisons and Local Coder. The Swarm path does not currently write a structured run record to that history.
+- **User benefit:** Revisit what the agents planned, see which subtask failed, and continue a useful run without rebuilding the whole request.
+- **Technical approach:** Add a bounded local run record containing task ID, plan, role/provider/model identifiers, task states, retry count, elapsed time, file-conflict summary and final synthesis. Store no credentials. Offer “re-run failed tasks” only after the user reviews the plan and confirms. Add an export-to-Markdown action and a retention limit.
+- **Dependencies:** `runAgentSwarm` event callbacks, Power Hub UI and existing local activity-history storage/export.
+- **Risks:** Sensitive prompts or project details could be retained longer than expected. Mitigate with opt-in full details, redaction, bounded retention and a clear delete/export control.
+- **Acceptance criteria:** Completed and failed Swarm runs survive navigation/restart; no API key is stored; replay is limited to selected failed tasks and requires confirmation.
+
+### IDEA-SKILL-001 — Imported Skill version comparison and rollback
+
+- **Priority:** P1
+- **Status:** NEW
+- **Estimated scope:** M
+- **Why it is new:** Skill import already has a preview queue, metadata display and duplicate-name warnings. It does not provide a version-aware update/diff flow for an already imported Skill.
+- **User benefit:** Update a downloaded Skill without accumulating confusing duplicates or silently replacing instructions that were previously reviewed.
+- **Technical approach:** Derive a stable source identity from normalized source URL plus Skill name; calculate a content hash; compare incoming version/source/license metadata with the installed copy; show a side-by-side diff; let the user update, keep both or skip; retain one rollback snapshot. Unknown license/source should be visibly flagged, not guessed.
+- **Dependencies:** Existing `parseSkillMarkdown`, `prepareSkillImportQueue`, Skill backup state and import preview dialog.
+- **Risks:** Untrusted instructions, spoofed version metadata and license uncertainty. Mitigate with explicit review, no execution of Skill content, preserved previous versions and a clear unknown-license warning.
+- **Acceptance criteria:** Re-importing the same source offers a diff instead of silently creating/replacing a record; update and rollback preserve IDs and profile selections; missing license metadata is not invented.
+
+### IDEA-PLUGIN-001 — Plugin archive trust receipt
+
+- **Priority:** P1
+- **Status:** NEW
+- **Estimated scope:** M
+- **Why it is new:** The marketplace restricts downloads to a curated repository allowlist, but its current archive URL is branch-based and the catalog does not provide a verified commit/hash, archive file inventory or permission/license receipt.
+- **User benefit:** Know exactly what is being downloaded before importing a Skill or using a desktop-required tool.
+- **Technical approach:** Resolve the allowlisted repository branch to a commit SHA; show repository, pinned commit, license evidence, desktop requirement and declared capabilities. After download, calculate an archive hash and inspect ZIP paths/file inventory before extraction. Reject path traversal and unexpected executable entrypoints. Keep downloads inert; do not run plugin code in the Android app.
+- **Dependencies:** Existing `PLUGIN_REPOSITORY_CATALOG`, GitHub repository metadata, archive download handling and safe ZIP inspection.
+- **Risks:** Repository contents can change, license data can be absent, and archives can contain malicious paths or scripts. Mitigate with commit pinning, hash display, explicit unknown-license state, path validation and no auto-execution.
+- **Acceptance criteria:** Every download shows its exact source revision; malformed/path-traversal archives are rejected; no plugin is executed merely because it was downloaded.
+
+### IDEA-DEVICE-001 — Offline GGUF preflight and device benchmark
+
+- **Priority:** P1
+- **Status:** NEW
+- **Estimated scope:** M
+- **Why it is new:** Device RAM/CPU/storage guardrails and safe model loading already exist, but the project still lacks a repeatable on-device acceptance report for actual model compatibility and inference performance.
+- **User benefit:** Choose a model based on measured behavior on the phone instead of relying only on approximate hardware thresholds.
+- **Technical approach:** After explicit user initiation, run a short local-only prompt against the selected GGUF model. Record model-file integrity, ABI, available RAM before/after, load time, first-token latency and a short throughput sample. Abort safely if memory pressure rises; unload the model after the test; save a per-device profile that can be cleared. Never send benchmark content to a cloud provider.
+- **Dependencies:** Native GGUF runtime, existing device-info bridge, model manager and a bounded benchmark prompt.
+- **Risks:** Benchmarking can consume RAM or heat the device and short tests may not predict long sessions. Mitigate with a short workload, memory guard, cooldown and clear “sample only” wording.
+- **Acceptance criteria:** The benchmark works without internet after model import, aborts on low-memory pressure, reports measured values separately from estimates and does not claim physical-device results until actually run.
+
+### IDEA-OLLAMA-001 — Native trusted-endpoint broker for Ollama
+
+- **Priority:** P1
+- **Status:** NEW
+- **Estimated scope:** L
+- **Why it is new:** Current endpoint validation and redirect rejection are useful, but the handoff records a residual app-wide Android cleartext permission and no DNS resolution/IP pinning for remote HTTPS hostnames.
+- **User benefit:** Keep trusted-LAN PC Ollama working while reducing the network access granted to unrelated app requests.
+- **Technical approach:** Move Ollama transport behind a narrowly scoped native broker. Pair an explicit endpoint, resolve and validate its destination at connection time, reject public cleartext HTTP and redirects, and bind requests to the approved host/address for the session. Add a host-scoped trust profile and investigate removing the broad manifest cleartext flag without breaking local Ollama.
+- **Dependencies:** Kotlin Capacitor plugin, native HTTP client/DNS resolver, existing `normalizeOllamaEndpoint` checks and Android manifest workflow.
+- **Risks:** DNS rebinding, changing LAN addresses, certificate management and regressions in trusted-LAN support. Mitigate with revalidation, short-lived endpoint approvals, strict tests and a fail-closed path.
+- **Acceptance criteria:** Unapproved destinations and redirects are blocked; trusted local Ollama remains usable; public cleartext endpoints are rejected; manifest policy is narrowed if technically supported.
+
+### IDEA-CREATOR-001 — Mode-specific Creator Series continuity profiles
+
+- **Priority:** P2
+- **Status:** NEW
+- **Estimated scope:** M
+- **Why it is new:** What If, In My Town and Clips are deliberately separate modes and drafts are saved, but there is no reusable series-level continuity profile shared across episodes.
+- **User benefit:** Produce multiple episodes with consistent characters, locations, tone and visual rules without repeating the same setup every time.
+- **Technical approach:** Let the user create a series profile inside one mode only. Store editable facts, recurring characters/locations, style rules, episode index and “already used” topics. Inject a small bounded profile into the selected mode's prompt. What If progression rules remain separate from In My Town lore; Clips never receives story-series instructions.
+- **Dependencies:** Existing Creator mode identifiers, local draft queue, prompt builders and bounded project-context helper.
+- **Risks:** Stale continuity notes and accidental cross-mode mixing. Mitigate with editable facts, per-mode storage keys, bounded context and a visible profile selector.
+- **Acceptance criteria:** A series profile can be reused and edited across drafts; switching modes never mixes profile data; the user can clear a profile without deleting unrelated drafts.
+
+## Review order
+
+1. `IDEA-REA-001` — highest integration priority and a concrete extension of the existing mock contract.
+2. `IDEA-AUTO-001` — matches the requested generator/reviewer/executor workflow; requires a separate GitHub authorization design.
+3. `IDEA-OPENSHORTS-001` — unlocks the already allowlisted optional upload/recut tools.
+4. `IDEA-PROVIDER-001` and `IDEA-OLLAMA-001` — improve free-route reliability and network safety.
+5. Remaining ideas can be scheduled after dependency and scope review.
+
+**Pipeline status:** All entries start as `NEW`. The review stage must independently verify duplicates and current source before changing any item to `READY`. The implementation stage must not treat this file as approval to perform external, destructive, paid or publishing actions.
