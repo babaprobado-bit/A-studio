@@ -1,3 +1,5 @@
+> **Latest checkpoint (2026-11-18):** Session 21 adds APInex as an optional OpenAI-compatible gateway with free/* model filtering, authenticated model-list refresh, hard paid-model rejection, secure-key reuse and CSP allowlisting. It is not selected in the default ten-engine AI Team. See SESSION_21_APINEX_PROVIDER_2026-11-18.md. Verify the Native GGUF CI/artifact after commit; PR #2 remains open Draft and main unchanged.
+
 > **Latest checkpoint (2026-11-17):** Session 20 adds AI Power Hub 1.1.4: bounded 10-role Agent Swarm, 34 searchable prompt plugins, free-only OpenRouter multi-chat (up to four models), ordered 13-provider access directory and explicit optional Cohere Trial / Cloudflare Workers AI routes. Focused syntax and regression tests passed; GitHub CI and Native GGUF artifact verification are pending after the feature-branch commit. See SESSION_20_AI_POWER_HUB_2026-11-17.md. PR #2 remains open Draft; main is unchanged.
 
 

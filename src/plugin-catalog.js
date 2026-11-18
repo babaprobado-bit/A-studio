@@ -37,6 +37,7 @@ P('summary','Uzun Metin Özetleyici','≡','Üretkenlik','Karar, risk ve görev 
 ]);
 export const EXTERNAL_CONNECTOR_CATALOG=Object.freeze([
 {id:'openrouter',name:'OpenRouter',category:'AI modelleri',status:'integrated',desc:'Sohbet ve ücretsiz model çoklu çağrısı.'},
+{id:'apinex',name:'APInex',category:'AI modelleri',status:'integrated',desc:'İsteğe bağlı OpenAI uyumlu API geçidi; yalnızca free/* model kimlikleri kabul edilir. İstek ve istemler APInex üzerinden üst sağlayıcıya iletilir.'},
 {id:'ollama',name:'Ollama (PC)',category:'Yerel AI',status:'integrated',desc:'Aynı güvenilir ağdaki bilgisayarda yerel model.'},
 {id:'gguf',name:'Android GGUF',category:'Yerel AI',status:'integrated',desc:'Native llama.cpp ile telefonda yerel model.'},
 {id:'openshorts',name:'OpenShorts MCP',category:'Video',status:'integrated',desc:'Video iş akışı; API anahtarı/kota gerekir.'},

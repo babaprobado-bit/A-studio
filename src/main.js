@@ -1,4 +1,5 @@
 import { Capacitor } from '@capacitor/core';
+import { APINEX_CHAT_ENDPOINT, APINEX_DEFAULT_FREE_MODEL, APINEX_MODELS_ENDPOINT, extractApinexFreeModels, isFreeApinexModelId } from './apinex-provider.js';
 import { connectOpenShorts, callOpenShortsTool, validateOpenShortsSourceUrl } from './openshorts-mcp.js';
 import { mountSocialStudio } from './social-studio.js';
 import { mountAiPowerHub } from './ai-power-hub.js';
@@ -42,6 +43,7 @@ const providers = {
   deepseek: { name:'DeepSeek', icon:'D', kind:'openai', endpoint:'https://api.deepseek.com/chat/completions', model:'', keyUrl:'https://platform.deepseek.com/api_keys', desc:'OpenAI uyumlu API · model kimliğini düzenleyebilirsin' },
   groq: { name:'Groq', icon:'Q', kind:'openai', endpoint:'https://api.groq.com/openai/v1/chat/completions', model:'', keyUrl:'https://console.groq.com/keys', desc:'Hızlı çıkarım · kullanılabilir model listesi değişebilir' },
   openrouter: { name:'OpenRouter', icon:'R', kind:'openai', endpoint:'https://openrouter.ai/api/v1/chat/completions', model:'openrouter/free', keyUrl:'https://openrouter.ai/keys', desc:'Birçok sağlayıcı için tek uyumlu API' },
+  apinex: { name:'APInex · Ücretsiz Modeller', icon:'Apx', kind:'openai', endpoint:APINEX_CHAT_ENDPOINT, model:APINEX_DEFAULT_FREE_MODEL, keyUrl:'https://apinex.bond/for-ai', desc:'İsteğe bağlı üçüncü taraf API geçidi. Yalnızca free/* model kimlikleri kabul edilir; istekler APInex ve üst sağlayıcı üzerinden iletilir.' },
   huggingface: { name:'Hugging Face Inference', icon:'H', kind:'openai', endpoint:'https://router.huggingface.co/v1/chat/completions', model:'', keyUrl:'https://huggingface.co/settings/tokens', desc:'Inference Providers · yüzlerce model için tek API' },
   custom: { name:'Özel OpenAI uyumlu API', icon:'+', kind:'openai', endpoint:'', model:'', keyUrl:'', desc:'Kendi API adresin ve model kimliğin; OpenAI chat completions uyumlu servisler' },
   ollama: { name:'LocalCoder / Ollama (PC)', icon:'⌘', kind:'ollama', endpoint:'', model:'qwen2.5-coder:1.5b', keyUrl:'https://ollama.com/', desc:'Ağdaki bilgisayarda çalışan yerel model; telefona gömülü değil' },
@@ -50,7 +52,7 @@ const providers = {
 const defaultSettings = {
   demoMode: true,
   models: Object.fromEntries(Object.entries(providers).map(([id,p]) => [id,p.model])),
-  team: Object.keys(providers),
+  team: Object.keys(providers).filter(id => id !== 'apinex'),
   customEndpoint: '',
   ollamaUrl: '',
   ollamaModel: 'qwen2.5-coder:1.5b',
@@ -220,6 +222,7 @@ function providerIsReady(id){
   const model=String(settings.models[id]||providers[id].model||'').trim();
   if(!model)return false;
   if(id==='openrouter'&&!isFreeOpenRouterModel(model))return false;
+  if(id==='apinex'&&!isFreeApinexModelId(model))return false;
   if(id==='custom')return Boolean(String(settings.customEndpoint||'').trim()&&runtimeKeys[id]);
   return Boolean(runtimeKeys[id]);
 }
@@ -374,6 +377,7 @@ function renderProviderCards(){
         '<div class="provider-help">'+(id==='custom'?'<span class="fineprint">OpenAI uyumlu servisler için. Endpoint HTTPS olmalı; anahtar yalnızca güvenli depoda tutulur.</span>':'<a href="'+esc(p.keyUrl)+'" target="_blank" rel="noopener noreferrer">Resmî anahtar sayfasını aç ↗</a>')+'<label class="team-check"><input type="checkbox" data-team="'+id+'" '+(isTeam?'checked':'')+'> Takım turuna ekle</label></div>'+
         '<div class="provider-actions"><button class="btn secondary small" data-save-key="'+id+'">Model / anahtarı kaydet</button><button class="btn ghost small" data-test-provider="'+id+'">Bağlantıyı test et</button><button class="btn ghost small danger-text" data-delete-key="'+id+'">Anahtarı sil</button></div>')+
       (id==='ollama'?'<div class="provider-help"><span class="fineprint">Adres ve model aşağıdaki yerel bağlantı bölümünde ayarlanır.</span><label class="team-check"><input type="checkbox" data-team="ollama" '+(isTeam?'checked':'')+'> Takım turuna ekle</label></div>':'')+
+      (id==='apinex'?'<div class="provider-help apinex-model-tools"><button class="btn ghost small" type="button" data-load-apinex-models>Ücretsiz modelleri getir</button><select class="input" id="apinexFreeModels" aria-label="APInex ücretsiz model listesi"><option value="">Listeyi yükle</option></select><span class="fineprint">Yalnızca free/ ile başlayan model kimlikleri listelenir.</span></div>':'')+
     '</article>';
   }).join('');
   $('teamChips').innerHTML=Object.entries(providers).map(([id,p])=>'<label class="chip"><input type="checkbox" data-team="'+id+'" '+(settings.team.includes(id)?'checked':'')+'>'+esc(p.name)+'</label>').join('');
@@ -465,7 +469,7 @@ async function callProvider(id,prompt,history,options={}){
     const d=await fetchJson(url+'/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},redirect:'error',body:JSON.stringify({model,messages,stream:false,options:{temperature:0.4}})});
     const answer=d?.message?.content;if(!answer)throw new Error('Ollama yanıtında mesaj yok. Model adını ve sunucuyu kontrol et.');return answer;
   }
-  const p=providers[id]; if(!p)throw new Error('Bilinmeyen AI sağlayıcısı.'); const model=String(options?.modelOverride||providerModel(id)||'').trim(); if(!model)throw new Error(p.name+' için model kimliği seçilmemiş. Ücretsiz olduğu doğrulanmış bir model kimliği gir.'); if(id==='openrouter'&&!isFreeOpenRouterModel(model))throw new Error('OpenRouter için yalnızca openrouter/free veya :free ile biten ücretsiz model kimlikleri kullanılabilir.'); const key=await getSecret(id); if(!key)throw new Error(p.name+' için API anahtarı ayarlanmamış. Modeller ekranından ekle.');
+  const p=providers[id]; if(!p)throw new Error('Bilinmeyen AI sağlayıcısı.'); const model=String(options?.modelOverride||providerModel(id)||'').trim(); if(!model)throw new Error(p.name+' için model kimliği seçilmemiş. Ücretsiz olduğu doğrulanmış bir model kimliği gir.'); if(id==='openrouter'&&!isFreeOpenRouterModel(model))throw new Error('OpenRouter için yalnızca openrouter/free veya :free ile biten ücretsiz model kimlikleri kullanılabilir.'); if(id==='apinex'&&!isFreeApinexModelId(model))throw new Error('APInex güvenlik kontrolü: Yalnızca free/ ile başlayan model kimlikleri kullanılabilir. Ücretli model çağrısı engellendi.'); const key=await getSecret(id); if(!key)throw new Error(p.name+' için API anahtarı ayarlanmamış. Modeller ekranından ekle.');
   const msgs=history.slice(-8).filter(m=>m.role==='user'||m.role==='assistant').map(m=>({role:m.role,content:m.content})); msgs.push({role:'user',content:prompt});
   if(p.kind==='anthropic'){
     const d=await fetchJson(p.endpoint,{method:'POST',headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model,max_tokens:2048,system:systemPrompt,messages:msgs.filter(m=>m.role==='user'||m.role==='assistant')})});
@@ -1438,8 +1442,7 @@ async function importWorkspace(file){
     nextSettings.models={...clone(defaultSettings.models),...(nextSettings.models&&typeof nextSettings.models==='object'&&!Array.isArray(nextSettings.models)?nextSettings.models:{})};
     for(const [id,paidDefault] of Object.entries({openai:'gpt-5-mini',anthropic:'claude-sonnet-5',deepseek:'deepseek-chat',groq:'llama-3.3-70b-versatile',huggingface:'openai/gpt-oss-120b:fastest'})){if(nextSettings.models[id]===paidDefault)nextSettings.models[id]='';}
     if(nextSettings.models.openrouter==='openai/gpt-5-mini')nextSettings.models.openrouter='openrouter/free';
-    for(const [id,paidDefault] of Object.entries({openai:'gpt-5-mini',anthropic:'claude-sonnet-5',deepseek:'deepseek-chat',groq:'llama-3.3-70b-versatile',huggingface:'openai/gpt-oss-120b:fastest'})){if(nextSettings.models[id]===paidDefault)nextSettings.models[id]='';}
-    if(nextSettings.models.openrouter==='openai/gpt-5-mini')nextSettings.models.openrouter='openrouter/free';
+    if(!isFreeApinexModelId(nextSettings.models.apinex))nextSettings.models.apinex=APINEX_DEFAULT_FREE_MODEL;
     nextSettings.swarmMaxAgents=Number.isFinite(Number(nextSettings.swarmMaxAgents))?Math.max(2,Math.min(10,Math.floor(Number(nextSettings.swarmMaxAgents)))):3;
     nextSettings.swarmConcurrency=Number.isFinite(Number(nextSettings.swarmConcurrency))?Math.max(1,Math.min(4,Math.floor(Number(nextSettings.swarmConcurrency)))):2;
     nextSettings.openrouterChatModels=Array.isArray(nextSettings.openrouterChatModels)?[...new Set(nextSettings.openrouterChatModels.filter(id=>typeof id==='string'&&(id.trim().toLowerCase()==='openrouter/free'||id.trim().toLowerCase().endsWith(':free'))))].slice(0,MAX_OPENROUTER_CHAT_MODELS):['openrouter/free'];
@@ -1510,6 +1513,22 @@ document.addEventListener('click',async e=>{
   const snippetDownload=e.target.closest('[data-snippet-download]');if(snippetDownload){const item=reusableSnippets[Number(snippetDownload.dataset.snippetDownload)];if(item){const ext=({javascript:'js',html:'html',css:'css',python:'py',json:'json',markdown:'md',text:'txt'})[item.language]||'txt';downloadText((item.name||'snippet').replace(/[^a-z0-9-_]+/gi,'_')+'.'+ext,item.code);}return;}
   const snippetDelete=e.target.closest('[data-snippet-delete]');if(snippetDelete){reusableSnippets.splice(Number(snippetDelete.dataset.snippetDelete),1);await setPref(DB.snippets,reusableSnippets);renderSnippetVault();showToast('Kod parçası kasadan silindi.');return;}
 
+  const apinexLoad=e.target.closest('[data-load-apinex-models]');if(apinexLoad){
+    const key=await getSecret('apinex');
+    if(!key){showToast('Önce APInex API anahtarını kaydet.');return;}
+    apinexLoad.disabled=true;apinexLoad.textContent='Modeller yükleniyor…';
+    try{
+      const data=await fetchJson(APINEX_MODELS_ENDPOINT,{method:'GET',headers:{'Authorization':'Bearer '+key,'Accept':'application/json'}});
+      const models=extractApinexFreeModels(data),select=$('apinexFreeModels');
+      if(!models.length)throw new Error('APInex /models yanıtında free/ model bulunamadı. Model kimliğini elle de girebilirsin.');
+      const current=$('model-apinex').value.trim();
+      select.innerHTML='<option value="">Ücretsiz model seç…</option>'+models.map(id=>'<option value="'+esc(id)+'">'+esc(id)+'</option>').join('');
+      if(models.includes(current))select.value=current;
+      showToast(models.length+' ücretsiz APInex modeli bulundu.');
+    }catch(error){showToast('APInex model listesi alınamadı: '+(error.message||'API anahtarını ve bağlantıyı kontrol et.'));}
+    finally{apinexLoad.disabled=false;apinexLoad.textContent='Ücretsiz modelleri yenile';}
+    return;
+  }
   const save=e.target.closest('[data-save-key]');if(save){await saveProviderCard(save.dataset.saveKey);return;}
   const test=e.target.closest('[data-test-provider]');if(test){await testProvider(test.dataset.testProvider);return;}
   const del=e.target.closest('[data-delete-key]');if(del){const id=del.dataset.deleteKey;if(confirm(providers[id].name+' anahtarı bu uygulamadan silinsin mi?')){await deleteSecret(id);renderProviderCards();updateDashboard();showToast('Anahtar silindi.');}return;}
@@ -1522,6 +1541,7 @@ document.addEventListener('click',async e=>{
   const plugDel=e.target.closest('[data-plugin-delete]');if(plugDel){userPlugins.splice(Number(plugDel.dataset.pluginDelete),1);await setPref(DB.plugins,userPlugins);renderPlugins();return;}
 });
 document.addEventListener('change',async e=>{
+  if(e.target.matches('#apinexFreeModels')){const id=e.target.value;if(isFreeApinexModelId(id)){$('model-apinex').value=id;settings.models.apinex=id;await setPref(DB.settings,settings);renderProviderCards();updateDashboard();showToast('APInex ücretsiz modeli seçildi.');}return;}
   if(e.target.matches('[data-skill-toggle]')){const id=e.target.dataset.skillToggle;if(e.target.checked){if(selectedSkillIds.length>=MAX_SELECTED_SKILLS){e.target.checked=false;showToast('En fazla 8 Skill seçebilirsin.');return;}if(!selectedSkillIds.includes(id))selectedSkillIds.push(id);}else selectedSkillIds=selectedSkillIds.filter(value=>value!==id);skillProfileId='custom';await persistSkillState();renderSkillLibrary();return;}
   if(e.target.matches('[data-team]')){const id=e.target.dataset.team;let group=[...document.querySelectorAll('[data-team="'+id+'"]')];if(e.target.checked){if(!settings.team.includes(id))settings.team.push(id);}else settings.team=settings.team.filter(x=>x!==id);settings.team=selectedTeam();group.forEach(x=>x.checked=e.target.checked);await setPref(DB.settings,settings);renderProviderCards();$('compareSelectionCount').textContent=settings.team.length+' ajan seçili';}
 });
@@ -1660,7 +1680,7 @@ async function prepareBrowserFeatures(){
 async function init(){
   try{settings={...clone(defaultSettings),...(await getPref(DB.settings,{}))};settings.models={...clone(defaultSettings.models),...(settings.models||{})};
     for(const [id,paidDefault] of Object.entries({openai:'gpt-5-mini',anthropic:'claude-sonnet-5',deepseek:'deepseek-chat',groq:'llama-3.3-70b-versatile',huggingface:'openai/gpt-oss-120b:fastest'})){if(settings.models[id]===paidDefault)settings.models[id]='';}
-    if(settings.models.openrouter==='openai/gpt-5-mini')settings.models.openrouter='openrouter/free';const savedTeam=Array.isArray(settings.team)?settings.team:null;settings.team=normalizeTeamSelection(settings.team||defaultSettings.team,Object.keys(providers));if(savedTeam&&settings.team.includes('openai')&&settings.team.includes('anthropic')&&settings.team.includes('gemini')&&settings.team.includes('deepseek')&&settings.team.includes('groq')&&settings.team.includes('openrouter')&&settings.team.includes('huggingface')&&settings.team.includes('custom')&&settings.team.includes('ollama')&&!settings.team.includes('device'))settings.team.push('device');settings.customEndpoint=typeof settings.customEndpoint==='string'?settings.customEndpoint.slice(0,500):'';if(settings.customEndpoint){try{settings.customEndpoint=normalizeOpenAiEndpoint(settings.customEndpoint);}catch(_){settings.customEndpoint='';}}settings.vaultBaseUrl=typeof settings.vaultBaseUrl==='string'?settings.vaultBaseUrl.slice(0,500):'';settings.localCoderEngine=['device','api'].includes(settings.localCoderEngine)?settings.localCoderEngine:'ollama';settings.localCoderApiProvider=providers[settings.localCoderApiProvider]&&settings.localCoderApiProvider!=='ollama'?settings.localCoderApiProvider:'openai';if(settings.ollamaUrl==='http://192.168.1.100:11434')settings.ollamaUrl='';}catch(_){}
+    if(settings.models.openrouter==='openai/gpt-5-mini')settings.models.openrouter='openrouter/free';if(!isFreeApinexModelId(settings.models.apinex))settings.models.apinex=APINEX_DEFAULT_FREE_MODEL;const savedTeam=Array.isArray(settings.team)?settings.team:null;settings.team=normalizeTeamSelection(settings.team||defaultSettings.team,Object.keys(providers));if(savedTeam&&settings.team.includes('openai')&&settings.team.includes('anthropic')&&settings.team.includes('gemini')&&settings.team.includes('deepseek')&&settings.team.includes('groq')&&settings.team.includes('openrouter')&&settings.team.includes('huggingface')&&settings.team.includes('custom')&&settings.team.includes('ollama')&&!settings.team.includes('device'))settings.team.push('device');settings.customEndpoint=typeof settings.customEndpoint==='string'?settings.customEndpoint.slice(0,500):'';if(settings.customEndpoint){try{settings.customEndpoint=normalizeOpenAiEndpoint(settings.customEndpoint);}catch(_){settings.customEndpoint='';}}settings.vaultBaseUrl=typeof settings.vaultBaseUrl==='string'?settings.vaultBaseUrl.slice(0,500):'';settings.localCoderEngine=['device','api'].includes(settings.localCoderEngine)?settings.localCoderEngine:'ollama';settings.localCoderApiProvider=providers[settings.localCoderApiProvider]&&settings.localCoderApiProvider!=='ollama'?settings.localCoderApiProvider:'openai';if(settings.ollamaUrl==='http://192.168.1.100:11434')settings.ollamaUrl='';}catch(_){}
   if(!nativeApp){showToast('Tarayıcıda API anahtarları yalnızca açık oturumda tutulur.');}
   await initKeys();await initOpenShortsKey(); projectList=await getPref(DB.projects,[]);activeProjectId=await getPref(DB.activeProject,'');chatHistory=await getPref(DB.chat,[]);userPlugins=await getPref(DB.plugins,[]);const storedSkills=await getPref(DB.skills,{});customSkills=(Array.isArray(storedSkills?.customSkills)?storedSkills.customSkills:[]).map(skill=>normalizeSkill(skill)).filter(Boolean).slice(-100);skillLibrary=[...SKILL_CATALOG,...customSkills];skillProfileId=storedSkills?.profileId==='custom'?'custom':(SKILL_PROFILES[storedSkills?.profileId]?storedSkills.profileId:'karpathy');const validSkillIds=new Set(skillLibrary.map(skill=>skill.id));selectedSkillIds=(Array.isArray(storedSkills?.selectedSkillIds)?storedSkills.selectedSkillIds:[]).filter(id=>validSkillIds.has(id)).slice(0,MAX_SELECTED_SKILLS);if(!selectedSkillIds.length)selectedSkillIds=getProfileSkillIds(skillProfileId);reusableSnippets=await getPref(DB.snippets,[]);agentActivity=await getPref(DB.activity,[]);codeFiles=normalizeCodeFileList(await getPref(DB.codeFiles,[]),true);if(!codeFiles.length)codeFiles=[makeCodeFile()];activeCodeFileId=codeFiles[0].id;await setPref(DB.codeFiles,codeFiles);
   if(!Array.isArray(projectList))projectList=[];if(!projectList.some(p=>p&&p.id===activeProjectId))activeProjectId=projectList[0]?.id||'';await setPref(DB.activeProject,activeProjectId);if(!Array.isArray(chatHistory))chatHistory=[];if(!Array.isArray(userPlugins))userPlugins=[];if(!Array.isArray(reusableSnippets))reusableSnippets=[];if(!Array.isArray(agentActivity))agentActivity=[];
@@ -1668,8 +1688,8 @@ async function init(){
     generateText:async prompt=>{
       if(settings.demoMode)throw new Error('Demo modu açık. Gerçek AI senaryosu için Demo modunu kapat.');
       const providerId=$('chatProvider').value||'gemini';
-      const freeOrLocal=providerId==='gemini'||providerId==='groq'||providerId==='ollama'||providerId==='device'||(providerId==='openrouter'&&isFreeOpenRouterModel(providerModel(providerId)));
-      if(!freeOrLocal)throw new Error('Social Studio yalnızca Gemini, Groq, OpenRouter :free veya yerel Ollama/GGUF modeliyle çalışır. Ücretli sağlayıcı çağrısı yapılmadı.');
+      const freeOrLocal=providerId==='gemini'||providerId==='groq'||providerId==='ollama'||providerId==='device'||(providerId==='openrouter'&&isFreeOpenRouterModel(providerModel(providerId)))||(providerId==='apinex'&&isFreeApinexModelId(providerModel(providerId)));
+      if(!freeOrLocal)throw new Error('Social Studio yalnızca Gemini, Groq, APInex free/*, OpenRouter :free veya yerel Ollama/GGUF modeliyle çalışır. Ücretli sağlayıcı çağrısı yapılmadı.');
       return callProvider(providerId,prompt,[]);
     },
     openShorts:{available:name=>openShortsToolNames.has(name),call:(name,args)=>requireOpenShortsTool(name,args)},

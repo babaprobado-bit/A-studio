@@ -65,6 +65,7 @@ app.use(helmet({
         'https://api.deepseek.com',
         'https://api.groq.com',
         'https://openrouter.ai',
+        'https://api.apinex.bond',
         'https://mcp.openshorts.app',
         'https://api.dev.runwayml.com',
         'https://*.cloudfront.net',

@@ -12,6 +12,11 @@ on:
       - 'scripts/patch-android-local-runtime.py'
       - '.github/workflows/build-android-local-coder.yml'
       - 'src/main.js'
+      - 'src/apinex-provider.js'
+      - 'src/plugin-catalog.js'
+      - 'src/ai-power-hub.js'
+      - 'scripts/test-ai-power-hub.mjs'
+      - 'server/server.js'
       - 'src/social-studio.js'
       - 'src/social-studio-automation.js'
       - 'src/social-studio-core.js'
@@ -33,7 +38,7 @@ permissions:
 
 jobs:
   build-local-coder-apk:
-    name: Build AI Studio 1.1.4 Android APK (GGUF / llama.cpp)
+    name: Build AI Studio 1.1.5 Android APK (GGUF / llama.cpp)
     runs-on: ubuntu-24.04
     timeout-minutes: 100
     steps:
@@ -102,6 +107,7 @@ jobs:
           node --check src/openrouter-chat.js
           node --check src/free-api-providers.js
           node --check src/ai-power-hub.js
+          node --check src/apinex-provider.js
           node --check scripts/test-ai-power-hub.mjs
           npm run test:ai-power-hub
       - name: Generate Capacitor Android project
@@ -192,7 +198,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: AI-Studio-1.1-OnDevice-LocalCoder-APK
+          name: AI-Studio-1.1.5-Full-Native-GGUF-APK
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
