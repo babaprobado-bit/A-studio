@@ -50,16 +50,19 @@ assert.equal(workerCalls,4);
 assert.equal(result.metrics.fileConflictCount,1);
 assert.match(result.summary,/Synthesis complete/);
 
-assert.equal(PROMPT_PLUGIN_CATALOG.length,34);
+assert.equal(PROMPT_PLUGIN_CATALOG.length,35);
 assert.equal(new Set(PROMPT_PLUGIN_CATALOG.map(item=>item.id)).size,34);
-assert.equal(normalizeEnabledPluginIds(null).length,34);
+assert.equal(normalizeEnabledPluginIds(null).length,35);
 assert.equal(filterPromptPlugins({enabledIds:['babylon'],query:'babylon'}).length,1);
 assert.equal(filterPromptPlugins({enabledIds:['babylon'],category:'Oyun Geliştirme'}).length,6);
 assert.ok(PROMPT_PLUGIN_CATALOG.some(item=>item.id==='reverse-api'));
 assert.ok(PROMPT_PLUGIN_CATALOG.some(item=>item.id==='agent-team'));
+assert.ok(PROMPT_PLUGIN_CATALOG.some(item=>item.id==='openshorts'&&item.category==='Video'));
+assert.equal(filterPromptPlugins({enabledIds:['openshorts'],query:'OpenShorts'}).length,1);
 assert.ok(EXTERNAL_CONNECTOR_CATALOG.some(item=>item.id==='openmausbot'&&item.status==='external'));
 assert.ok(EXTERNAL_CONNECTOR_CATALOG.some(item=>item.id==='apinex'&&item.status==='integrated'));
 assert.ok(EXTERNAL_CONNECTOR_CATALOG.some(item=>item.id==='rea-companion'&&item.status==='contract'));
+assert.ok(EXTERNAL_CONNECTOR_CATALOG.some(item=>item.id==='openshorts'&&item.status==='integrated'&&item.url==='https://github.com/mutonby/openshorts-plugin'));
 
 assert.equal(OPENROUTER_CHAT_MODEL_LIMIT,4);
 assert.equal(isFreeOpenRouterModelId('openrouter/free'),true);

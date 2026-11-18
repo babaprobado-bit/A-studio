@@ -382,9 +382,24 @@ export const SKILL_CATALOG = Object.freeze([
     "content": "First understand the existing code and its constraints. Read before writing; prefer the smallest coherent change; keep the design simple and explicit; avoid unnecessary abstractions and dependencies; preserve working behavior; reason about edge cases; verify with tests; do not claim unrun tests; and explain limitations honestly. This is an AI Studio-authored summary inspired by public software-engineering guidance, not an official or verbatim Karpathy skill file.",
     "source": "AI Studio starter pack",
     "builtIn": true
+  },
+  {
+    "id": "openshorts-workflow",
+    "name": "OpenShorts Video Workflow",
+    "group": "Video",
+    "stage": "all",
+    "description": "Run OpenShorts to make and review vertical clips from a supplied video.",
+    "content": "Use OpenShorts only after the user supplies a video URL or a supported video file and confirms that they own it or have permission to process it. OpenShorts does not search the internet for source videos; it finds useful moments inside the submitted video. Check get_quota before a long job. Start process_video with confirm_rights=true only after that explicit confirmation; then retain the job_id, check get_job_status at reasonable intervals, and use list_clips to show the completed clips. Use add_subtitles only when requested. recut_clip replaces the current render, so show the proposed new cut and ask before applying it. publish_clip can create public posts or schedules: never call it unless the user specifically requests publication and names the destination. Report quota, errors and unsupported tools honestly. For a local file, use create_upload and transfer the file with the returned upload_url only when the app exposes a verified binary PUT upload path; otherwise ask for an accessible HTTPS video URL rather than pretending the file was uploaded.",
+    "source": "AI Studio summary of the OpenShorts plugin workflow",
+    "sourceUrl": "https://github.com/mutonby/openshorts-plugin",
+    "license": "MIT",
+    "author": "mutonby",
+    "version": "1",
+    "builtIn": true
   }
 ]);
 export const SKILL_PROFILES = Object.freeze({
+  openshorts: { name: 'OpenShorts Video', description: 'OpenShorts ile izinli videodan klip üretme, altyazı düzenleme ve güvenli yeniden kesme akışı.', skillIds: ['openshorts-workflow'] },
   karpathy: { name: 'Karpathy Guidelines', description: 'Tek temel kalite kuralı.', skillIds: ['karpathy-guidelines'] },
   superpowers: {
     name: 'Superpowers', description: 'Planlama, araştırma, test ve inceleme.',

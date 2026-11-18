@@ -9,16 +9,21 @@ import {
 import { encryptWorkspaceBackup, decryptWorkspaceBackup } from '../src/encrypted-backup.js';
 import { webcrypto } from 'node:crypto';
 
-assert.equal(SKILL_CATALOG.length, 38, 'starter pack must contain 15 Superpowers, 22 Caveman and one guideline');
+assert.equal(SKILL_CATALOG.length, 39, 'starter pack adds the OpenShorts workflow Skill');
 assert.equal(SKILL_CATALOG.filter(skill => skill.group === 'Superpowers').length, 15);
 assert.equal(SKILL_CATALOG.filter(skill => skill.group === 'Caveman').length, 22);
-for (const id of ['karpathy','superpowers','superpowers-development','planning','review','caveman','caveman-short','balanced']) {
+for (const id of ['karpathy','superpowers','superpowers-development','planning','review','caveman','caveman-short','balanced','openshorts']) {
   assert.ok(SKILL_PROFILES[id], 'missing profile: ' + id);
   assert.ok(SKILL_PROFILES[id].skillIds.length <= MAX_SELECTED_SKILLS, 'profile exceeds eight Skills: ' + id);
   assert.equal(getProfileSkillIds(id).length, SKILL_PROFILES[id].skillIds.length);
 }
 assert.deepEqual(getProfileSkillIds('karpathy'), ['karpathy-guidelines']);
 assert.equal(getProfileSkillIds('balanced').length, MAX_SELECTED_SKILLS);
+assert.deepEqual(getProfileSkillIds('openshorts'), ['openshorts-workflow']);
+const openshortsSkill = SKILL_CATALOG.find(skill => skill.id === 'openshorts-workflow');
+assert.ok(openshortsSkill && openshortsSkill.builtIn && openshortsSkill.license === 'MIT');
+assert.match(openshortsSkill.content, /does not search the internet/i);
+assert.match(openshortsSkill.content, /only when the user specifically requests publication/i);
 
 const parsed = parseSkillMarkdown(
   '---\nname: My Skill\ndescription: A test skill\nstage: code\nlicense: MIT\nsource: Example repository\nsource_url: https://example.com/skill\nauthor: Example Author\nversion: 1.2\ncategory: testing\n---\n# My Skill\nUse small, verifiable changes.',

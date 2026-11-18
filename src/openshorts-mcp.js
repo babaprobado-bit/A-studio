@@ -1,7 +1,7 @@
 const DEFAULT_ENDPOINT='https://mcp.openshorts.app/mcp';
 const PROTOCOL_VERSION='2025-06-18';
 const REQUIRED_TOOLS=['process_video','get_job_status','list_clips','get_quota'];
-const ALLOWED_TOOLS=new Set([...REQUIRED_TOOLS,'add_subtitles','publish_clip']);
+const ALLOWED_TOOLS=new Set([...REQUIRED_TOOLS,'create_upload','add_subtitles','recut_clip','publish_clip']);
 let requestSequence=0;
 
 function redactError(value,key){
