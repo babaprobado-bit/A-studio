@@ -22,6 +22,7 @@ const DB = {
   projects: 'ai-studio-projects-v2',
   activeProject: 'ai-studio-active-project-v1',
   chat: 'ai-studio-chat-v2',
+  threads: 'ai-studio-chat-threads-v1',
   plugins: 'ai-studio-prompt-plugins-v2',
   snippets: 'ai-studio-snippet-v1',
   activity: 'ai-studio-agent-activity-v1',
@@ -65,6 +66,9 @@ const defaultSettings = {
 };
 let settings = structuredClone(defaultSettings);
 let chatHistory = [];
+let chatThreads = [];
+let activeChatThreadId = '';
+let deepThinkNext = false;
 let projectList = [];
 let activeProjectId = '';
 let userPlugins = [];
@@ -402,10 +406,70 @@ function demoAnswer(providerId,prompt,roleOverride){
   return '['+role+' · DEMO ŞABLONU]\n\n'+(base[providerId]||base.openai)+'\n\nGörev: '+prompt+'\n\nNot: Bu gerçek model çağrısı değildir; Demo modu açıktır.';
 }
 function pushMessage(role,content,meta){ chatHistory.push({role,content,provider:meta?.provider||'',mode:meta?.mode||'demo',time:new Date().toISOString()}); if(chatHistory.length>80)chatHistory=chatHistory.slice(-80); renderChat(); persistChat(); }
-function renderChat(){ const out=$('chatMessages'); if(!chatHistory.length){out.innerHTML='<div class="chat-empty"><div class="chat-empty-icon">✳</div><div class="eyebrow">AI STUDIO</div><h2>Ne üzerine çalışıyoruz?</h2><p>Bir soru sor, fikir geliştir veya kod üzerinde birlikte çalış. Yanıt verecek modeli yukarıdan seçebilirsin.</p><small>'+(settings.demoMode?'Demo yanıtları açık':'Gerçek model modu')+'</small></div>';return;} out.innerHTML=chatHistory.map(m=>'<article class="chat-bubble '+(m.role==='user'?'user':'assistant')+'"><div class="chat-meta">'+(m.role==='user'?'SEN':esc(m.provider||'AI STUDIO'))+' · '+(m.mode==='error'?'HATA':m.mode==='live'?'GERÇEK MODEL':'DEMO')+'</div><div class="chat-text '+(m.mode==='error'?'error':'')+'">'+esc(m.content)+'</div></article>').join(''); out.scrollTop=out.scrollHeight; }
+function renderChat(){const out=$('chatMessages');if(!out)return;if(!chatHistory.length){out.innerHTML='<div class="chat-empty"><div class="chat-empty-icon">✳</div><h2>Bugün ne yapmak istiyorsun?</h2><p>Bir fikir sor, dosya ekle, kod geliştir veya bir eklenti seç. Başlamak için aşağıya yaz.</p><small>'+(settings.demoMode?'Demo modu açık':'Gerçek model modu')+'</small></div>';}else{out.innerHTML=chatHistory.map(m=>'<article class="chat-bubble '+(m.role==='user'?'user':'assistant')+'"><div class="chat-meta">'+(m.role==='user'?'SEN':esc(m.provider||'AI STUDIO'))+' · '+(m.mode==='error'?'HATA':m.mode==='live'?'GERÇEK MODEL':'DEMO')+'</div><div class="chat-text '+(m.mode==='error'?'error':'')+'">'+esc(m.content)+'</div></article>').join('');}out.scrollTop=out.scrollHeight;renderSidebarChats();}
 function fitChatInput(){const input=$('chatInput');if(!input)return;input.style.height='auto';input.style.height=Math.min(input.scrollHeight,180)+'px';}
 let chatPersistTimer;
-function persistChat(){clearTimeout(chatPersistTimer);chatPersistTimer=setTimeout(()=>setPref(DB.chat,chatHistory).catch(()=>showToast('Sohbet kaydı başarısız oldu.')),250);}
+function chatThreadTitle(messages){
+  const first=messages.find(message=>message.role==='user')?.content||'Yeni sohbet';
+  const clean=String(first).replace(/\s+/g,' ').trim();
+  return clean.length>38?clean.slice(0,37)+'…':(clean||'Yeni sohbet');
+}
+function makeChatThread(messages=[]){
+  const now=new Date().toISOString();
+  return {id:crypto.randomUUID?crypto.randomUUID():String(Date.now())+'-'+Math.random().toString(36).slice(2,8),title:chatThreadTitle(messages),updatedAt:now,messages:messages.slice(-80)};
+}
+function updateActiveChatThread(){
+  const thread=chatThreads.find(item=>item.id===activeChatThreadId);if(!thread)return;
+  thread.messages=chatHistory.slice(-80);thread.title=chatThreadTitle(thread.messages);thread.updatedAt=new Date().toISOString();
+}
+async function persistChatThreads(){updateActiveChatThread();chatThreads=chatThreads.slice(0,80);await setPref(DB.threads,{activeId:activeChatThreadId,items:chatThreads});}
+async function persistActiveChatNow(){await setPref(DB.chat,chatHistory);await persistChatThreads();renderSidebarChats();}
+async function ensureChatThreads(){
+  if(!Array.isArray(chatThreads))chatThreads=[];
+  if(!chatThreads.length&&chatHistory.length){const migrated=makeChatThread(chatHistory);chatThreads=[migrated];activeChatThreadId=migrated.id;}
+  if(!chatThreads.some(item=>item.id===activeChatThreadId)){
+    const latest=chatThreads[0];
+    if(latest){activeChatThreadId=latest.id;chatHistory=Array.isArray(latest.messages)?latest.messages:[];}
+    else{const fresh=makeChatThread([]);chatThreads=[fresh];activeChatThreadId=fresh.id;chatHistory=[];}
+  }else{const active=chatThreads.find(item=>item.id===activeChatThreadId);if(active&&Array.isArray(active.messages))chatHistory=active.messages;}
+  await setPref(DB.chat,chatHistory);await persistChatThreads();renderSidebarChats();
+}
+function renderSidebarChats(){
+  const list=$('chatThreadList');if(!list)return;
+  const query=($('chatSearchInput')?.value||'').trim().toLocaleLowerCase('tr-TR');
+  const visible=[...chatThreads].sort((a,b)=>String(b.updatedAt||'').localeCompare(String(a.updatedAt||''))).filter(item=>!query||String(item.title||'Yeni sohbet').toLocaleLowerCase('tr-TR').includes(query));
+  if(!visible.length){list.innerHTML='<p class="sidebar-empty">'+(query?'Eşleşen sohbet yok.':'Henüz sohbet yok. Yeni sohbet başlat.')+'</p>';return;}
+  list.innerHTML=visible.map(item=>'<button type="button" class="chat-thread-item '+(item.id===activeChatThreadId?'active':'')+'" data-chat-thread="'+esc(item.id)+'"><span class="thread-title">'+esc(item.title||'Yeni sohbet')+'</span><small>'+esc(new Date(item.updatedAt||Date.now()).toLocaleDateString('tr-TR',{day:'2-digit',month:'short'}))+'</small></button>').join('');
+}
+function persistChat(){clearTimeout(chatPersistTimer);chatPersistTimer=setTimeout(()=>persistActiveChatNow().catch(()=>showToast('Sohbet kaydı başarısız oldu.')),250);}
+async function createNewChat(){
+  await persistActiveChatNow();
+  if(!chatHistory.length){closeSidebar();$('chatInput').focus();return;}
+  const fresh=makeChatThread([]);chatThreads.unshift(fresh);activeChatThreadId=fresh.id;chatHistory=[];
+  await persistActiveChatNow();renderChat();renderSidebarChats();closeSidebar();go('chat');$('chatInput').focus();
+}
+async function switchChatThread(id){
+  await persistActiveChatNow();const thread=chatThreads.find(item=>item.id===id);if(!thread)return;
+  activeChatThreadId=id;chatHistory=Array.isArray(thread.messages)?thread.messages.slice(-80):[];
+  await persistActiveChatNow();renderChat();renderSidebarChats();closeSidebar();go('chat');
+}
+
+function openSidebar(){
+  $('appSidebar')?.classList.add('open');$('sidebarScrim')?.classList.remove('hidden');$('appSidebar')?.setAttribute('aria-hidden','false');$('sidebarToggleBtn')?.setAttribute('aria-expanded','true');renderSidebarChats();
+}
+function closeSidebar(){
+  $('appSidebar')?.classList.remove('open');$('sidebarScrim')?.classList.add('hidden');$('appSidebar')?.setAttribute('aria-hidden','true');$('sidebarToggleBtn')?.setAttribute('aria-expanded','false');
+}
+function closeChatMoreMenu(){$('chatMoreMenu')?.classList.add('hidden');$('chatMoreToggle')?.setAttribute('aria-expanded','false');}
+function renderComposerPlugins(){
+  const out=$('composerPluginList');if(!out)return;
+  if(!userPlugins.length){out.innerHTML='<div class="composer-plugin-empty">Henüz özel eklenti yok. Yeni bir eklenti tanımlayarak buraya ekleyebilirsin.</div>';return;}
+  out.innerHTML=userPlugins.map((plugin,index)=>'<button type="button" class="composer-plugin-option" data-compose-plugin="'+index+'"><span class="composer-plugin-symbol">◇</span><span><strong>'+esc(plugin.name)+'</strong><small>'+esc(plugin.prompt.slice(0,110))+'</small></span><span class="composer-plugin-arrow">›</span></button>').join('');
+}
+function openComposerPluginDialog(){
+  $('composerPlusMenu')?.classList.add('hidden');$('plusMenuToggle')?.setAttribute('aria-expanded','false');renderComposerPlugins();
+  const dialog=$('composerPluginDialog');if(dialog&&!dialog.open)dialog.showModal();
+}
 function chatContext(){return chatHistory.slice(-10).filter(m=>m.role==='user'||m.role==='assistant').map(m=>({role:m.role,content:m.content}));}
 function getActiveProject(){return projectList.find(p=>p&&p.id===activeProjectId)||null;}
 function getSharedProjectContext(){
@@ -1390,8 +1454,8 @@ function renderBuiltinTools(){ $('builtinTools').innerHTML=builtinTools.map(t=>'
 function renderPlugins(){ const out=$('pluginList'); if(!userPlugins.length){out.innerHTML='<div class="panel"><p class="muted">Henüz özel eklenti yok. Eklentiler yalnızca metin talimatlarıdır; keyfi kod çalıştırmaz.</p></div>';return;}
   out.innerHTML=userPlugins.map((p,i)=>'<article class="plugin-card"><div class="plugin-head"><h3>'+esc(p.name)+'</h3><span class="pill">'+(p.kind==='builtin'?'HAZIR':'ÖZEL')+'</span></div><p>'+esc(p.prompt)+'</p><div class="row-actions"><button class="btn secondary small" data-plugin-run="'+i+'">Sohbette kullan</button><span class="grow"></span>'+(p.kind==='builtin'?'':'<button class="btn danger small" data-plugin-delete="'+i+'">Sil</button>')+'</div></article>').join('');
 }
-async function addPlugin(e){e.preventDefault();const name=$('pluginName').value.trim(),prompt=$('pluginPrompt').value.trim();if(!name||!prompt)return;userPlugins.push({id:crypto.randomUUID?crypto.randomUUID():String(Date.now()),name,prompt,kind:'custom'});await setPref(DB.plugins,userPlugins);$('pluginForm').reset();renderPlugins();showToast('Prompt eklentisi kaydedildi.');}
-async function importPlugins(file){try{const data=JSON.parse(await file.text());const incoming=Array.isArray(data)?data:data.plugins;if(!Array.isArray(incoming))throw new Error('JSON içinde plugins dizisi bulunamadı.');let count=0;for(const p of incoming){if(typeof p?.name==='string'&&typeof p?.prompt==='string'&&p.name.trim()&&p.prompt.trim()){userPlugins.push({id:crypto.randomUUID?crypto.randomUUID():String(Date.now()+count),name:p.name.trim().slice(0,80),prompt:p.prompt.trim().slice(0,6000),kind:'custom'});count++;}}userPlugins=userPlugins.slice(-100);await setPref(DB.plugins,userPlugins);renderPlugins();showToast(count+' prompt eklentisi içe aktarıldı.');}catch(err){showToast('Eklenti içe aktarılamadı: '+(err.message||'JSON dosyasını kontrol et.'));}}
+async function addPlugin(e){e.preventDefault();const name=$('pluginName').value.trim(),prompt=$('pluginPrompt').value.trim();if(!name||!prompt)return;userPlugins.push({id:crypto.randomUUID?crypto.randomUUID():String(Date.now()),name,prompt,kind:'custom'});await setPref(DB.plugins,userPlugins);$('pluginForm').reset();renderPlugins();renderComposerPlugins();showToast('Prompt eklentisi kaydedildi.');}
+async function importPlugins(file){try{const data=JSON.parse(await file.text());const incoming=Array.isArray(data)?data:data.plugins;if(!Array.isArray(incoming))throw new Error('JSON içinde plugins dizisi bulunamadı.');let count=0;for(const p of incoming){if(typeof p?.name==='string'&&typeof p?.prompt==='string'&&p.name.trim()&&p.prompt.trim()){userPlugins.push({id:crypto.randomUUID?crypto.randomUUID():String(Date.now()+count),name:p.name.trim().slice(0,80),prompt:p.prompt.trim().slice(0,6000),kind:'custom'});count++;}}userPlugins=userPlugins.slice(-100);await setPref(DB.plugins,userPlugins);renderPlugins();renderComposerPlugins();showToast(count+' prompt eklentisi içe aktarıldı.');}catch(err){showToast('Eklenti içe aktarılamadı: '+(err.message||'JSON dosyasını kontrol et.'));}}
 function updateDashboard(){const connected=Object.keys(providers).filter(providerIsReady);$('connectedCount').textContent=connected.length;$('projectCount').textContent=projectList.length;
   $('dashboard').innerHTML='<article class="panel"><div class="row-actions"><strong>Bağlı AI motorları</strong><span class="grow"></span><span class="pill">'+connected.length+' hazır</span></div><p class="muted">'+esc(connected.map(id=>providers[id].name).join(', ')||'Henüz model/bağlantı hazır değil.')+'</p><button class="btn ghost small" data-go="models">Bağlantıları yönet</button></article><article class="panel"><div class="row-actions"><strong>Sohbet geçmişi</strong><span class="grow"></span><span class="pill">'+chatHistory.length+' mesaj</span></div><p class="muted">Bu cihazdaki yerel geçmiş. Gerçek model sohbetleri de dışa aktarılabilir.</p></article>';
 }
@@ -1501,7 +1565,21 @@ async function clearAllLocal(){if(!confirm('Proje notları, sohbet, özel eklent
 function copyText(text){if(navigator.clipboard?.writeText){navigator.clipboard.writeText(text).then(()=>showToast('Kopyalandı.')).catch(()=>fallbackCopy(text));}else fallbackCopy(text);}
 function fallbackCopy(text){const t=document.createElement('textarea');t.value=text;t.style.position='fixed';t.style.opacity='0';document.body.append(t);t.select();try{document.execCommand('copy');showToast('Kopyalandı.');}catch(_){showToast('Kopyalanamadı; dosya olarak dışa aktarabilirsin.');}t.remove();}
 document.addEventListener('click',async e=>{
-  const nav=e.target.closest('[data-go],[data-tab]');if(nav){go(nav.dataset.go||nav.dataset.tab);return;}
+  const focusPlugins=e.target.closest('[data-focus-plugins]');
+  if(focusPlugins){go('tools');closeSidebar();setTimeout(()=>$('pluginForm')?.scrollIntoView({behavior:'smooth',block:'start'}),120);return;}
+  const thread=e.target.closest('[data-chat-thread]');if(thread){await switchChatThread(thread.dataset.chatThread);return;}
+  const composerPlugin=e.target.closest('[data-compose-plugin]');
+  if(composerPlugin){const plugin=userPlugins[Number(composerPlugin.dataset.composePlugin)];if(plugin){$('chatInput').value=plugin.prompt.replace('{{gorev}}','[Görevini buraya yaz]');$('chatInput').focus();$('composerPluginDialog')?.close();go('chat');showToast(plugin.name+' eklentisi mesaja eklendi.');}return;}
+  const composerAction=e.target.closest('[data-composer-action]');
+  if(composerAction){
+    const action=composerAction.dataset.composerAction;$('composerPlusMenu').classList.add('hidden');$('plusMenuToggle').setAttribute('aria-expanded','false');
+    if(action==='files')$('chatFileInput').click();
+    else if(action==='plugins')openComposerPluginDialog();
+    else if(action==='think'){deepThinkNext=!deepThinkNext;$('deepThinkLabel').textContent=deepThinkNext?'Daha çok düşün ✓':'Daha çok düşün';showToast(deepThinkNext?'Bir sonraki mesaj ajan zinciriyle işlenecek.':'Derin düşünme seçimi kapatıldı.');}
+    else if(action==='team'){const prompt=$('chatInput').value.trim();if(!prompt){showToast('Önce AI Team için bir görev yaz.');return;}$('chatInput').value='';fitChatInput();runTeam(prompt);}
+    return;
+  }
+  const nav=e.target.closest('[data-go],[data-tab]');if(nav){go(nav.dataset.go||nav.dataset.tab);closeSidebar();closeChatMoreMenu();$('composerPlusMenu')?.classList.add('hidden');return;}
   const nativeVaultToChat=e.target.closest('[data-native-vault-to-chat]');if(nativeVaultToChat){const item=sharedVaultItems.find(x=>x.id===nativeVaultToChat.dataset.nativeVaultToChat);if(item){go('chat');$('chatInput').value=('Ortak kasadan alınan proje kaydı: '+item.title+'\n\n'+String(item.content||'')).slice(0,12000);$('chatInput').focus();}return;}
   const nativeVaultDelete=e.target.closest('[data-native-vault-delete]');if(nativeVaultDelete){await deleteNativeVaultItem(nativeVaultDelete.dataset.nativeVaultDelete);return;}
   const vaultToChat=e.target.closest('[data-vault-to-chat]');if(vaultToChat){const item=sharedVaultItems.find(x=>x.id===vaultToChat.dataset.vaultToChat);if(item){go('chat');$('chatInput').value=('Ortak kasadan alınan proje kaydı: '+item.title+'\n\n'+String(item.content||'')).slice(0,12000);$('chatInput').focus();}return;}
@@ -1538,14 +1616,31 @@ document.addEventListener('click',async e=>{
   const projectOpen=e.target.closest('[data-project-open]');if(projectOpen){const p=projectList[Number(projectOpen.dataset.projectOpen)];if(p){activeProjectId=p.id;await setPref(DB.activeProject,activeProjectId);renderProjects();go('chat');$('chatInput').value='Aktif projedeki mevcut kararları dikkate alarak en iyi sonraki adımları öner.';$('chatInput').focus();}return;}
   const tool=e.target.closest('[data-tool]');if(tool){const p=builtinTools.find(t=>t.id===tool.dataset.tool);go('chat');$('chatInput').value=p.prompt.replace('{{gorev}}','[Buraya görevi, kodu veya fikri yaz]');$('chatInput').focus();return;}
   const plug=e.target.closest('[data-plugin-run]');if(plug){const p=userPlugins[Number(plug.dataset.pluginRun)];go('chat');$('chatInput').value=p.prompt.replace('{{gorev}}','[Görevini buraya yaz]');$('chatInput').focus();return;}
-  const plugDel=e.target.closest('[data-plugin-delete]');if(plugDel){userPlugins.splice(Number(plugDel.dataset.pluginDelete),1);await setPref(DB.plugins,userPlugins);renderPlugins();return;}
+  const plugDel=e.target.closest('[data-plugin-delete]');if(plugDel){userPlugins.splice(Number(plugDel.dataset.pluginDelete),1);await setPref(DB.plugins,userPlugins);renderPlugins();renderComposerPlugins();return;}
 });
 document.addEventListener('change',async e=>{
   if(e.target.matches('#apinexFreeModels')){const id=e.target.value;if(isFreeApinexModelId(id)){$('model-apinex').value=id;settings.models.apinex=id;await setPref(DB.settings,settings);renderProviderCards();updateDashboard();showToast('APInex ücretsiz modeli seçildi.');}return;}
   if(e.target.matches('[data-skill-toggle]')){const id=e.target.dataset.skillToggle;if(e.target.checked){if(selectedSkillIds.length>=MAX_SELECTED_SKILLS){e.target.checked=false;showToast('En fazla 8 Skill seçebilirsin.');return;}if(!selectedSkillIds.includes(id))selectedSkillIds.push(id);}else selectedSkillIds=selectedSkillIds.filter(value=>value!==id);skillProfileId='custom';await persistSkillState();renderSkillLibrary();return;}
   if(e.target.matches('[data-team]')){const id=e.target.dataset.team;let group=[...document.querySelectorAll('[data-team="'+id+'"]')];if(e.target.checked){if(!settings.team.includes(id))settings.team.push(id);}else settings.team=settings.team.filter(x=>x!==id);settings.team=selectedTeam();group.forEach(x=>x.checked=e.target.checked);await setPref(DB.settings,settings);renderProviderCards();$('compareSelectionCount').textContent=settings.team.length+' ajan seçili';}
 });
-$('chatForm').addEventListener('submit',e=>{e.preventDefault();const p=$('chatInput').value.trim();if(!p)return;$('chatInput').value='';fitChatInput();submitChat(p,$('chatProvider').value);});
+$('sidebarToggleBtn').addEventListener('click',openSidebar);
+$('sidebarCloseBtn').addEventListener('click',closeSidebar);
+$('sidebarScrim').addEventListener('click',closeSidebar);
+$('newChatBtn').addEventListener('click',createNewChat);
+$('sidebarNewChatBtn').addEventListener('click',createNewChat);
+$('chatSearchInput').addEventListener('input',renderSidebarChats);
+$('chatMoreToggle').addEventListener('click',()=>{const menu=$('chatMoreMenu');menu.classList.toggle('hidden');$('chatMoreToggle').setAttribute('aria-expanded',String(!menu.classList.contains('hidden')));});
+$('plusMenuToggle').addEventListener('click',()=>{const menu=$('composerPlusMenu');menu.classList.toggle('hidden');$('plusMenuToggle').setAttribute('aria-expanded',String(!menu.classList.contains('hidden')));closeChatMoreMenu();});
+$('closeComposerPluginDialog').addEventListener('click',()=>$('composerPluginDialog').close());
+$('openPluginManagerFromComposer').addEventListener('click',()=>{$('composerPluginDialog').close();go('tools');setTimeout(()=>$('pluginForm')?.scrollIntoView({behavior:'smooth',block:'start'}),120);});
+$('chatFileInput').addEventListener('change',async e=>{
+  const file=e.target.files?.[0];if(!file)return;
+  if(file.size>100000){showToast('Sohbete eklenecek metin dosyası 100 KB sınırını aşıyor.');e.target.value='';return;}
+  try{const content=await file.text();$('chatInput').value=($('chatInput').value+'\n\n[Dosya: '+file.name+']\n'+content.slice(0,18000)).trim().slice(0,12000);fitChatInput();$('chatInput').focus();showToast(file.name+' içeriği mesaj taslağına eklendi.');}
+  catch(_){showToast('Dosya okunamadı. Metin tabanlı bir dosya seç.');}
+  e.target.value='';
+});
+$('chatForm').addEventListener('submit',e=>{e.preventDefault();const p=$('chatInput').value.trim();if(!p)return;$('chatInput').value='';fitChatInput();if(deepThinkNext){deepThinkNext=false;$('deepThinkLabel').textContent='Daha çok düşün';runPipeline(p);}else submitChat(p,$('chatProvider').value);});
 $('chatInput').addEventListener('input',fitChatInput);
 $('chatInput').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();$('chatForm').requestSubmit();}});
 $('teamRun').addEventListener('click',()=>{const p=$('chatInput').value.trim();if(!p){showToast('Önce takımın görevini yaz.');return;}$('chatInput').value='';fitChatInput();runTeam(p);});
@@ -1591,7 +1686,7 @@ $('exportPlugins').addEventListener('click',()=>downloadText('ai-studio-prompt-p
 $('importPluginsBtn').addEventListener('click',()=> $('importPluginsFile').click());
 $('importPluginsFile').addEventListener('change',async e=>{if(e.target.files?.[0])await importPlugins(e.target.files[0]);e.target.value='';});
 $('exportChat').addEventListener('click',()=>downloadText('ai-studio-chat.json',JSON.stringify({exportedAt:new Date().toISOString(),messages:chatHistory},null,2),'application/json;charset=utf-8'));
-$('clearChat').addEventListener('click',async()=>{if(confirm('Sohbet geçmişi temizlensin mi?')){chatHistory=[];await removePref(DB.chat);renderChat();}});
+$('clearChat').addEventListener('click',async()=>{if(confirm('Bu sohbetin mesajları temizlensin mi?')){chatHistory=[];const current=chatThreads.find(item=>item.id===activeChatThreadId);if(current){current.messages=[];current.title='Yeni sohbet';current.updatedAt=new Date().toISOString();}await setPref(DB.chat,[]);await persistChatThreads();renderChat();renderSidebarChats();closeChatMoreMenu();}});
 $('saveOllama').addEventListener('click',saveOllama);
 $('testOllama').addEventListener('click',testOllama);
 $('copyCode').addEventListener('click',()=>copyText($('codePad').value));
@@ -1682,9 +1777,9 @@ async function init(){
     for(const [id,paidDefault] of Object.entries({openai:'gpt-5-mini',anthropic:'claude-sonnet-5',deepseek:'deepseek-chat',groq:'llama-3.3-70b-versatile',huggingface:'openai/gpt-oss-120b:fastest'})){if(settings.models[id]===paidDefault)settings.models[id]='';}
     if(settings.models.openrouter==='openai/gpt-5-mini')settings.models.openrouter='openrouter/free';if(!isFreeApinexModelId(settings.models.apinex))settings.models.apinex=APINEX_DEFAULT_FREE_MODEL;const savedTeam=Array.isArray(settings.team)?settings.team:null;settings.team=normalizeTeamSelection(settings.team||defaultSettings.team,Object.keys(providers));if(savedTeam&&settings.team.includes('openai')&&settings.team.includes('anthropic')&&settings.team.includes('gemini')&&settings.team.includes('deepseek')&&settings.team.includes('groq')&&settings.team.includes('openrouter')&&settings.team.includes('huggingface')&&settings.team.includes('custom')&&settings.team.includes('ollama')&&!settings.team.includes('device'))settings.team.push('device');settings.customEndpoint=typeof settings.customEndpoint==='string'?settings.customEndpoint.slice(0,500):'';if(settings.customEndpoint){try{settings.customEndpoint=normalizeOpenAiEndpoint(settings.customEndpoint);}catch(_){settings.customEndpoint='';}}settings.vaultBaseUrl=typeof settings.vaultBaseUrl==='string'?settings.vaultBaseUrl.slice(0,500):'';settings.localCoderEngine=['device','api'].includes(settings.localCoderEngine)?settings.localCoderEngine:'ollama';settings.localCoderApiProvider=providers[settings.localCoderApiProvider]&&settings.localCoderApiProvider!=='ollama'?settings.localCoderApiProvider:'openai';if(settings.ollamaUrl==='http://192.168.1.100:11434')settings.ollamaUrl='';}catch(_){}
   if(!nativeApp){showToast('Tarayıcıda API anahtarları yalnızca açık oturumda tutulur.');}
-  await initKeys();await initOpenShortsKey(); projectList=await getPref(DB.projects,[]);activeProjectId=await getPref(DB.activeProject,'');chatHistory=await getPref(DB.chat,[]);userPlugins=await getPref(DB.plugins,[]);const storedSkills=await getPref(DB.skills,{});customSkills=(Array.isArray(storedSkills?.customSkills)?storedSkills.customSkills:[]).map(skill=>normalizeSkill(skill)).filter(Boolean).slice(-100);skillLibrary=[...SKILL_CATALOG,...customSkills];skillProfileId=storedSkills?.profileId==='custom'?'custom':(SKILL_PROFILES[storedSkills?.profileId]?storedSkills.profileId:'karpathy');const validSkillIds=new Set(skillLibrary.map(skill=>skill.id));selectedSkillIds=(Array.isArray(storedSkills?.selectedSkillIds)?storedSkills.selectedSkillIds:[]).filter(id=>validSkillIds.has(id)).slice(0,MAX_SELECTED_SKILLS);if(!selectedSkillIds.length)selectedSkillIds=getProfileSkillIds(skillProfileId);reusableSnippets=await getPref(DB.snippets,[]);agentActivity=await getPref(DB.activity,[]);codeFiles=normalizeCodeFileList(await getPref(DB.codeFiles,[]),true);if(!codeFiles.length)codeFiles=[makeCodeFile()];activeCodeFileId=codeFiles[0].id;await setPref(DB.codeFiles,codeFiles);
+  await initKeys();await initOpenShortsKey(); projectList=await getPref(DB.projects,[]);activeProjectId=await getPref(DB.activeProject,'');chatHistory=await getPref(DB.chat,[]);const savedThreadState=await getPref(DB.threads,{});chatThreads=Array.isArray(savedThreadState?.items)?savedThreadState.items:[];activeChatThreadId=typeof savedThreadState?.activeId==='string'?savedThreadState.activeId:'';userPlugins=await getPref(DB.plugins,[]);const storedSkills=await getPref(DB.skills,{});customSkills=(Array.isArray(storedSkills?.customSkills)?storedSkills.customSkills:[]).map(skill=>normalizeSkill(skill)).filter(Boolean).slice(-100);skillLibrary=[...SKILL_CATALOG,...customSkills];skillProfileId=storedSkills?.profileId==='custom'?'custom':(SKILL_PROFILES[storedSkills?.profileId]?storedSkills.profileId:'karpathy');const validSkillIds=new Set(skillLibrary.map(skill=>skill.id));selectedSkillIds=(Array.isArray(storedSkills?.selectedSkillIds)?storedSkills.selectedSkillIds:[]).filter(id=>validSkillIds.has(id)).slice(0,MAX_SELECTED_SKILLS);if(!selectedSkillIds.length)selectedSkillIds=getProfileSkillIds(skillProfileId);reusableSnippets=await getPref(DB.snippets,[]);agentActivity=await getPref(DB.activity,[]);codeFiles=normalizeCodeFileList(await getPref(DB.codeFiles,[]),true);if(!codeFiles.length)codeFiles=[makeCodeFile()];activeCodeFileId=codeFiles[0].id;await setPref(DB.codeFiles,codeFiles);
   if(!Array.isArray(projectList))projectList=[];if(!projectList.some(p=>p&&p.id===activeProjectId))activeProjectId=projectList[0]?.id||'';await setPref(DB.activeProject,activeProjectId);if(!Array.isArray(chatHistory))chatHistory=[];if(!Array.isArray(userPlugins))userPlugins=[];if(!Array.isArray(reusableSnippets))reusableSnippets=[];if(!Array.isArray(agentActivity))agentActivity=[];
-  renderProviderCards();renderProjects();renderChat();renderBuiltinTools();renderPlugins();renderOpenShortsPanel();await mountSocialStudio({
+  await ensureChatThreads();renderProviderCards();renderProjects();renderChat();renderSidebarChats();renderBuiltinTools();renderPlugins();renderComposerPlugins();renderOpenShortsPanel();await mountSocialStudio({
     generateText:async prompt=>{
       if(settings.demoMode)throw new Error('Demo modu açık. Gerçek AI senaryosu için Demo modunu kapat.');
       const providerId=$('chatProvider').value||'gemini';

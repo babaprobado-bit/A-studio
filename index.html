@@ -15,15 +15,45 @@
 <body>
   <div id="app">
     <header class="topbar">
-      <a class="brand" href="#home" aria-label="AI Studio ana ekran">
-        <span class="brand-mark">✳</span><span><strong>AI Studio</strong><small>MOBILE WORKSPACE</small></span>
-      </a>
+      <button id="sidebarToggleBtn" type="button" class="icon-button" aria-label="Sohbetler ve GPT özellikleri" aria-expanded="false">☰</button>
+      <a class="brand" href="#chat" data-go="chat" aria-label="AI Studio sohbet"><span class="brand-mark">✳</span><span><strong>AI Studio</strong><small>MOBILE WORKSPACE</small></span></a>
       <div class="topbar-actions">
         <button id="installWebAppBtn" type="button" class="btn ghost small hidden">Uygulamayı yükle</button>
         <button id="webLogoutBtn" type="button" class="btn ghost small hidden">Güvenli çıkış</button>
         <span id="modePill" class="pill safe">DEMO MODU</span>
+        <button id="newChatBtn" type="button" class="icon-button" aria-label="Yeni sohbet" title="Yeni sohbet">✎</button>
+        <div class="chat-more-wrap">
+          <button id="chatMoreToggle" type="button" class="icon-button" aria-label="Sohbet seçenekleri" aria-expanded="false">⋮</button>
+          <div id="chatMoreMenu" class="chat-more-menu hidden">
+            <button type="button" id="exportChat" class="chat-menu-item">Sohbeti dışa aktar</button>
+            <button type="button" id="clearChat" class="chat-menu-item">Sohbeti temizle</button>
+            <button type="button" class="chat-menu-item" data-go="models">Modelleri yönet</button>
+            <div class="chat-menu-separator"></div>
+            <div class="switch-row"><div><strong>Demo yanıtları</strong><small>Kapalıyken seçili modele gerçek istek gönderilir.</small></div><label class="switch"><input type="checkbox" id="demoToggle" checked><span></span></label></div>
+            <p class="fineprint">Gerçek çağrılar sağlayıcının kotasını veya ücretini kullanabilir.</p>
+            <div class="chat-team-actions"><button type="button" class="btn secondary small" id="teamRun">Paralel AI Team</button><button type="button" class="btn ghost small" id="pipelineRun">Sıralı ajan zinciri</button></div>
+          </div>
+        </div>
       </div>
     </header>
+    <div id="sidebarScrim" class="sidebar-scrim hidden"></div>
+    <aside id="appSidebar" class="app-sidebar" aria-label="Sohbetler ve GPT özellikleri" aria-hidden="true">
+      <div class="sidebar-heading"><strong>AI Studio</strong><button id="sidebarCloseBtn" type="button" class="icon-button sidebar-close" aria-label="Menüyü kapat">×</button></div>
+      <button type="button" id="sidebarNewChatBtn" class="sidebar-new-chat"><span>＋</span> Yeni sohbet</button>
+      <label class="sidebar-search-label" for="chatSearchInput">Sohbetlerde ara</label>
+      <input id="chatSearchInput" class="sidebar-search" type="search" placeholder="Sohbet ara..." autocomplete="off">
+      <div class="sidebar-section-title">Sohbetler</div><div id="chatThreadList" class="chat-thread-list" aria-live="polite"></div>
+      <div class="sidebar-divider"></div><div class="sidebar-section-title">GPT özellikleri</div>
+      <nav class="sidebar-feature-list" aria-label="GPT özellikleri">
+        <button type="button" data-go="compare"><span>⇄</span><span><strong>Model karşılaştırma</strong><small>Birden fazla modeli dene</small></span></button>
+        <button type="button" data-go="models"><span>✳</span><span><strong>Modeller ve bağlantılar</strong><small>Sağlayıcıları ve API anahtarlarını yönet</small></span></button>
+        <button type="button" data-go="tools"><span>⌘</span><span><strong>Skills ve AI araçları</strong><small>Local Coder, Power Hub ve Skills</small></span></button>
+        <button type="button" data-focus-plugins><span>◇</span><span><strong>Eklentiler</strong><small>Plugin seç, oluştur ve düzenle</small></span></button>
+        <button type="button" data-go="projects"><span>▤</span><span><strong>Projeler</strong><small>Proje notları ve bağlam</small></span></button>
+        <button type="button" data-go="home"><span>⌂</span><span><strong>Çalışma panosu</strong><small>AI Studio genel görünümü</small></span></button>
+      </nav>
+      <div class="sidebar-footnote">Sohbetlerin ve eklentilerin bu cihazda saklanır.</div>
+    </aside>
     <main>
       <section class="screen" id="home">
         <div class="hero">
@@ -48,51 +78,26 @@
 
       <section class="screen active" id="chat">
         <div class="chat-shell">
-          <header class="chat-header">
-            <div class="chat-heading">
-              <div class="eyebrow">AI STUDIO · SOHBET</div>
-              <h1>Yeni sohbet</h1>
-              <p>Bir modelle konuş veya gerektiğinde AI Team'i çalıştır.</p>
-            </div>
-            <div class="chat-model-control">
-              <label class="sr-only" for="chatProvider">Yanıt modeli</label>
-              <select class="input" id="chatProvider" aria-label="Yanıt modeli"></select>
-              <span id="providerState" class="status-dot" aria-live="polite">Demo</span>
-            </div>
-          </header>
-          <details class="chat-settings">
-            <summary>
-              <span>Sohbet ayarları</span>
-              <small class="chat-settings-hint">Demo modu ve takım araçları</small>
-            </summary>
-            <div class="chat-settings-body">
-              <div class="switch-row">
-                <div><strong>Demo yanıtları</strong><small>Kapalıyken seçili modele gerçek istek gönderilir.</small></div>
-                <label class="switch"><input type="checkbox" id="demoToggle" checked><span></span></label>
-              </div>
-              <div class="notice compact">Gerçek çağrılar sağlayıcının kota veya ücretini kullanabilir. Anahtarını yalnızca kendi cihazında sakla; kimseyle paylaşma.</div>
-              <div class="chat-team-actions">
-                <button type="button" class="btn secondary small" id="teamRun">Paralel takım</button>
-                <button type="button" class="btn ghost small" id="pipelineRun">Sıralı ajan zinciri</button>
-              </div>
-            </div>
-          </details>
+          <header class="chat-header"><div class="chat-heading"><div class="eyebrow">AI STUDIO</div><h1 id="chatScreenTitle">Ne üzerinde çalışıyoruz?</h1><p>Bir soru sor, fikir geliştir veya kod üzerinde çalış.</p></div></header>
           <div class="chat-window chat-messages" id="chatMessages" role="log" aria-live="polite" aria-relevant="additions" aria-label="Sohbet mesajları"></div>
+          <div class="composer-menu hidden" id="composerPlusMenu" role="menu" aria-label="Mesaj ekleme seçenekleri">
+            <button type="button" data-composer-action="files"><span class="composer-menu-icon">↥</span><span><strong>Dosyalar</strong><small>Metin, kod ve proje dosyası ekle</small></span></button>
+            <button type="button" data-composer-action="plugins"><span class="composer-menu-icon">◇</span><span><strong>Eklentiler</strong><small>Hazır plugin seç veya oluştur</small></span></button>
+            <button type="button" data-composer-action="think"><span class="composer-menu-icon">◉</span><span><strong id="deepThinkLabel">Daha çok düşün</strong><small>Bir sonraki mesajı ajan zinciriyle işle</small></span></button>
+            <button type="button" data-composer-action="team"><span class="composer-menu-icon">✳</span><span><strong>AI Team</strong><small>Seçili ajanlardan paralel yanıt al</small></span></button>
+          </div>
           <form id="chatForm" class="compose chat-composer">
             <label class="sr-only" for="chatInput">Mesajın</label>
             <textarea id="chatInput" class="input compose-input" rows="1" maxlength="12000" placeholder="AI Studio'ya mesaj gönder..." autocomplete="off" required></textarea>
             <div class="compose-actions">
-              <span class="chat-composer-hint">Enter gönderir · Shift + Enter yeni satır</span>
-              <button type="submit" class="btn primary chat-send">↑ Gönder</button>
+              <div class="composer-controls"><button id="plusMenuToggle" type="button" class="composer-plus" aria-label="Dosya ve eklenti ekle" aria-expanded="false">＋</button>
+                <div class="model-picker"><span class="model-picker-label">Model</span><label class="sr-only" for="chatProvider">Yanıt modeli</label><select class="input" id="chatProvider" aria-label="Yanıt modeli"></select><span id="providerState" class="status-dot" aria-live="polite">Demo</span></div>
+              </div>
+              <button type="submit" class="chat-send" aria-label="Mesajı gönder" title="Gönder">↑</button>
             </div>
           </form>
-          <div class="chat-footer">
-            <span>Geçmiş bu cihazda saklanır.</span>
-            <div>
-              <button type="button" class="btn ghost small" id="exportChat">Dışa aktar</button>
-              <button type="button" class="btn ghost small" id="clearChat">Temizle</button>
-            </div>
-          </div>
+          <input type="file" id="chatFileInput" class="hidden" accept=".txt,.md,.markdown,.json,.js,.ts,.jsx,.tsx,.html,.css,.py,.xml,.csv,.yaml,.yml,.toml,.log,text/*,application/json">
+          <div class="chat-footer"><span>Geçmiş bu cihazda saklanır.</span></div>
         </div>
       </section>
 
@@ -322,14 +327,13 @@
         <div class="panel"><h2>Proje verileri / gizlilik</h2><p class="muted">Proje notları, sohbet geçmişi ve prompt eklentileri bu cihazda saklanır. Yedekler API anahtarlarını içermez. Sohbeti gerçek modele gönderdiğinde, yazdığın içerik seçili sağlayıcıya iletilir.</p><button class="btn danger" id="resetLocal">Cihazdaki notları ve geçmişi sil</button></div>
       </section>
     </main>
-    <nav class="bottom-nav" aria-label="Ana gezinme">
-      <button class="nav-btn active" data-tab="chat"><span>◉</span>Sohbet</button>
-      <button class="nav-btn" data-tab="compare"><span>⇄</span>Karşılaştır</button>
-      <button class="nav-btn" data-tab="models"><span>✳</span>Modeller</button>
-      <button class="nav-btn" data-tab="projects"><span>▤</span>Projeler</button>
-      <button class="nav-btn" data-tab="tools"><span>⌘</span>Araçlar</button>
-      <button class="nav-btn" data-tab="home"><span>⌂</span>Ana ekran</button>
-    </nav>
+    <dialog id="composerPluginDialog" class="composer-plugin-dialog" aria-labelledby="composerPluginTitle">
+      <div class="composer-plugin-head"><div><div class="eyebrow">PLUGIN LIBRARY</div><h2 id="composerPluginTitle">Eklenti seç</h2></div><button type="button" id="closeComposerPluginDialog" class="icon-button" aria-label="Eklenti penceresini kapat">×</button></div>
+      <p class="muted">Seçtiğin eklentinin talimatı mesaj kutusuna eklenir. Göndermeden önce düzenleyebilirsin.</p>
+      <div id="composerPluginList" class="composer-plugin-list"></div>
+      <button type="button" id="openPluginManagerFromComposer" class="plugin-create-button">＋ Yeni eklenti tanımla</button>
+    </dialog>
+    <nav class="bottom-nav hidden" aria-hidden="true" aria-label="Ana gezinme"></nav>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
   </div>
   <script type="module" src="/src/main.js"></script>
