@@ -2,7 +2,7 @@
 
 ## Scope and behavior
 - Added APInex as an optional OpenAI-compatible provider at `https://api.apinex.bond/v1/chat/completions`.
-- Default model is `free/gemini-3.8-flash`; users may refresh the provider's `/models` list and select only IDs beginning with `free/`.
+- Default model is `free/gemini-3.8-flash`; users may refresh the provider's `/models` list and select only lowercase IDs beginning with `free/`.
 - APInex is excluded from the default ten-engine AI Team selection. Users may add it explicitly from Models / Team settings.
 - The generic provider plumbing makes the configured provider available to standard chat, AI Team, comparison, pipeline and API Local Coder. Creator text generation allows it only when the selected model has the free namespace.
 - API keys use the existing Android SecureStorage path; browser preview keys remain session-memory only. Workspace backups do not serialize provider keys.

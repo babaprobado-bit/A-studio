@@ -3,7 +3,7 @@ export const APINEX_CHAT_ENDPOINT = APINEX_API_BASE_URL + '/chat/completions';
 export const APINEX_MODELS_ENDPOINT = APINEX_API_BASE_URL + '/models';
 export const APINEX_DEFAULT_FREE_MODEL = 'free/gemini-3.8-flash';
 
-const FREE_MODEL_ID = /^free\/[a-z0-9][a-z0-9._-]{0,130}$/i;
+const FREE_MODEL_ID = /^free\/[a-z0-9][a-z0-9._-]{0,130}$/;
 
 export function isFreeApinexModelId(value) {
   const id = String(value ?? '').trim();
