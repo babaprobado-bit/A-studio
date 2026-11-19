@@ -170,7 +170,7 @@ assert.match(mainSource, /isFreeApiProviderModel\(id,requestedModel\)/,
 assert.match(apiSource, /modelId:providerModel\(providerId\)/,
   'API Local Coder must pass its selected model to the preflight');
 const blocked = await runApiLocalCoderSequence({
-  ...common, providerId:'openai', modelId:'gpt-4o', hasKey:true,
+  ...common, providerId:'openai', modelId:'gpt-4o', providers:{...providers,openai:{name:'OpenAI',model:'gpt-4o'}}, hasKey:true,
   confirmConsent:async()=>{throw new Error('blocked paid model must not prompt or send requests');}
 });
 assert.equal(blocked.status,'paid-model-blocked');
