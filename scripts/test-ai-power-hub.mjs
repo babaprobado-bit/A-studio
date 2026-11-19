@@ -131,7 +131,7 @@ assert.ok(hub.includes('AI Swarm'));
 assert.ok(hub.includes('OpenRouter Multi-Chat'));
 assert.doesNotMatch(hub,/Cohere Trial|cohereTrial/i);
 assert.ok(hub.includes('Cloudflare Workers AI'));
-assert.ok(hub.includes('10 doğrulanmış ücretsiz sağlayıcı'));
+assert.ok(hub.includes('9 doğrulanmış ücretsiz sağlayıcı'));
 assert.ok(!hub.includes('runCohereTrial'));
 assert.ok(css.includes('@media(max-width:620px)'));
 assert.ok(server.includes("'https://api.apinex.bond'"));
