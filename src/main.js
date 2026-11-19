@@ -1,5 +1,6 @@
 import { Capacitor } from '@capacitor/core';
 import { APINEX_CHAT_ENDPOINT, APINEX_DEFAULT_FREE_MODEL, APINEX_MODELS_ENDPOINT, extractApinexFreeModels, isFreeApinexModelId } from './apinex-provider.js';
+import { ZAI_FREE_MODELS, MERKIUM_FREE_MODELS, NVIDIA_NIM_DEVELOPER_MODELS } from './free-api-providers.js';
 import { connectOpenShorts, callOpenShortsTool, validateOpenShortsSourceUrl } from './openshorts-mcp.js';
 import { mountSocialStudio } from './social-studio.js';
 import { mountAiPowerHub } from './ai-power-hub.js';
@@ -47,6 +48,9 @@ const providers = {
   groq: { name:'Groq', icon:'Q', kind:'openai', endpoint:'https://api.groq.com/openai/v1/chat/completions', model:'', keyUrl:'https://console.groq.com/keys', desc:'Hızlı çıkarım · kullanılabilir model listesi değişebilir' },
   openrouter: { name:'OpenRouter', icon:'R', kind:'openai', endpoint:'https://openrouter.ai/api/v1/chat/completions', model:'openrouter/free', keyUrl:'https://openrouter.ai/keys', desc:'Birçok sağlayıcı için tek uyumlu API' },
   apinex: { name:'APInex · Ücretsiz Modeller', icon:'Apx', kind:'openai', endpoint:APINEX_CHAT_ENDPOINT, model:APINEX_DEFAULT_FREE_MODEL, keyUrl:'https://apinex.bond/for-ai', desc:'İsteğe bağlı üçüncü taraf API geçidi. Yalnızca free/* model kimlikleri kabul edilir; istekler APInex ve üst sağlayıcı üzerinden iletilir.' },
+  nvidia: { name:'NVIDIA NIM Developer', icon:'N', kind:'openai', endpoint:'https://integrate.api.nvidia.com/v1/chat/completions', model:NVIDIA_NIM_DEVELOPER_MODELS[0], freeModels:NVIDIA_NIM_DEVELOPER_MODELS, keyUrl:'https://build.nvidia.com/', desc:'NVIDIA Developer Program · yalnızca ücretsiz hosted endpoint erişimiyle prototip, araştırma ve test; üretim için değildir.' },
+  zai: { name:'Z.ai / GLM Flash', icon:'Z', kind:'openai', endpoint:'https://api.z.ai/api/paas/v4/chat/completions', model:ZAI_FREE_MODELS[0], freeModels:ZAI_FREE_MODELS, keyUrl:'https://z.ai/manage-apikey/apikey-list', desc:'Yalnızca doğrulanmış ücretsiz GLM Flash modelleri seçilebilir.' },
+  merkium: { name:'Merkium · Kalıcı Ücretsiz', icon:'M', kind:'openai', endpoint:'https://chat.merkium.nl/api/v1/chat/completions', model:MERKIUM_FREE_MODELS[0], freeModels:MERKIUM_FREE_MODELS, keyUrl:'https://chat.merkium.nl/', desc:'Yedi kalıcı ücretsiz API modeli · 30 istek/dakika.' },
   huggingface: { name:'Hugging Face Inference', icon:'H', kind:'openai', endpoint:'https://router.huggingface.co/v1/chat/completions', model:'', keyUrl:'https://huggingface.co/settings/tokens', desc:'Inference Providers · yüzlerce model için tek API' },
   custom: { name:'Özel OpenAI uyumlu API', icon:'+', kind:'openai', endpoint:'', model:'', keyUrl:'', desc:'Kendi API adresin ve model kimliğin; OpenAI chat completions uyumlu servisler' },
   ollama: { name:'LocalCoder / Ollama (PC)', icon:'⌘', kind:'ollama', endpoint:'', model:'qwen2.5-coder:1.5b', keyUrl:'https://ollama.com/', desc:'Ağdaki bilgisayarda çalışan yerel model; telefona gömülü değil' },
@@ -55,7 +59,7 @@ const providers = {
 const defaultSettings = {
   demoMode: false,
   models: Object.fromEntries(Object.entries(providers).map(([id,p]) => [id,p.model])),
-  team: Object.keys(providers).filter(id => id !== 'apinex'),
+  team: ['openai','anthropic','gemini','deepseek','groq','openrouter','huggingface','custom','ollama','device'],
   customEndpoint: '',
   ollamaUrl: '',
   ollamaModel: 'qwen2.5-coder:1.5b',
@@ -229,6 +233,7 @@ function providerIsReady(id){
   if(id==='ollama')return Boolean(String(settings.ollamaUrl||'').trim()&&String(settings.ollamaModel||settings.models.ollama||providers.ollama.model||'').trim());
   const model=String(settings.models[id]||providers[id].model||'').trim();
   if(!model)return false;
+  if(providers[id].freeModels&&!providers[id].freeModels.includes(model))return false;
   if(id==='openrouter'&&!isFreeOpenRouterModel(model))return false;
   if(id==='apinex'&&!isFreeApinexModelId(model))return false;
   if(id==='custom')return Boolean(String(settings.customEndpoint||'').trim()&&runtimeKeys[id]);
@@ -446,7 +451,7 @@ function renderProviderCards(){
     }
     return '<article class="provider-card" data-provider-card="'+id+'"><div class="provider-head"><span class="provider-icon">'+esc(p.icon)+'</span><div class="provider-title"><h3>'+esc(p.name)+'</h3><p>'+esc(p.desc)+'</p></div><span id="state-'+id+'" class="provider-state '+(configured?'connected':'')+'">'+(configured?'Ayarlı':'Bağlı değil')+'</span></div>'+
       '<details class="provider-settings"><summary>Bağlantı ve model ayarlarını aç</summary>'+
-      '<label class="field-label" for="model-'+id+'">Model kimliği</label><input class="input" id="model-'+id+'" value="'+esc(model)+'" maxlength="140" autocomplete="off">'+
+      '<label class="field-label" for="model-'+id+'">Model kimliği</label><input class="input" id="model-'+id+'" value="'+esc(model)+'" maxlength="140" autocomplete="off"'+(p.freeModels?' list="free-models-'+id+'"':'')+'>'+(p.freeModels?'<datalist id="free-models-'+id+'">'+p.freeModels.map(item=>'<option value="'+esc(item)+'"></option>').join('')+'</datalist><p class="fineprint">Yalnızca doğrulanmış ücretsiz model kimlikleri kullanılabilir.</p>':'')+'+
       (id==='ollama'?'':'<label class="field-label" for="key-'+id+'">API anahtarı</label><input class="input provider-key" type="password" id="key-'+id+'" placeholder="'+(configured?'Kayıtlı anahtar gizli':'Anahtarı buraya yapıştır')+'" autocomplete="new-password" autocapitalize="off" spellcheck="false">'+
         (id==='custom'?'<label class="field-label" for="endpoint-custom">API endpoint (temel adres veya tam chat/completions)</label><input class="input" id="endpoint-custom" value="'+esc(settings.customEndpoint||'')+'" maxlength="500" placeholder="https://api.ornek.com/v1" autocomplete="url">':'')+
         '<div class="provider-help">'+(id==='custom'?'<span class="fineprint">OpenAI uyumlu servisler için. Endpoint HTTPS olmalı; anahtar yalnızca güvenli depoda tutulur.</span>':'<a href="'+esc(p.keyUrl)+'" target="_blank" rel="noopener noreferrer">Resmî anahtar sayfasını aç ↗</a>')+'<label class="team-check"><input type="checkbox" data-team="'+id+'" '+(isTeam?'checked':'')+'> Takım turuna ekle</label></div>'+
@@ -660,7 +665,7 @@ async function callProvider(id,prompt,history,options={}){
     const d=await fetchJson(url+'/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},redirect:'error',body:JSON.stringify({model,messages,stream:false,options:{temperature:0.4}})});
     const answer=d?.message?.content;if(!answer)throw new Error('Ollama yanıtında mesaj yok. Model adını ve sunucuyu kontrol et.');return answer;
   }
-  const p=providers[id]; if(!p)throw new Error('Bilinmeyen AI sağlayıcısı.'); const model=String(options?.modelOverride||providerModel(id)||'').trim(); if(!model)throw new Error(p.name+' için model kimliği seçilmemiş. Ücretsiz olduğu doğrulanmış bir model kimliği gir.'); if(id==='openrouter'&&!isFreeOpenRouterModel(model))throw new Error('OpenRouter için yalnızca openrouter/free veya :free ile biten ücretsiz model kimlikleri kullanılabilir.'); if(id==='apinex'&&!isFreeApinexModelId(model))throw new Error('APInex güvenlik kontrolü: Yalnızca free/ ile başlayan model kimlikleri kullanılabilir. Ücretli model çağrısı engellendi.'); const key=await getSecret(id); if(!key)throw new Error(p.name+' için API anahtarı ayarlanmamış. Modeller ekranından ekle.');
+  const p=providers[id]; if(!p)throw new Error('Bilinmeyen AI sağlayıcısı.'); const model=String(options?.modelOverride||providerModel(id)||'').trim(); if(!model)throw new Error(p.name+' için model kimliği seçilmemiş. Ücretsiz olduğu doğrulanmış bir model kimliği gir.'); if(id==='openrouter'&&!isFreeOpenRouterModel(model))throw new Error('OpenRouter için yalnızca openrouter/free veya :free ile biten ücretsiz model kimlikleri kullanılabilir.'); if(id==='apinex'&&!isFreeApinexModelId(model))throw new Error('APInex güvenlik kontrolü: Yalnızca free/ ile başlayan model kimlikleri kullanılabilir. Ücretli model çağrısı engellendi.'); if(p.freeModels&&!p.freeModels.includes(model))throw new Error('Bu sağlayıcıda yalnızca doğrulanmış ücretsiz model kimlikleri kullanılabilir.'); const key=await getSecret(id); if(!key)throw new Error(p.name+' için API anahtarı ayarlanmamış. Modeller ekranından ekle.');
   const msgs=history.slice(-8).filter(m=>m.role==='user'||m.role==='assistant').map(m=>({role:m.role,content:m.content})); msgs.push({role:'user',content:prompt});
   if(p.kind==='anthropic'){
     const d=await fetchJson(p.endpoint,{method:'POST',headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model,max_tokens:2048,system:systemPrompt,messages:msgs.filter(m=>m.role==='user'||m.role==='assistant')})});
@@ -1591,7 +1596,7 @@ function updateDashboard(){const connected=Object.keys(providers).filter(provide
 }
 async function exportProjects(){downloadText('ai-studio-projects.json',JSON.stringify({format:'ai-studio-projects-v2',exportedAt:new Date().toISOString(),projects:projectList},null,2),'application/json;charset=utf-8');}
 function buildWorkspaceSnapshot(){
-  return {format:'ai-studio-workspace-v1',exportedAt:new Date().toISOString(),settings:{models:settings.models,team:settings.team,customEndpoint:settings.customEndpoint||'',ollamaUrl:settings.ollamaUrl,ollamaModel:settings.ollamaModel,localCoderEngine:['device','api'].includes(settings.localCoderEngine)?settings.localCoderEngine:'ollama',localCoderApiProvider:settings.localCoderApiProvider||'openai',systemPrompt:settings.systemPrompt,shareReusableContext:settings.shareReusableContext===true,shareVaultContext:settings.shareVaultContext===true,vaultBaseUrl:settings.vaultBaseUrl||'',swarmMaxAgents:settings.swarmMaxAgents,swarmConcurrency:settings.swarmConcurrency,openrouterChatModels:settings.openrouterChatModels,enabledPromptPluginIds:settings.enabledPromptPluginIds,cloudflareAccountId:settings.cloudflareAccountId||'',cloudflareModel:settings.cloudflareModel||'',cohereTrialModel:settings.cohereTrialModel||''},projects:projectList,activeProjectId,chat:chatHistory,plugins:userPlugins.filter(p=>p.kind!=='builtin').map(p=>({name:p.name,prompt:p.prompt})),skills:createSkillBackupState({customSkills,selectedSkillIds,profileId:skillProfileId}),snippets:reusableSnippets,activity:agentActivity,codeFiles,activeCodeFileId};
+  return {format:'ai-studio-workspace-v1',exportedAt:new Date().toISOString(),settings:{models:settings.models,team:settings.team,customEndpoint:settings.customEndpoint||'',ollamaUrl:settings.ollamaUrl,ollamaModel:settings.ollamaModel,localCoderEngine:['device','api'].includes(settings.localCoderEngine)?settings.localCoderEngine:'ollama',localCoderApiProvider:settings.localCoderApiProvider||'openai',systemPrompt:settings.systemPrompt,shareReusableContext:settings.shareReusableContext===true,shareVaultContext:settings.shareVaultContext===true,vaultBaseUrl:settings.vaultBaseUrl||'',swarmMaxAgents:settings.swarmMaxAgents,swarmConcurrency:settings.swarmConcurrency,openrouterChatModels:settings.openrouterChatModels,enabledPromptPluginIds:settings.enabledPromptPluginIds,cloudflareAccountId:settings.cloudflareAccountId||'',cloudflareModel:settings.cloudflareModel||''},projects:projectList,activeProjectId,chat:chatHistory,plugins:userPlugins.filter(p=>p.kind!=='builtin').map(p=>({name:p.name,prompt:p.prompt})),skills:createSkillBackupState({customSkills,selectedSkillIds,profileId:skillProfileId}),snippets:reusableSnippets,activity:agentActivity,codeFiles,activeCodeFileId};
 }
 async function exportWorkspace(){
   await saveCurrentCodeFile(false);
@@ -1644,7 +1649,6 @@ async function importWorkspace(file){
     nextSettings.enabledPromptPluginIds=Array.isArray(nextSettings.enabledPromptPluginIds)?[...new Set(nextSettings.enabledPromptPluginIds.filter(id=>typeof id==='string'))].slice(0,34):undefined;
     nextSettings.cloudflareAccountId=typeof nextSettings.cloudflareAccountId==='string'&&/^[a-f0-9]{32}$/i.test(nextSettings.cloudflareAccountId)?nextSettings.cloudflareAccountId:'';
     nextSettings.cloudflareModel=['@cf/zai-org/glm-4.7-flash','@cf/google/gemma-4-26b-a4b-it','@cf/nvidia/nemotron-3-120b-a12b'].includes(nextSettings.cloudflareModel)?nextSettings.cloudflareModel:'@cf/zai-org/glm-4.7-flash';
-    nextSettings.cohereTrialModel=typeof nextSettings.cohereTrialModel==='string'?nextSettings.cohereTrialModel.slice(0,120):'command-a-03-2025';
     nextSettings.team=normalizeTeamSelection(Array.isArray(nextSettings.team)?nextSettings.team:defaultSettings.team,Object.keys(providers));
     nextSettings.customEndpoint=typeof nextSettings.customEndpoint==='string'?nextSettings.customEndpoint.slice(0,500):'';
     if(nextSettings.customEndpoint){try{nextSettings.customEndpoint=normalizeOpenAiEndpoint(nextSettings.customEndpoint);}catch(_){nextSettings.customEndpoint='';}}
@@ -1682,7 +1686,9 @@ async function saveOllama(){const rawUrl=$('ollamaUrl').value.trim();try{setting
 async function testProvider(id){if(!providerIsReady(id)){showToast(providers[id].name+' bağlantısı hazır değil. Önce anahtarını ve model ayarını kaydet.');openFirstRunSetup(id==='openrouter'?'openrouter':id==='ollama'?'ollama':id==='device'?'device':'cloud');return;}try{const result=await callProvider(id,'Yanıt olarak sadece OK yaz.',[]);showToast('Bağlantı yanıt verdi: '+result.slice(0,70));}catch(e){showToast('Bağlantı testi başarısız: '+(e.message||'Hata'));}}
 async function testOllama(){if(!await saveOllama())return;if(!providerIsReady('ollama')){showToast('Önce Ollama sunucu adresini ve modelini doğrula.');return;}try{const result=await callProvider('ollama','Yanıt olarak sadece OK yaz.',[]);showToast('Ollama yanıt verdi: '+result.slice(0,70));}catch(e){showToast('Ollama testi başarısız: '+(e.message||'Hata'));}}
 async function saveProviderCard(id){
-  settings.models[id]=$('model-'+id).value.trim()||providers[id].model;
+  const requestedModel=$('model-'+id).value.trim()||providers[id].model;
+  if(providers[id].freeModels&&!providers[id].freeModels.includes(requestedModel)){showToast('Bu sağlayıcıda yalnızca listelenen ücretsiz modeller kullanılabilir.');return;}
+  settings.models[id]=requestedModel;
   if(id==='custom'){
     const endpointValue=$('endpoint-custom').value.trim();
     try{settings.customEndpoint=endpointValue?normalizeOpenAiEndpoint(endpointValue):'';}

@@ -5,7 +5,7 @@ import { FREE_API_PROVIDER_CATALOG, CLOUDFLARE_FREE_MODELS } from './free-api-pr
 
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const clamp=(value,min,max,fallback)=>{const n=Number(value);return Number.isFinite(n)?Math.max(min,Math.min(max,Math.floor(n))):fallback;};
-const accessLabel={'free-tier':'Ücretsiz kota','free-models':'Ücretsiz modeller','conditional':'Hesaba bağlı','trial':'Deneme kotası','unverified':'Doğrulanmadı','no-free-api':'Ücretsiz API yok'};
+const accessLabel={'free-tier':'Ücretsiz kota','free-models':'Ücretsiz modeller','developer-access':'Ücretsiz geliştirici erişimi','permanent-free':'Kalıcı ücretsiz','free-plan':'Ücretsiz plan'};
 const connectorLabel={integrated:'Bağlı',external:'Harici uygulama',planned:'Planlandı',contract:'Sözleşme / mock'};
 const OPENROUTER_MODELS_URL='https://openrouter.ai/api/v1/models?output_modalities=text&sort=most-popular&limit=200';
 const CF_MODELS=CLOUDFLARE_FREE_MODELS;
@@ -52,7 +52,7 @@ export async function mountAiPowerHub(options={}){
       '<button type="button" class="ai-power-tab active" data-power-tab="swarm">AI Swarm</button>'+
       '<button type="button" class="ai-power-tab" data-power-tab="plugins">Plugin Library</button>'+
       '<button type="button" class="ai-power-tab" data-power-tab="openrouter">OpenRouter Multi-Chat</button>'+
-      '<button type="button" class="ai-power-tab" data-power-tab="providers">13 API sağlayıcısı</button>'+
+      '<button type="button" class="ai-power-tab" data-power-tab="providers">10 doğrulanmış ücretsiz sağlayıcı</button>'+
       '<button type="button" class="ai-power-tab" data-power-tab="connectors">Bağlantılar</button></nav>'+
     '<section class="ai-power-panel" data-power-panel="swarm">'+
       '<div class="ai-power-heading"><div><div class="eyebrow">MULTI-AGENT ORCHESTRATOR</div><h3>AI Swarm</h3><p>Görevi uzman ajanlara böl, paralel çalıştır, ortak panoda bulguları paylaş ve sonuçları birleştir.</p></div><span class="pill">En fazla 10 ajan</span></div>'+
@@ -74,13 +74,12 @@ export async function mountAiPowerHub(options={}){
       '<div class="row-actions"><button type="button" class="btn primary" id="runOpenRouterMulti">Seçili modelleri çalıştır</button><span class="grow"></span><span id="openRouterMultiStatus" class="fineprint">En az iki model seç.</span></div><div id="openRouterMultiResults" class="stack"></div>'+
       '<p class="fineprint">Seçilen her model bir API isteği ve kota kullanır. Uygulama ücretli model kimliklerini reddeder; ücretsiz model kotaları yine de sınırlıdır.</p></section>'+
     '<section class="ai-power-panel" data-power-panel="providers" hidden>'+
-      '<div class="ai-power-heading"><div><div class="eyebrow">FREE API DIRECTORY</div><h3>13 API sağlayıcısı</h3><p>Ücretsiz erişim, deneme kredisi, koşullu kota ve ücretli API birbirinden ayrılır.</p></div><span class="pill">Ücretli varsayılan yok</span></div>'+
+      '<div class="ai-power-heading"><div><div class="eyebrow">FREE API DIRECTORY</div><h3>13 API sağlayıcısı</h3><p>Yalnızca doğrulanmış ücretsiz katman, sıfır fiyatlı model veya ücretsiz geliştirici erişimi gösterilir. Ücretli ve deneme kredili seçenekler çıkarıldı.</p></div><span class="pill">Ücretli varsayılan yok</span></div>'+
       '<div class="ai-provider-directory" id="freeProviderDirectory"></div>'+
-      '<div class="panel ai-provider-setup"><div class="section-head"><div><div class="eyebrow">OPTIONAL FREE ROUTES</div><h3>Cohere Trial ve Cloudflare Workers AI</h3></div><span class="pill">AI Team listesine otomatik eklenmez</span></div>'+
+      '<div class="panel ai-provider-setup"><div class="section-head"><div><div class="eyebrow">OPTIONAL FREE ROUTES</div><h3>Cloudflare Workers AI</h3></div><span class="pill">AI Team listesine otomatik eklenmez</span></div>'+
       '<p class="fineprint">İsteğe bağlı bağlantılar. API anahtarları Android güvenli deposunda tutulur. Kota/plan şartlarını sağlayıcı panelinde kontrol et.</p>'+
-      '<div class="ai-provider-form"><h4>Cohere Trial</h4><label class="field-label" for="cohereTrialKey">Trial API anahtarı<input id="cohereTrialKey" class="input" type="password" maxlength="256" autocomplete="new-password" placeholder="Trial key"></label><label class="field-label" for="cohereTrialModel">Model kimliği<input id="cohereTrialModel" class="input" maxlength="120" value="command-a-03-2025"></label><label class="ai-consent"><input id="cohereTrialConsent" type="checkbox"> Yalnızca Trial anahtarı kullanıyorum; deneme kotası sınırlıdır.</label><div class="row-actions"><button type="button" class="btn secondary small" id="saveCohereTrial">Trial ayarını kaydet</button><button type="button" class="btn ghost small" id="runCohereTrial">Tek istek dene</button><button type="button" class="btn ghost small danger-text" id="clearCohereTrial">Anahtarı sil</button></div><p id="cohereTrialStatus" class="fineprint" role="status">Bağlı değil.</p></div>'+
       '<div class="ai-provider-form"><h4>Cloudflare Workers AI · Free plan</h4><label class="field-label" for="cloudflareAccountId">Cloudflare Account ID<input id="cloudflareAccountId" class="input" maxlength="32" autocomplete="off" placeholder="32 karakterlik Account ID"></label><label class="field-label" for="cloudflareApiKey">API token<input id="cloudflareApiKey" class="input" type="password" maxlength="256" autocomplete="new-password" placeholder="Workers AI token"></label><label class="field-label" for="cloudflareModel">Ücretsiz model<select id="cloudflareModel" class="input"></select></label><label class="ai-consent"><input id="cloudflareFreeConsent" type="checkbox"> Free plan kullanıyorum; günlük kota ve faturalandırma şartlarını kontrol ettim.</label><div class="row-actions"><button type="button" class="btn secondary small" id="saveCloudflare">Workers AI ayarını kaydet</button><button type="button" class="btn ghost small" id="runCloudflare">Tek istek dene</button><button type="button" class="btn ghost small danger-text" id="clearCloudflare">Tokenı sil</button></div><p id="cloudflareStatus" class="fineprint" role="status">Bağlı değil.</p><p class="fineprint">Workers Free için 10.000 Neuron/gün tahsisi vardır. Ücretli planda kota aşımı ücret doğurabilir; uygulama hesap faturalandırmasını denetleyemez.</p></div>'+
-      '<label class="field-label" for="freeProviderPrompt">Tek istek görevi<textarea id="freeProviderPrompt" class="input" rows="3" maxlength="5000" placeholder="Cohere veya Cloudflare için görev..."></textarea></label><div id="freeProviderResult" class="ai-power-result" aria-live="polite"></div></div></section>'+
+      '<label class="field-label" for="freeProviderPrompt">Tek istek görevi<textarea id="freeProviderPrompt" class="input" rows="3" maxlength="5000" placeholder="Cloudflare Workers AI için görev..."></textarea></label><div id="freeProviderResult" class="ai-power-result" aria-live="polite"></div></div></section>'+
     '<section class="ai-power-panel" data-power-panel="connectors" hidden><div class="ai-power-heading"><div><div class="eyebrow">CONNECTOR REGISTRY</div><h3>Plugin ve servis bağlantıları</h3><p>Bağlı, harici, planlanan ve mock sözleşmeli entegrasyonları ayırt et.</p></div><span class="pill">Açık izin sınırları</span></div><div class="ai-provider-directory" id="externalConnectorDirectory"></div></section>';
 
   const title=root.querySelector('.page-title');
@@ -93,7 +92,6 @@ export async function mountAiPowerHub(options={}){
   settings.enabledPromptPluginIds=normalizeEnabledPluginIds(settings.enabledPromptPluginIds);
   settings.cloudflareModel=CF_MODELS.includes(settings.cloudflareModel)?settings.cloudflareModel:CF_MODELS[0];
   settings.cloudflareAccountId=String(settings.cloudflareAccountId||'').slice(0,32);
-  settings.cohereTrialModel=String(settings.cohereTrialModel||'command-a-03-2025').slice(0,120);
   await saveSettings();
   function setStatus(id,message,tone){const node=$(id);if(node){node.textContent=String(message||'');node.dataset.tone=tone||'info';}}
   function link(url,label){return url?'<a href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">'+esc(label||'Resmî belge')+' ↗</a>':'';}
@@ -221,19 +219,10 @@ export async function mountAiPowerHub(options={}){
 
   $('freeProviderDirectory').innerHTML=FREE_API_PROVIDER_CATALOG.map(item=>'<article class="ai-directory-card"><div class="reuse-top"><strong>'+item.rank+'. '+esc(item.name)+'</strong><span class="pill">'+esc(accessLabel[item.access]||item.access)+'</span></div><p>'+esc(item.note)+'</p>'+link(item.url,'Resmî belge')+'</article>').join('');
   $('externalConnectorDirectory').innerHTML=EXTERNAL_CONNECTOR_CATALOG.map(item=>'<article class="ai-directory-card"><div class="reuse-top"><strong>'+esc(item.name)+'</strong><span class="pill">'+esc(connectorLabel[item.status]||item.status)+'</span></div><p>'+esc(item.desc)+'</p>'+link(item.url,'Resmî kaynak')+'</article>').join('');
-  $('cohereTrialModel').value=settings.cohereTrialModel;
   $('cloudflareAccountId').value=settings.cloudflareAccountId;
   $('cloudflareModel').innerHTML=CF_MODELS.map(model=>'<option value="'+esc(model)+'">'+esc(model)+'</option>').join('');
   $('cloudflareModel').value=settings.cloudflareModel;
-  setStatus('cohereTrialStatus',await getSecret('cohere')?'Trial anahtarı kayıtlı.':'Trial anahtarı bağlı değil.');
   setStatus('cloudflareStatus',await getSecret('cloudflare')?'Workers AI tokenı kayıtlı.':'Workers AI tokenı bağlı değil.');
-  $('saveCohereTrial').addEventListener('click',async()=>{
-    const key=$('cohereTrialKey').value.trim(),model=$('cohereTrialModel').value.trim();
-    if(!model){setStatus('cohereTrialStatus','Cohere model kimliğini gir.','error');return;}
-    try{if(key)await saveSecret('cohere',key);settings.cohereTrialModel=model.slice(0,120);await save();$('cohereTrialKey').value='';setStatus('cohereTrialStatus','Cohere Trial ayarları kaydedildi.','success');}
-    catch(error){setStatus('cohereTrialStatus',error.message||'Ayar kaydedilemedi.','error');}
-  });
-  $('clearCohereTrial').addEventListener('click',async()=>{try{await deleteSecret('cohere');setStatus('cohereTrialStatus','Cohere anahtarı silindi.','success');}catch(error){setStatus('cohereTrialStatus',error.message||'Anahtar silinemedi.','error');}});
   $('saveCloudflare').addEventListener('click',async()=>{
     const account=$('cloudflareAccountId').value.trim(),key=$('cloudflareApiKey').value.trim(),model=$('cloudflareModel').value;
     if(!/^[a-f0-9]{32}$/i.test(account)){setStatus('cloudflareStatus','Account ID 32 karakterlik hex olmalı.','error');return;}
@@ -244,40 +233,33 @@ export async function mountAiPowerHub(options={}){
   $('clearCloudflare').addEventListener('click',async()=>{try{await deleteSecret('cloudflare');setStatus('cloudflareStatus','Cloudflare tokenı silindi.','success');}catch(error){setStatus('cloudflareStatus',error.message||'Token silinemedi.','error');}});
 
   let freeApiBusy=false;
-  async function runFreeApi(provider){
+  async function runFreeApi(){
     if(freeApiBusy)return;
-    if(isDemo()){setStatus(provider==='cohere'?'cohereTrialStatus':'cloudflareStatus','Demo modu açık. Gerçek model moduna geç.','error');return;}
+    if(isDemo()){setStatus('cloudflareStatus','Demo modu açık. Gerçek model moduna geç.','error');return;}
     const prompt=$('freeProviderPrompt').value.trim();
     if(!prompt){notify('Önce tek istek görevi yaz.');return;}
-    if(provider==='cohere'&&!$('cohereTrialConsent').checked){setStatus('cohereTrialStatus','Trial anahtarı onay kutusunu işaretle.','error');return;}
-    if(provider==='cloudflare'&&!$('cloudflareFreeConsent').checked){setStatus('cloudflareStatus','Workers Free plan onay kutusunu işaretle.','error');return;}
-    const confirmText=provider==='cohere'?'Cohere Trial kotasından bir API çağrısı kullanılacak. Devam?':'Workers AI Free kotası kullanılacak. Ücretli plandaki hesaplar kota aşımında ücretlendirilmiş olabilir. Devam?';
+    if(!$('cloudflareFreeConsent').checked){setStatus('cloudflareStatus','Workers Free plan onay kutusunu işaretle.','error');return;}
+    const confirmText='Workers AI Free kotası kullanılacak. Yalnızca Free plan hesabında devam et; ücretli plan kullanıyorsan dur.';
     if(!window.confirm(confirmText))return;
-    freeApiBusy=true;const button=$(provider==='cohere'?'runCohereTrial':'runCloudflare');button.disabled=true;$('freeProviderResult').textContent='Yanıt bekleniyor…';
+    freeApiBusy=true;const button=$('runCloudflare');button.disabled=true;$('freeProviderResult').textContent='Yanıt bekleniyor…';
     try{
-      const key=await getSecret(provider);if(!key)throw new Error('Önce sağlayıcı anahtarını kaydet.');
-      let answer='';
-      if(provider==='cohere'){
-        const data=await requestJson('https://api.cohere.com/v2/chat',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model:$('cohereTrialModel').value.trim(),max_tokens:1200,messages:[{role:'system',content:getSystemPrompt()},{role:'user',content:prompt}]})});
-        const pieces=data?.message?.content;answer=Array.isArray(pieces)?pieces.filter(item=>item?.type==='text').map(item=>item.text||'').join('\n'):String(pieces||'');
-      }else{
-        const account=$('cloudflareAccountId').value.trim(),model=$('cloudflareModel').value;
-        if(!/^[a-f0-9]{32}$/i.test(account)||!CF_MODELS.includes(model))throw new Error('Cloudflare Free ayarları geçersiz.');
-        const url='https://api.cloudflare.com/client/v4/accounts/'+account+'/ai/v1/chat/completions';
-        const data=await requestJson(url,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model,messages:[{role:'system',content:getSystemPrompt()},{role:'user',content:prompt}],max_tokens:1200,temperature:0.4})});
-        const text=data?.choices?.[0]?.message?.content;answer=Array.isArray(text)?text.map(item=>item.text||'').join('\n'):String(text||'');
-      }
+      const key=await getSecret('cloudflare');if(!key)throw new Error('Önce Cloudflare tokenını kaydet.');
+      const account=$('cloudflareAccountId').value.trim(),model=$('cloudflareModel').value;
+      if(!/^[a-f0-9]{32}$/i.test(account)||!CF_MODELS.includes(model))throw new Error('Cloudflare Free ayarları geçersiz.');
+      const url='https://api.cloudflare.com/client/v4/accounts/'+account+'/ai/v1/chat/completions';
+      const data=await requestJson(url,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model,messages:[{role:'system',content:getSystemPrompt()},{role:'user',content:prompt}],max_tokens:1200,temperature:0.4})});
+      const text=data?.choices?.[0]?.message?.content;
+      const answer=Array.isArray(text)?text.map(item=>item.text||'').join('\n'):String(text||'');
       if(!answer.trim())throw new Error('Sağlayıcı boş yanıt verdi.');
-      $('freeProviderResult').textContent=answer;setStatus(provider==='cohere'?'cohereTrialStatus':'cloudflareStatus','Gerçek model yanıt verdi.','success');
-      await logActivity(provider==='cohere'?'Cohere Trial':'Cloudflare Workers AI','Tamamlandı',answer.slice(0,220));
+      $('freeProviderResult').textContent=answer;setStatus('cloudflareStatus','Gerçek model yanıt verdi.','success');
+      await logActivity('Cloudflare Workers AI','Tamamlandı',answer.slice(0,220));
     }catch(error){
       $('freeProviderResult').textContent='Hata: '+(error.message||'İstek başarısız.');
-      setStatus(provider==='cohere'?'cohereTrialStatus':'cloudflareStatus',error.message||'İstek başarısız.','error');
-      await logActivity(provider==='cohere'?'Cohere Trial':'Cloudflare Workers AI','Hata',error.message||'Bilinmeyen hata');
+      setStatus('cloudflareStatus',error.message||'İstek başarısız.','error');
+      await logActivity('Cloudflare Workers AI','Hata',error.message||'Bilinmeyen hata');
     }finally{freeApiBusy=false;button.disabled=false;}
   }
-  $('runCohereTrial').addEventListener('click',()=>runFreeApi('cohere'));
-  $('runCloudflare').addEventListener('click',()=>runFreeApi('cloudflare'));
+  $('runCloudflare').addEventListener('click',runFreeApi);
   window.addEventListener('ai-studio-workspace-restored',()=>{
     settings.swarmMaxAgents=clamp(settings.swarmMaxAgents,2,10,3);
     settings.swarmConcurrency=clamp(settings.swarmConcurrency,1,4,2);
@@ -285,10 +267,8 @@ export async function mountAiPowerHub(options={}){
     settings.enabledPromptPluginIds=normalizeEnabledPluginIds(settings.enabledPromptPluginIds);
     settings.cloudflareModel=CF_MODELS.includes(settings.cloudflareModel)?settings.cloudflareModel:CF_MODELS[0];
     settings.cloudflareAccountId=String(settings.cloudflareAccountId||'').slice(0,32);
-    settings.cohereTrialModel=String(settings.cohereTrialModel||'command-a-03-2025').slice(0,120);
     $('swarmAgentLimit').value=String(settings.swarmMaxAgents);
     $('swarmConcurrency').value=String(settings.swarmConcurrency);
-    $('cohereTrialModel').value=settings.cohereTrialModel;
     $('cloudflareAccountId').value=settings.cloudflareAccountId;
     $('cloudflareModel').value=settings.cloudflareModel;
     renderSwarmBudget();renderPlugins();renderOpenRouterModels();
