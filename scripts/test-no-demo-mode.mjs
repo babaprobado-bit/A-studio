@@ -15,5 +15,5 @@ assert.doesNotMatch(html, /id="demoToggle"|id="settingsDemoToggle"|DEMO MODU/, '
 assert.ok(html.includes('id="firstRunSetup"'), 'First-run setup card must be present');
 assert.ok(main.includes('function openFirstRunSetup'), 'First-run actions must route to a provider setup section');
 assert.ok(nativeWorkflow.includes('workflow_dispatch'), 'Native APK workflow remains manually runnable');
-await assert.rejects(access(new URL('.github/workflows/build-android-demo.yml', root)), 'Demo APK workflow must be removed');
+await assert.rejects(access(new URL('.github/workflows/build-android-demo.yml', root)), { code: 'ENOENT' }, 'Demo APK workflow must be removed');
 console.log('Real-model-only contract passed: demo disabled, no demo build workflow, and first-run model setup present.');
