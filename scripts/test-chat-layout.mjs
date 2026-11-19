@@ -9,7 +9,7 @@ const [html, css, main] = await Promise.all([
 ]);
 
 const requiredIds = [
-  'chatProvider', 'providerState', 'demoToggle', 'chatMessages',
+  'chatProvider', 'providerState', 'firstRunSetup', 'firstRunSetupStatus', 'chatMessages',
   'chatForm', 'chatInput', 'teamRun', 'pipelineRun', 'exportChat', 'clearChat',
   'sidebarToggleBtn', 'appSidebar', 'chatThreadList', 'newChatBtn',
   'plusMenuToggle', 'composerPlusMenu', 'composerPluginDialog',
@@ -39,4 +39,7 @@ assert.match(main, /requestSubmit\(\)/, 'Enter must submit the chat form');
 assert.match(main, /settings\.team/, 'Existing AI Team selection logic must remain');
 assert.ok(main.includes('function renderPluginMarketplace()'), 'Curated repository marketplace must render inside plugin selection');
 assert.ok(main.includes('isAllowedPluginRepositoryDownload'), 'Repository downloads must use the fixed allowlist');
+assert.ok(main.includes('function openFirstRunSetup'), 'First-run setup must open the correct provider or local model section');
+assert.ok(main.includes('if(!providerIsReady(providerId))'), 'An unconfigured provider must not send an empty live request');
+assert.doesNotMatch(html, /id="demoToggle"|id="settingsDemoToggle"/, 'Demo-mode switches must not be exposed');
 console.log('Chat layout contract passed: message history, anchored composer, accessible controls, marketplace and AI Team hooks are present.');

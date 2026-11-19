@@ -23,7 +23,8 @@
     "test:runway-video": "node scripts/test-runway-video.mjs",
     "test:ai-power-hub": "node scripts/test-ai-power-hub.mjs",
     "test:plugin-marketplace": "node scripts/test-plugin-marketplace.mjs",
-    "test:usability": "node scripts/test-usability-controls.mjs"
+    "test:usability": "node scripts/test-usability-controls.mjs",
+    "test:no-demo-mode": "node scripts/test-no-demo-mode.mjs"
   },
   "dependencies": {
     "express": "^5.1.0",

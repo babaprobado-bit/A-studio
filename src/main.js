@@ -53,7 +53,7 @@ const providers = {
   device: { name:'Telefon içi GGUF', icon:'▣', kind:'device', endpoint:'', model:'', keyUrl:'', desc:'Android belleğine yüklenmiş GGUF modeli; API anahtarı ve internet gerekmez' }
 };
 const defaultSettings = {
-  demoMode: true,
+  demoMode: false,
   models: Object.fromEntries(Object.entries(providers).map(([id,p]) => [id,p.model])),
   team: Object.keys(providers).filter(id => id !== 'apinex'),
   customEndpoint: '',
@@ -236,16 +236,19 @@ function providerIsReady(id){
 }
 function configuredTeam(){return selectConfiguredTeam(selectedTeam(),Object.keys(providers),providerIsReady).selected;}
 function syncModeUI(){
-  $('demoToggle').checked=!!settings.demoMode;
-  $('settingsDemoToggle').checked=!!settings.demoMode;
-  $('modePill').textContent=settings.demoMode?'DEMO MODU':'GERÇEK MODEL';
-  $('modePill').className='pill '+(settings.demoMode?'safe':'live');
+  settings.demoMode=false;
+  $('modePill').textContent='GERÇEK MODEL';
+  $('modePill').className='pill live';
   $('connectedCount').textContent=Object.keys(providers).filter(providerIsReady).length;
-  const current=$('chatProvider')?.value||'openai';
+  const current=$('chatProvider')?.value||'gemini';
   const status=current==='device'?(deviceLocalCoder.loadedFileName?'Telefon GGUF modeli hazır':'Telefon GGUF modeli yüklenmeli')
     :current==='ollama'?(providerIsReady('ollama')?'Ollama bağlantısı ayarlı':'Ollama adresi gerekli')
-    :(providerIsReady(current)?'API anahtarı hazır':'API anahtarı gerekli');
-  $('providerState').textContent=settings.demoMode?'Demo yanıtı':status;
+    :(providerIsReady(current)?'Bağlantı hazır':'API anahtarı gerekli');
+  $('providerState').textContent=status;
+  const ready=Object.keys(providers).some(providerIsReady);
+  $('firstRunSetup')?.classList.toggle('hidden',ready);
+  const setupStatus=$('firstRunSetupStatus');
+  if(setupStatus)setupStatus.textContent=ready?'AI bağlantısı hazır. Sohbette modelini seçebilirsin.':'Başlamak için bir model sağlayıcısı veya yerel motor bağla.';
 }
 async function getSecret(id){ if(!nativeApp)return runtimeKeys[id]||''; try{const r=await SecureStoragePlugin.get({key:'ai-studio-provider-'+id}); return r?.value||'';}catch(_){return '';} }
 async function saveSecret(id,key){ if(!key.trim())return; if(!nativeApp){runtimeKeys[id]=key.trim(); showToast('Önizleme: anahtar yalnızca bu açık oturumda tutulur, güvenli şekilde kaydedilmez.');return;} await SecureStoragePlugin.set({key:'ai-studio-provider-'+id,value:key.trim()}); runtimeKeys[id]=key.trim(); }
@@ -433,7 +436,7 @@ function applyProviderFilter(){
   $('providerNoResults')?.classList.toggle('hidden',visible>0);
 }
 function renderProviderCards(){
-  const currentChatProvider=$('chatProvider')?.value||'openai';
+  const currentChatProvider=$('chatProvider')?.value||'gemini';
   $('providerGrid').innerHTML=Object.entries(providers).map(([id,p])=>{
     const configured=providerIsReady(id),isTeam=settings.team.includes(id),model=providerModel(id);
     if(id==='device'){
@@ -458,26 +461,11 @@ function renderProviderCards(){
   applyProviderFilter();
   $('ollamaUrl').value=settings.ollamaUrl||''; $('ollamaModel').value=settings.ollamaModel||providers.ollama.model;
   $('chatProvider').innerHTML=Object.entries(providers).map(([id,p])=>'<option value="'+id+'">'+esc(p.name)+'</option>').join('');
-  $('chatProvider').value=providers[currentChatProvider]?currentChatProvider:'openai';
+  $('chatProvider').value=providers[currentChatProvider]?currentChatProvider:'gemini';
   syncModeUI();
 }
-function demoAnswer(providerId,prompt,roleOverride){
-  const name=providers[providerId]?.name||'AI Studio';
-  const role=roleOverride || ({openai:'Planlayıcı',anthropic:'Kalite gözden geçirici',gemini:'Fikir üretici',deepseek:'Akıl yürütme',groq:'Hızlı yardımcı',openrouter:'Model yönlendirici',ollama:'LocalCoder taslağı',device:'Telefon içi uzman'}[providerId]||'Yardımcı');
-  const base={
-    openai:'Önce hedefi ve başarı ölçütünü netleştir. Ardından en küçük çalışan sürümü oluştur, alt görevlere böl ve her parçayı test et.',
-    anthropic:'Kapsamı sınırla, hata durumlarını düşün ve mevcut dosyalara dokunmadan önce yedek / değişiklik planı belirle.',
-    gemini:'Üç yaklaşım düşün: basit prototip, modüler sürüm ve daha sonra genişletilecek tasarım. En ucuz doğrulamayı önce yap.',
-    deepseek:'Girdi → işlem → çıktı akışını açıkça tanımla. Kritik varsayımları kontrol et ve tekrarlanabilir bir test ekle.',
-    groq:'İlk sürüm için en gerekli özelliği seç. Çalıştığını gösteren tek test kur; sonra sıradaki özelliğe geç.',
-    openrouter:'İş için hangi modelin gerektiğini belirle. Hız, maliyet ve kaliteyi karşılaştır; başarısız sağlayıcı için alternatif plan hazırla.',
-    ollama:'Yerel kod yardımcısı taslağı: 1) ilgili dosyaları oku, 2) küçük değişiklik öner, 3) test çalıştır, 4) farkları incele. Bu yanıt gerçek yerel model çıktısı değildir.',
-    device:'Telefon içi GGUF ajanı seçildi. Gerçek yanıt için Android cihazda bir GGUF modelini belleğe yükle.'
-  };
-  return '['+role+' · DEMO ŞABLONU]\n\n'+(base[providerId]||base.openai)+'\n\nGörev: '+prompt+'\n\nNot: Bu gerçek model çağrısı değildir; Demo modu açıktır.';
-}
 function pushMessage(role,content,meta){ chatHistory.push({role,content,provider:meta?.provider||'',mode:meta?.mode||'demo',time:new Date().toISOString()}); if(chatHistory.length>80)chatHistory=chatHistory.slice(-80); renderChat(); persistChat(); }
-function renderChat(){const out=$('chatMessages');if(!out)return;if(!chatHistory.length){out.innerHTML='<div class="chat-empty"><div class="chat-empty-icon">✳</div><h2>Bugün ne yapmak istiyorsun?</h2><p>Bir fikir sor, dosya ekle, kod geliştir veya bir eklenti seç. Başlamak için aşağıya yaz.</p><small>'+(settings.demoMode?'Demo modu açık':'Gerçek model modu')+'</small></div>';}else{out.innerHTML=chatHistory.map(m=>'<article class="chat-bubble '+(m.role==='user'?'user':'assistant')+'"><div class="chat-meta">'+(m.role==='user'?'SEN':esc(m.provider||'AI STUDIO'))+' · '+(m.mode==='error'?'HATA':m.mode==='live'?'GERÇEK MODEL':'DEMO')+'</div><div class="chat-text '+(m.mode==='error'?'error':'')+'">'+esc(m.content)+'</div></article>').join('');}out.scrollTop=out.scrollHeight;renderSidebarChats();}
+function renderChat(){const out=$('chatMessages');if(!out)return;if(!chatHistory.length){out.innerHTML='<div class="chat-empty"><div class="chat-empty-icon">✳</div><h2>Bugün ne yapmak istiyorsun?</h2><p>Bir soru sor, dosya ekle, kod geliştir veya bir plugin seç. Yanıtlar seçtiğin gerçek AI motorundan gelir.</p></div>';}else{out.innerHTML=chatHistory.map(m=>'<article class="chat-bubble '+(m.role==='user'?'user':'assistant')+'"><div class="chat-meta">'+(m.role==='user'?'SEN':esc(m.provider||'AI STUDIO'))+' · '+(m.mode==='error'?'HATA':m.mode==='live'?'GERÇEK MODEL':'DEMO')+'</div><div class="chat-text '+(m.mode==='error'?'error':'')+'">'+esc(m.content)+'</div></article>').join('');}out.scrollTop=out.scrollHeight;renderSidebarChats();}
 function fitChatInput(){const input=$('chatInput');if(!input)return;input.style.height='auto';input.style.height=Math.min(input.scrollHeight,180)+'px';}
 let chatPersistTimer;
 function chatThreadTitle(messages){
@@ -574,6 +562,36 @@ function renderPluginMarketplace(){
   const notice=$('pluginStoreNotice');
   if(notice)notice.textContent=entries.length+' / 32 GitHub kaynağı gösteriliyor. ZIP dosyaları bu mağazanın sabit izin listesinden açılır; indirilen araçların kodu AI Studio içinde otomatik çalıştırılmaz.';
 }
+function openFirstRunSetup(mode='cloud'){
+  const selectedMode=mode==='openrouter'?'openrouter':mode==='ollama'?'ollama':mode==='device'?'device':'cloud';
+  if(selectedMode==='device'){
+    if(!nativeApp){showToast('Telefon içi GGUF yalnızca Android APK’da kullanılabilir.');go('tools');return;}
+    go('tools');
+    const engine=$('localCoderEngine');
+    if(engine){engine.value='device';engine.dispatchEvent(new Event('change',{bubbles:true}));}
+    const panel=$('deviceLocalModelsPanel');
+    panel?.classList.remove('hidden');
+    setTimeout(()=>panel?.scrollIntoView({behavior:'smooth',block:'start'}),80);
+    return;
+  }
+  go('models');
+  if(selectedMode==='ollama'){
+    $('chatProvider').value='ollama';syncModeUI();
+    const panel=$('ollamaSettingsPanel');
+    panel?.scrollIntoView({behavior:'smooth',block:'start'});
+    $('ollamaUrl')?.focus({preventScroll:true});
+    return;
+  }
+  const providerId=selectedMode==='openrouter'?'openrouter':'gemini';
+  $('chatProvider').value=providerId;
+  $('providerSearch').value=providerId;
+  $('providerFilter').value='all';
+  applyProviderFilter();syncModeUI();
+  const card=$('providerGrid')?.querySelector('[data-provider-card="'+providerId+'"]');
+  card?.querySelector('details.provider-settings')?.setAttribute('open','');
+  card?.scrollIntoView({behavior:'smooth',block:'start'});
+  $('key-'+providerId)?.focus({preventScroll:true});
+}
 function openComposerPluginDialog(){
   $('composerPlusMenu')?.classList.add('hidden');$('plusMenuToggle')?.setAttribute('aria-expanded','false');
   renderComposerPlugins();renderPluginMarketplace();setPluginLibraryTab('store');
@@ -663,29 +681,36 @@ async function callProvider(id,prompt,history,options={}){
   const text=Array.isArray(message)?message.map(x=>x.text||'').join('\n'):message;
   if(!text)throw new Error('Yanıtta metin bulunamadı. Model kimliğinin bu API üzerinde kullanılabildiğini doğrula.');return text;
 }
-async function submitChat(prompt,providerId,roleOverride){
-  if(busy)return;const text=prompt.trim();if(!text)return;busy=true;$('chatInput').disabled=true;$('chatForm').querySelector('[type=submit]').disabled=true;
-  pushMessage('user',text,{mode:settings.demoMode?'demo':'live'});const out=$('chatMessages'),loading=document.createElement('article');loading.className='result-card';loading.innerHTML='<div class="result-label">YANIT HAZIRLANIYOR</div><p>Seçili sağlayıcıdan yanıt bekleniyor…</p>';out.append(loading);
+async function submitChat(prompt,providerId){
+  if(busy)return;
+  const text=String(prompt||'').trim();
+  if(!text)return;
+  if(!providerIsReady(providerId)){
+    showToast(providers[providerId].name+' bağlantısı hazır değil. Önce kurulumunu tamamla; mesaj gönderilmedi.');
+    openFirstRunSetup(providerId==='ollama'?'ollama':providerId==='device'?'device':providerId==='openrouter'?'openrouter':'cloud');
+    return;
+  }
+  busy=true;$('chatInput').disabled=true;$('chatForm').querySelector('[type=submit]').disabled=true;
+  pushMessage('user',text,{mode:'live'});
+  const out=$('chatMessages'),loading=document.createElement('article');
+  loading.className='result-card';loading.innerHTML='<div class="result-label">GERÇEK MODEL YANITI</div><p>Seçili sağlayıcıdan yanıt bekleniyor…</p>';out.append(loading);
   await logAgentActivity('Tekli sohbet · '+providers[providerId].name,'Başladı',text);
-  try{let answer,mode;if(settings.demoMode){answer=demoAnswer(providerId,text,roleOverride);mode='demo';}else{answer=await callProvider(providerId,text,chatContext().slice(0,-1));mode='live';}
-    loading.remove();pushMessage('assistant',answer,{provider:providers[providerId].name,mode});await logAgentActivity('Tekli sohbet · '+providers[providerId].name,'Tamamlandı',(mode==='demo'?'Demo şablonu üretildi. ':'Gerçek model yanıt verdi. ')+answer.slice(0,180));
-  }catch(err){loading.remove();pushMessage('assistant','Hata: '+(err?.message||'Bilinmeyen hata')+'\n\nGerçek yanıt alınmadı. Model, anahtar, kota ve bağlantıyı kontrol et.',{provider:providers[providerId].name,mode:'error'});await logAgentActivity('Tekli sohbet · '+providers[providerId].name,'Hata',err?.message||'Bilinmeyen hata');}
-  finally{busy=false;$('chatInput').disabled=false;$('chatForm').querySelector('[type=submit]').disabled=false;$('chatInput').focus();syncModeUI();}
+  try{
+    const answer=await callProvider(providerId,text,chatContext().slice(0,-1));
+    loading.remove();pushMessage('assistant',answer,{provider:providers[providerId].name,mode:'live'});
+    await logAgentActivity('Tekli sohbet · '+providers[providerId].name,'Tamamlandı','Gerçek model yanıt verdi. '+answer.slice(0,180));
+  }catch(err){
+    loading.remove();pushMessage('assistant','Hata: '+(err?.message||'Bilinmeyen hata')+'\n\nGerçek yanıt alınmadı. Modeli, anahtarı, kotayı ve bağlantıyı kontrol et.',{provider:providers[providerId].name,mode:'error'});
+    await logAgentActivity('Tekli sohbet · '+providers[providerId].name,'Hata',err?.message||'Bilinmeyen hata');
+  }finally{
+    busy=false;$('chatInput').disabled=false;$('chatForm').querySelector('[type=submit]').disabled=false;$('chatInput').focus();syncModeUI();
+  }
 }
 async function runTeam(prompt){
   if(busy)return;
   const task=String(prompt||'').trim(),chosen=selectedTeam();
   if(!task){showToast('Önce takımın görevini yaz.');return;}
   if(!chosen.length){showToast('Önce Modeller ekranından takım ajanı seç.');return;}
-  if(settings.demoMode){
-    busy=true;
-    await logAgentActivity('Paralel takım','Başladı',chosen.map(id=>providers[id].name).join(', ')+': '+task);
-    pushMessage('user',task,{mode:'demo'});
-    chosen.forEach(id=>pushMessage('assistant',demoAnswer(id,task),{provider:providers[id].name,mode:'demo'}));
-    await logAgentActivity('Paralel takım','Tamamlandı',chosen.length+' demo şablonu üretildi; gerçek model çağrısı yapılmadı.');
-    busy=false;
-    return;
-  }
   const selected=configuredTeam();
   const skipped=chosen.length-selected.length;
   if(!selected.length){showToast('Seçili sağlayıcılarda API anahtarı veya Ollama bağlantısı ayarlı değil. Modeller ekranını kontrol et.');return;}
@@ -712,14 +737,14 @@ async function runPipeline(prompt){
   const task=String(prompt||'').trim(),chosen=selectedTeam();
   if(!task){showToast('Önce iş akışının görevini yaz.');return;}
   if(chosen.length<2){showToast('Sıralı zincir için en az iki ajan seç.');go('models');return;}
-  const selected=settings.demoMode?chosen:configuredTeam();
+  const selected=configuredTeam();
   const skipped=chosen.length-selected.length;
-  if(!settings.demoMode&&skipped)showToast(skipped+' ayarsız sağlayıcı sıralı zincirden atlandı.');
+  if(skipped)showToast(skipped+' ayarsız sağlayıcı sıralı zincirden atlandı.');
   if(selected.length<2){showToast('Sıralı zincir için en az iki seçili sağlayıcının anahtarı veya bağlantısı hazır olmalı.');go('models');return;}
-  if(!settings.demoMode&&!confirmTeamLiveCalls(selected,count=>confirm('Sıralı ajan zinciri '+count+' gerçek API isteği gönderebilir ve ücret/kota kullanabilir. Her ajan bir öncekinin çıktısını görür. Devam?')))return;
+  if(!confirmTeamLiveCalls(selected,count=>confirm('Sıralı ajan zinciri '+count+' gerçek API isteği gönderebilir ve sağlayıcı kotası kullanabilir. Her ajan bir öncekinin çıktısını görür. Devam?')))return;
   busy=true;$('chatInput').disabled=true;$('chatForm').querySelector('[type=submit]').disabled=true;$('teamRun').disabled=true;$('pipelineRun').disabled=true;
   await logAgentActivity('Sıralı ajan zinciri','Başladı',selected.length+' aşama: '+task);
-  pushMessage('user',task,{mode:settings.demoMode?'demo':'live'});
+  pushMessage('user',task,{mode:'live'});
   const out=$('chatMessages'),loading=document.createElement('article');
   loading.className='result-card';loading.innerHTML='<div class="result-label">SIRALI AJAN ZİNCİRİ</div><p>Planla → geliştir → eleştir → test et aşamaları çalışıyor…</p>';out.append(loading);
   try{
@@ -727,14 +752,14 @@ async function runPipeline(prompt){
       providerIds:selected,
       task,
       getHistory:()=>chatContext().slice(0,-1),
-      runStage:({id,prompt,stage},history)=>settings.demoMode?demoAnswer(id,prompt,stage.role):callProvider(id,prompt,history),
+      runStage:({id,prompt},history)=>callProvider(id,prompt,history),
       onStageStart:async({id,index,stage})=>{
         const title='Aşama '+(index+1)+' · '+providers[id].name;
         await logAgentActivity('Sıralı zincir · '+title,'Çalışıyor',stage.role);
       },
       onStageComplete:async({id,index,total,answer})=>{
         const title='Aşama '+(index+1)+' · '+providers[id].name;
-        pushMessage('assistant','AŞAMA '+(index+1)+'/'+total+'\n'+answer,{provider:providers[id].name,mode:settings.demoMode?'demo':'live'});
+        pushMessage('assistant','AŞAMA '+(index+1)+'/'+total+'\n'+answer,{provider:providers[id].name,mode:'live'});
         await logAgentActivity('Sıralı zincir · '+title,'Tamamlandı',answer.slice(0,180));
         loading.querySelector('p').textContent='Tamamlanan aşama: '+(index+1)+'/'+total+' · '+providers[id].name;
       }
@@ -757,22 +782,22 @@ async function runCompare(){
   if(!prompt){showToast('Önce karşılaştırılacak görevi yaz.');return;}
   const chosen=selectedTeam();
   if(chosen.length<2){showToast('Karşılaştırmak için en az iki ajan seç.');go('models');return;}
-  const selected=settings.demoMode?chosen:configuredTeam();
+  const selected=configuredTeam();
   const skipped=chosen.length-selected.length;
-  if(!settings.demoMode&&skipped)showToast(skipped+' ayarsız sağlayıcı karşılaştırmadan atlandı.');
+  if(skipped)showToast(skipped+' ayarsız sağlayıcı karşılaştırmadan atlandı.');
   if(selected.length<2){showToast('Karşılaştırmak için en az iki sağlayıcının anahtarı veya bağlantısı hazır olmalı.');go('models');return;}
-  if(!settings.demoMode&&!confirmTeamLiveCalls(selected,count=>confirm('Karşılaştırma '+count+' gerçek API isteği gönderebilir; ücret/kota kullanabilir. Devam?')))return;
+  if(!confirmTeamLiveCalls(selected,count=>confirm('Karşılaştırma '+count+' gerçek API isteği gönderebilir ve sağlayıcı kotası kullanabilir. Devam?')))return;
   busy=true;$('compareRun').disabled=true;$('compareRun').textContent='Çalışıyor…';
   $('compareResults').innerHTML='<div class="panel"><p>Sonuçlar bekleniyor…</p></div>';
   await logAgentActivity('Model karşılaştırma','Başladı',selected.map(id=>providers[id].name).join(', ')+': '+prompt);
   try{
     const rawResults=await runParallelTeamCalls({
       providerIds:selected,task:prompt,history:[],
-      callProvider:(id,task,history)=>settings.demoMode?demoAnswer(id,task):callProvider(id,task,history)
+      callProvider
     });
     const results=rawResults.map(result=>result.error
       ? {...result,mode:'error'}
-      : {...result,mode:settings.demoMode?'demo':'live'});
+      : {...result,mode:'live'});
     renderCompareResults(results);
     for(const r of results)await logAgentActivity('Karşılaştırma · '+providers[r.id].name,r.error?'Hata':'Tamamlandı',r.error||String(r.answer||'').slice(0,180));
     await logAgentActivity('Model karşılaştırma',results.some(r=>r.error)?'Kısmi başarı':'Tamamlandı',results.filter(r=>!r.error).length+'/'+results.length+' yanıt başarılı.');
@@ -1159,14 +1184,10 @@ async function runApiLocalCoderWorkshop(){
       providerId,
       providers,
       hasKey:Boolean(key),
-      demoMode:settings.demoMode,
+      demoMode:false,
       stages,
       confirmConsent:message=>confirm(message),
-      disableDemoMode:async()=>{
-        settings.demoMode=false;
-        await setPref(DB.settings,settings);
-        syncModeUI();
-      },
+      disableDemoMode:async()=>{},
       onApproved:async()=>{
         settings.localCoderApiProvider=providerId;
         await setPref(DB.settings,settings);
@@ -1570,7 +1591,7 @@ function updateDashboard(){const connected=Object.keys(providers).filter(provide
 }
 async function exportProjects(){downloadText('ai-studio-projects.json',JSON.stringify({format:'ai-studio-projects-v2',exportedAt:new Date().toISOString(),projects:projectList},null,2),'application/json;charset=utf-8');}
 function buildWorkspaceSnapshot(){
-  return {format:'ai-studio-workspace-v1',exportedAt:new Date().toISOString(),settings:{demoMode:settings.demoMode,models:settings.models,team:settings.team,customEndpoint:settings.customEndpoint||'',ollamaUrl:settings.ollamaUrl,ollamaModel:settings.ollamaModel,localCoderEngine:['device','api'].includes(settings.localCoderEngine)?settings.localCoderEngine:'ollama',localCoderApiProvider:settings.localCoderApiProvider||'openai',systemPrompt:settings.systemPrompt,shareReusableContext:settings.shareReusableContext===true,shareVaultContext:settings.shareVaultContext===true,vaultBaseUrl:settings.vaultBaseUrl||'',swarmMaxAgents:settings.swarmMaxAgents,swarmConcurrency:settings.swarmConcurrency,openrouterChatModels:settings.openrouterChatModels,enabledPromptPluginIds:settings.enabledPromptPluginIds,cloudflareAccountId:settings.cloudflareAccountId||'',cloudflareModel:settings.cloudflareModel||'',cohereTrialModel:settings.cohereTrialModel||''},projects:projectList,activeProjectId,chat:chatHistory,plugins:userPlugins.filter(p=>p.kind!=='builtin').map(p=>({name:p.name,prompt:p.prompt})),skills:createSkillBackupState({customSkills,selectedSkillIds,profileId:skillProfileId}),snippets:reusableSnippets,activity:agentActivity,codeFiles,activeCodeFileId};
+  return {format:'ai-studio-workspace-v1',exportedAt:new Date().toISOString(),settings:{models:settings.models,team:settings.team,customEndpoint:settings.customEndpoint||'',ollamaUrl:settings.ollamaUrl,ollamaModel:settings.ollamaModel,localCoderEngine:['device','api'].includes(settings.localCoderEngine)?settings.localCoderEngine:'ollama',localCoderApiProvider:settings.localCoderApiProvider||'openai',systemPrompt:settings.systemPrompt,shareReusableContext:settings.shareReusableContext===true,shareVaultContext:settings.shareVaultContext===true,vaultBaseUrl:settings.vaultBaseUrl||'',swarmMaxAgents:settings.swarmMaxAgents,swarmConcurrency:settings.swarmConcurrency,openrouterChatModels:settings.openrouterChatModels,enabledPromptPluginIds:settings.enabledPromptPluginIds,cloudflareAccountId:settings.cloudflareAccountId||'',cloudflareModel:settings.cloudflareModel||'',cohereTrialModel:settings.cohereTrialModel||''},projects:projectList,activeProjectId,chat:chatHistory,plugins:userPlugins.filter(p=>p.kind!=='builtin').map(p=>({name:p.name,prompt:p.prompt})),skills:createSkillBackupState({customSkills,selectedSkillIds,profileId:skillProfileId}),snippets:reusableSnippets,activity:agentActivity,codeFiles,activeCodeFileId};
 }
 async function exportWorkspace(){
   await saveCurrentCodeFile(false);
@@ -1634,7 +1655,7 @@ async function importWorkspace(file){
     nextSettings.vaultBaseUrl=typeof nextSettings.vaultBaseUrl==='string'?nextSettings.vaultBaseUrl.slice(0,500):'';
     nextSettings.shareVaultContext=nextSettings.shareVaultContext===true;
     nextSettings.systemPrompt=typeof nextSettings.systemPrompt==='string'?nextSettings.systemPrompt.slice(0,6000):defaultSettings.systemPrompt;
-    nextSettings.demoMode=nextSettings.demoMode!==false;
+    nextSettings.demoMode=false;
     const nextProjects=(Array.isArray(data.projects)?data.projects:[]).filter(p=>typeof p?.name==='string'&&typeof p?.notes==='string').slice(0,300).map((p,i)=>({id:typeof p.id==='string'&&p.id.trim()?p.id.slice(0,100):(crypto.randomUUID?crypto.randomUUID():String(Date.now()+i)),name:p.name.slice(0,100),notes:p.notes.slice(0,20000),updated:typeof p.updated==='string'?p.updated:new Date().toISOString()}));
     const nextChat=(Array.isArray(data.chat)?data.chat:[]).filter(m=>(m?.role==='user'||m?.role==='assistant')&&typeof m.content==='string').slice(-80).map(m=>({role:m.role,content:m.content.slice(0,20000),provider:typeof m.provider==='string'?m.provider.slice(0,100):'',mode:['demo','live','error'].includes(m.mode)?m.mode:'demo',time:typeof m.time==='string'?m.time:new Date().toISOString()}));
     const nextPlugins=(Array.isArray(data.plugins)?data.plugins:[]).filter(p=>typeof p?.name==='string'&&typeof p?.prompt==='string'&&p.name.trim()&&p.prompt.trim()).slice(-100).map((p,i)=>({id:crypto.randomUUID?crypto.randomUUID():String(Date.now()+i),name:p.name.trim().slice(0,80),prompt:p.prompt.trim().slice(0,6000),kind:'custom'}));
@@ -1658,8 +1679,8 @@ async function importWorkspace(file){
 }
 async function importProjects(file){try{const data=JSON.parse(await file.text());const incoming=Array.isArray(data)?data:data.projects;if(!Array.isArray(incoming))throw new Error('JSON içinde projects dizisi bulunamadı.');for(const p of incoming){if(typeof p?.name==='string'&&typeof p?.notes==='string'){projectList.push({id:crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random()),name:p.name.slice(0,100),notes:p.notes.slice(0,20000),updated:p.updated||new Date().toISOString()});}}if(!getActiveProject()&&projectList.length)activeProjectId=projectList[0].id;await Promise.all([setPref(DB.projects,projectList),setPref(DB.activeProject,activeProjectId)]);renderProjects();updateDashboard();showToast('Proje yedeği içe aktarıldı.');}catch(e){showToast('İçe aktarma başarısız: '+(e.message||'JSON dosyasını kontrol et.'));}}
 async function saveOllama(){const rawUrl=$('ollamaUrl').value.trim();try{settings.ollamaUrl=rawUrl?normalizeOllamaEndpoint(rawUrl):'';}catch(error){showToast('Ollama adresi güvenlik kontrolünden geçmedi: '+error.message);return false;}settings.ollamaModel=$('ollamaModel').value.trim()||providers.ollama.model;settings.models.ollama=settings.ollamaModel;await setPref(DB.settings,settings);renderProviderCards();updateDashboard();showToast('Ollama ayarları kaydedildi.');return true;}
-async function testProvider(id){if(settings.demoMode){showToast('Önce Demo modunu kapat; bu test tek gerçek API isteği gönderebilir.');return;}try{const result=await callProvider(id,'Yanıt olarak sadece OK yaz.',[]);showToast('Bağlantı yanıt verdi: '+result.slice(0,70));}catch(e){showToast('Bağlantı testi başarısız: '+(e.message||'Hata'));}}
-async function testOllama(){if(!await saveOllama())return;if(settings.demoMode){showToast('Demo modu açık. Gerçek yerel test için Demo modunu kapat.');return;}try{const result=await callProvider('ollama','Yanıt olarak sadece OK yaz.',[]);showToast('Ollama yanıt verdi: '+result.slice(0,70));}catch(e){showToast('Ollama testi başarısız: '+(e.message||'Hata'));}}
+async function testProvider(id){if(!providerIsReady(id)){showToast(providers[id].name+' bağlantısı hazır değil. Önce anahtarını ve model ayarını kaydet.');openFirstRunSetup(id==='openrouter'?'openrouter':id==='ollama'?'ollama':id==='device'?'device':'cloud');return;}try{const result=await callProvider(id,'Yanıt olarak sadece OK yaz.',[]);showToast('Bağlantı yanıt verdi: '+result.slice(0,70));}catch(e){showToast('Bağlantı testi başarısız: '+(e.message||'Hata'));}}
+async function testOllama(){if(!await saveOllama())return;if(!providerIsReady('ollama')){showToast('Önce Ollama sunucu adresini ve modelini doğrula.');return;}try{const result=await callProvider('ollama','Yanıt olarak sadece OK yaz.',[]);showToast('Ollama yanıt verdi: '+result.slice(0,70));}catch(e){showToast('Ollama testi başarısız: '+(e.message||'Hata'));}}
 async function saveProviderCard(id){
   settings.models[id]=$('model-'+id).value.trim()||providers[id].model;
   if(id==='custom'){
@@ -1674,6 +1695,8 @@ async function clearAllLocal(){if(!confirm('Proje notları, sohbet, özel eklent
 function copyText(text){if(navigator.clipboard?.writeText){navigator.clipboard.writeText(text).then(()=>showToast('Kopyalandı.')).catch(()=>fallbackCopy(text));}else fallbackCopy(text);}
 function fallbackCopy(text){const t=document.createElement('textarea');t.value=text;t.style.position='fixed';t.style.opacity='0';document.body.append(t);t.select();try{document.execCommand('copy');showToast('Kopyalandı.');}catch(_){showToast('Kopyalanamadı; dosya olarak dışa aktarabilirsin.');}t.remove();}
 document.addEventListener('click',async e=>{
+  const firstRunButton=e.target.closest('[data-first-run-setup]');
+  if(firstRunButton){openFirstRunSetup(firstRunButton.dataset.firstRunSetup);return;}
   const projectTemplate=e.target.closest('[data-project-template]');
   if(projectTemplate){
     const templates={
@@ -1783,15 +1806,13 @@ $('chatFileInput').addEventListener('change',async e=>{
   catch(_){showToast('Dosya okunamadı. Metin tabanlı bir dosya seç.');}
   e.target.value='';
 });
-$('chatForm').addEventListener('submit',e=>{e.preventDefault();const p=$('chatInput').value.trim();if(!p)return;$('chatInput').value='';fitChatInput();if(deepThinkNext){deepThinkNext=false;$('deepThinkLabel').textContent='Daha çok düşün';runPipeline(p);}else submitChat(p,$('chatProvider').value);});
+$('chatForm').addEventListener('submit',e=>{e.preventDefault();const p=$('chatInput').value.trim();if(!p)return;const providerId=$('chatProvider').value;if(!providerIsReady(providerId)){showToast(providers[providerId].name+' hazır değil. Önce sohbet üstündeki kurulum kartını kullan.');openFirstRunSetup(providerId==='ollama'?'ollama':providerId==='device'?'device':providerId==='openrouter'?'openrouter':'cloud');return;}$('chatInput').value='';fitChatInput();if(deepThinkNext){deepThinkNext=false;$('deepThinkLabel').textContent='Daha çok düşün';runPipeline(p);}else submitChat(p,providerId);});
 $('chatInput').addEventListener('input',fitChatInput);
 $('chatInput').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();$('chatForm').requestSubmit();}});
 $('teamRun').addEventListener('click',()=>{const p=$('chatInput').value.trim();if(!p){showToast('Önce takımın görevini yaz.');return;}$('chatInput').value='';fitChatInput();runTeam(p);});
 $('pipelineRun').addEventListener('click',()=>{const p=$('chatInput').value.trim();if(!p){showToast('Önce zincirin görevini yaz.');return;}$('chatInput').value='';fitChatInput();runPipeline(p);});
 $('compareRun').addEventListener('click',runCompare);
 $('selectAllTeam').addEventListener('click',async()=>{settings.team=Object.keys(providers);await setPref(DB.settings,settings);renderProviderCards();$('compareSelectionCount').textContent=settings.team.length+' ajan seçili';showToast('Tüm AI sağlayıcıları takıma eklendi.');});
-$('demoToggle').addEventListener('change',async e=>{settings.demoMode=e.target.checked;await setPref(DB.settings,settings);syncModeUI();});
-$('settingsDemoToggle').addEventListener('change',async e=>{settings.demoMode=e.target.checked;await setPref(DB.settings,settings);syncModeUI();});
 $('chatProvider').addEventListener('change',syncModeUI);
 $('projectForm').addEventListener('submit',saveProject);
 $('sharedVaultForm').addEventListener('submit',saveSharedVaultItem);
@@ -1917,28 +1938,30 @@ async function prepareBrowserFeatures(){
   }catch(_){}
 }
 async function init(){
-  try{settings={...clone(defaultSettings),...(await getPref(DB.settings,{}))};settings.models={...clone(defaultSettings.models),...(settings.models||{})};
+  try{settings={...clone(defaultSettings),...(await getPref(DB.settings,{}))};settings.demoMode=false;settings.models={...clone(defaultSettings.models),...(settings.models||{})};
     for(const [id,paidDefault] of Object.entries({openai:'gpt-5-mini',anthropic:'claude-sonnet-5',deepseek:'deepseek-chat',groq:'llama-3.3-70b-versatile',huggingface:'openai/gpt-oss-120b:fastest'})){if(settings.models[id]===paidDefault)settings.models[id]='';}
     if(settings.models.openrouter==='openai/gpt-5-mini')settings.models.openrouter='openrouter/free';if(!isFreeApinexModelId(settings.models.apinex))settings.models.apinex=APINEX_DEFAULT_FREE_MODEL;const savedTeam=Array.isArray(settings.team)?settings.team:null;settings.team=normalizeTeamSelection(settings.team||defaultSettings.team,Object.keys(providers));if(savedTeam&&settings.team.includes('openai')&&settings.team.includes('anthropic')&&settings.team.includes('gemini')&&settings.team.includes('deepseek')&&settings.team.includes('groq')&&settings.team.includes('openrouter')&&settings.team.includes('huggingface')&&settings.team.includes('custom')&&settings.team.includes('ollama')&&!settings.team.includes('device'))settings.team.push('device');settings.customEndpoint=typeof settings.customEndpoint==='string'?settings.customEndpoint.slice(0,500):'';if(settings.customEndpoint){try{settings.customEndpoint=normalizeOpenAiEndpoint(settings.customEndpoint);}catch(_){settings.customEndpoint='';}}settings.vaultBaseUrl=typeof settings.vaultBaseUrl==='string'?settings.vaultBaseUrl.slice(0,500):'';settings.localCoderEngine=['device','api'].includes(settings.localCoderEngine)?settings.localCoderEngine:'ollama';settings.localCoderApiProvider=providers[settings.localCoderApiProvider]&&settings.localCoderApiProvider!=='ollama'?settings.localCoderApiProvider:'openai';if(settings.ollamaUrl==='http://192.168.1.100:11434')settings.ollamaUrl='';}catch(_){}
+  settings.demoMode=false;
+  try{await setPref(DB.settings,settings);}catch(_){}
   if(!nativeApp){showToast('Tarayıcıda API anahtarları yalnızca açık oturumda tutulur.');}
   await initKeys();await initOpenShortsKey(); projectList=await getPref(DB.projects,[]);activeProjectId=await getPref(DB.activeProject,'');chatHistory=await getPref(DB.chat,[]);const savedThreadState=await getPref(DB.threads,{});chatThreads=Array.isArray(savedThreadState?.items)?savedThreadState.items:[];downloadedPluginRepoIds=(await getPref(DB.pluginDownloads,[])).filter(id=>getPluginRepositoryById(id)?.repository);activeChatThreadId=typeof savedThreadState?.activeId==='string'?savedThreadState.activeId:'';userPlugins=await getPref(DB.plugins,[]);const storedSkills=await getPref(DB.skills,{});customSkills=(Array.isArray(storedSkills?.customSkills)?storedSkills.customSkills:[]).map(skill=>normalizeSkill(skill)).filter(Boolean).slice(-100);skillLibrary=[...SKILL_CATALOG,...customSkills];skillProfileId=storedSkills?.profileId==='custom'?'custom':(SKILL_PROFILES[storedSkills?.profileId]?storedSkills.profileId:'karpathy');const validSkillIds=new Set(skillLibrary.map(skill=>skill.id));selectedSkillIds=(Array.isArray(storedSkills?.selectedSkillIds)?storedSkills.selectedSkillIds:[]).filter(id=>validSkillIds.has(id)).slice(0,MAX_SELECTED_SKILLS);if(!selectedSkillIds.length)selectedSkillIds=getProfileSkillIds(skillProfileId);reusableSnippets=await getPref(DB.snippets,[]);agentActivity=await getPref(DB.activity,[]);codeFiles=normalizeCodeFileList(await getPref(DB.codeFiles,[]),true);if(!codeFiles.length)codeFiles=[makeCodeFile()];activeCodeFileId=codeFiles[0].id;await setPref(DB.codeFiles,codeFiles);
   if(!Array.isArray(projectList))projectList=[];if(!projectList.some(p=>p&&p.id===activeProjectId))activeProjectId=projectList[0]?.id||'';await setPref(DB.activeProject,activeProjectId);if(!Array.isArray(chatHistory))chatHistory=[];if(!Array.isArray(userPlugins))userPlugins=[];if(!Array.isArray(reusableSnippets))reusableSnippets=[];if(!Array.isArray(agentActivity))agentActivity=[];
   await ensureChatThreads();renderProviderCards();renderProjects();renderChat();renderSidebarChats();renderBuiltinTools();renderPlugins();renderComposerPlugins();renderOpenShortsPanel();await mountSocialStudio({
     generateText:async prompt=>{
-      if(settings.demoMode)throw new Error('Demo modu açık. Gerçek AI senaryosu için Demo modunu kapat.');
       const providerId=$('chatProvider').value||'gemini';
+      if(!providerIsReady(providerId)){openFirstRunSetup(providerId==='ollama'?'ollama':providerId==='device'?'device':providerId==='openrouter'?'openrouter':'cloud');throw new Error('Önce bir AI bağlantısı kur.');}
       const freeOrLocal=providerId==='gemini'||providerId==='groq'||providerId==='ollama'||providerId==='device'||(providerId==='openrouter'&&isFreeOpenRouterModel(providerModel(providerId)))||(providerId==='apinex'&&isFreeApinexModelId(providerModel(providerId)));
       if(!freeOrLocal)throw new Error('Social Studio yalnızca Gemini, Groq, APInex free/*, OpenRouter :free veya yerel Ollama/GGUF modeliyle çalışır. Ücretli sağlayıcı çağrısı yapılmadı.');
       return callProvider(providerId,prompt,[]);
     },
     openShorts:{available:name=>openShortsToolNames.has(name),call:(name,args)=>requireOpenShortsTool(name,args)},
     videoKeyStore:{isNative:nativeApp,get:()=>getSecret('runway'),save:key=>saveSecret('runway',key),remove:()=>deleteSecret('runway')},
-    go,notify:showToast,getAiMode:()=>settings.demoMode?'Demo açık':($('chatProvider').selectedOptions[0]?.textContent||'Seçili AI modeli')
+    go,notify:showToast,getAiMode:()=>($('chatProvider').selectedOptions[0]?.textContent||'Seçili AI modeli')
   });
   await mountAiPowerHub({
     root:$('tools'),getSettings:()=>settings,saveSettings:()=>setPref(DB.settings,settings),
     getConfiguredTeam:()=>configuredTeam(),callProvider:(id,prompt,history,callOptions)=>callProvider(id,prompt,history,callOptions),
-    getSecret,saveSecret,deleteSecret,isDemo:()=>settings.demoMode,notify:showToast,
+    getSecret,saveSecret,deleteSecret,isDemo:()=>false,notify:showToast,
     logActivity:logAgentActivity,go,getDeviceInfo:()=>deviceLocalState?.device||null,nativeApp,getSystemPrompt:()=>settings.systemPrompt
   });
   renderSkillLibrary();renderPluginMarketplace();renderReuseCatalog();renderSnippetVault();renderAgentActivity();loadActiveCodeFile();syncModeUI();updateDashboard();$('compareSelectionCount').textContent=settings.team.length+' ajan seçili';

@@ -20,7 +20,7 @@
       <div class="topbar-actions">
         <button id="installWebAppBtn" type="button" class="btn ghost small hidden">Uygulamayı yükle</button>
         <button id="webLogoutBtn" type="button" class="btn ghost small hidden">Güvenli çıkış</button>
-        <span id="modePill" class="pill safe">DEMO MODU</span>
+        <span id="modePill" class="pill live">GERÇEK MODEL</span>
         <button id="newChatBtn" type="button" class="icon-button" aria-label="Yeni sohbet" title="Yeni sohbet">✎</button>
         <div class="chat-more-wrap">
           <button id="chatMoreToggle" type="button" class="icon-button" aria-label="Sohbet seçenekleri" aria-expanded="false">⋮</button>
@@ -29,8 +29,7 @@
             <button type="button" id="clearChat" class="chat-menu-item">Sohbeti temizle</button>
             <button type="button" class="chat-menu-item" data-go="models">Modelleri yönet</button>
             <div class="chat-menu-separator"></div>
-            <div class="switch-row"><div><strong>Demo yanıtları</strong><small>Kapalıyken seçili modele gerçek istek gönderilir.</small></div><label class="switch"><input type="checkbox" id="demoToggle" checked><span></span></label></div>
-            <p class="fineprint">Gerçek çağrılar sağlayıcının kotasını veya ücretini kullanabilir.</p>
+            <p class="fineprint">Sohbet, seçili gerçek AI sağlayıcısına bağlanır. Mesaj göndermeden önce model seçimini kontrol et; sağlayıcı kotası geçerli olabilir.</p>
             <div class="chat-team-actions"><button type="button" class="btn secondary small" id="teamRun">Paralel AI Team</button><button type="button" class="btn ghost small" id="pipelineRun">Sıralı ajan zinciri</button></div>
           </div>
         </div>
@@ -65,13 +64,13 @@
         </div>
         <div class="section-head"><div><div class="eyebrow">ÇALIŞMA ALANI</div><h2>Hızlı başlangıç</h2></div></div>
         <div class="quick-grid">
-          <button class="quick-card" data-go="chat"><span class="quick-icon">◉</span><strong>Takım sohbeti</strong><small>Gerçek model veya demo yanıtı</small></button>
+          <button class="quick-card" data-go="chat"><span class="quick-icon">◉</span><strong>Gerçek AI sohbeti</strong><small>Bağlı model sağlayıcınla</small></button>
           <button class="quick-card" data-go="compare"><span class="quick-icon">⇄</span><strong>Yanıtları karşılaştır</strong><small>Birden fazla sağlayıcı</small></button>
           <button class="quick-card" data-go="projects"><span class="quick-icon">▤</span><strong>Projeler</strong><small>Not, görev ve dışa aktarma</small></button>
           <button class="quick-card" data-go="tools"><span class="quick-icon">⌘</span><strong>Araçlar / eklentiler</strong><small>Hazır komutlar ve kod alanı</small></button>
           <button class="quick-card" data-go="tools"><span class="quick-icon">⌘</span><strong>Local Coder + tekrar kullanım</strong><small>Yerel kod zinciri ve kaynak kasası</small></button>
         </div>
-        <div class="notice"><strong>Gerçeklik kontrolü:</strong> Demo yanıtları çevrimdışı şablonlardır. Gerçek AI yanıtları için ilgili sağlayıcının API anahtarını ekleyip Demo modunu kapatmalısın. Ollama modeli telefona gömülü değildir; ağdaki bir bilgisayarda çalışması gerekir.</div>
+        <div class="notice"><strong>Başlangıç:</strong> Demo yanıtları kapalı. Gemini / Groq / OpenRouter gibi ücretsiz kotası olan bir sağlayıcı bağlayabilir veya Android’de GGUF modelini telefona indirip çevrimdışı kullanabilirsin. Ollama ise ağdaki bilgisayarda çalışır.</div>
         <div class="section-head"><div><div class="eyebrow">SON DURUM</div><h2>Çalışma panosu</h2></div></div>
         <div id="dashboard" class="stack"></div>
       </section>
@@ -79,6 +78,18 @@
       <section class="screen active" id="chat">
         <div class="chat-shell">
           <header class="chat-header"><div class="chat-heading"><div class="eyebrow">AI STUDIO</div><h1 id="chatScreenTitle">Ne üzerinde çalışıyoruz?</h1><p>Bir soru sor, fikir geliştir veya kod üzerinde çalış.</p></div></header>
+          <section id="firstRunSetup" class="first-run-setup hidden" aria-labelledby="firstRunSetupTitle">
+            <div class="eyebrow">İLK KURULUM · DEMO KAPALI</div>
+            <h2 id="firstRunSetupTitle">AI motorunu bağla</h2>
+            <p>Bir yöntem seç. Bağlantı kurulmadan sohbet mesajın gönderilmez.</p>
+            <div class="first-run-options">
+              <button type="button" data-first-run-setup="cloud"><strong>Ücretsiz çevrimiçi model</strong><small>Gemini · ücretsiz kota</small></button>
+              <button type="button" data-first-run-setup="openrouter"><strong>OpenRouter Free</strong><small>Ücretsiz model yönlendiricisi</small></button>
+              <button type="button" data-first-run-setup="device"><strong>Telefon içi GGUF</strong><small>Modeli indir, sonra internetsiz kullan</small></button>
+              <button type="button" data-first-run-setup="ollama"><strong>PC / Ollama</strong><small>Aynı ağdaki bilgisayarda çalıştır</small></button>
+            </div>
+            <p class="first-run-status" id="firstRunSetupStatus" role="status">Başlamak için bir model sağlayıcısı veya yerel motor bağla.</p>
+          </section>
           <div class="chat-window chat-messages" id="chatMessages" role="log" aria-live="polite" aria-relevant="additions" aria-label="Sohbet mesajları"></div>
           <div class="composer-menu hidden" id="composerPlusMenu" role="menu" aria-label="Mesaj ekleme seçenekleri">
             <button type="button" data-composer-action="files"><span class="composer-menu-icon">↥</span><span><strong>Dosyalar</strong><small>Metin, kod ve proje dosyası ekle</small></span></button>
@@ -91,7 +102,7 @@
             <textarea id="chatInput" class="input compose-input" rows="1" maxlength="12000" placeholder="AI Studio'ya mesaj gönder..." autocomplete="off" required></textarea>
             <div class="compose-actions">
               <div class="composer-controls"><button id="plusMenuToggle" type="button" class="composer-plus" aria-label="Dosya ve eklenti ekle" aria-expanded="false">＋</button>
-                <div class="model-picker"><span class="model-picker-label">Model</span><label class="sr-only" for="chatProvider">Yanıt modeli</label><select class="input" id="chatProvider" aria-label="Yanıt modeli"></select><span id="providerState" class="status-dot" aria-live="polite">Demo</span></div>
+                <div class="model-picker"><span class="model-picker-label">Model</span><label class="sr-only" for="chatProvider">Yanıt modeli</label><select class="input" id="chatProvider" aria-label="Yanıt modeli"></select><span id="providerState" class="status-dot" aria-live="polite">Bağlantı gerekli</span></div>
               </div>
               <button type="submit" class="chat-send" aria-label="Mesajı gönder" title="Gönder">↑</button>
             </div>
@@ -115,7 +126,6 @@
         <div class="page-title"><div class="eyebrow">PROVIDER HUB</div><h1>Modeller ve anahtarlar</h1><p>API anahtarlarını Android'in güvenli anahtar deposunda sakla. Her model kimliğini ihtiyaç duyduğunda değiştirebilirsin.</p></div>
         <div class="notice"><strong>Güvenlik:</strong> Android uygulamasında anahtarlar KeyStore tabanlı şifreli depoda saklanır. Yine de ele geçirilmiş/root erişimli bir cihaz veya uygulama incelemesi risktir. Kod depomuzda anahtarın yok; bu ekrana yalnızca kendi anahtarını gir. Gerçek kullanım ücretli olabilir.</div>
         <div class="panel">
-          <div class="switch-row"><div><strong>Demo modu</strong><small>Varsayılan açık. Gerçek API çağrılarının önüne geçer.</small></div><label class="switch"><input type="checkbox" id="settingsDemoToggle" checked><span></span></label></div>
           <details class="team-picker">
             <summary><strong>AI Team motorlarını seç</strong><span id="teamSelectionSummary">Seçimler yükleniyor…</span></summary>
             <p class="fineprint">İşaretlediğin motorlar paralel takım, sıralı zincir ve karşılaştırmada kullanılır. Gerçek modda yalnızca bağlantısı hazır olanlar çağrılır.</p>
@@ -134,7 +144,7 @@
           <p id="providerNoResults" class="fineprint hidden">Bu aramada sağlayıcı bulunamadı.</p>
         </div>
         <div id="providerGrid" class="stack"></div>
-        <div class="panel">
+        <div class="panel" id="ollamaSettingsPanel">
           <h2>Yerel Ollama bağlantısı</h2>
           <p class="muted">Model telefonda değil, aynı güvenilir Wi-Fi ağına bağlı bilgisayarda çalışır. Ollama sunucusunu o bilgisayarda başlat; bilgisayarın yerel IP adresini yaz.</p>
           <label class="field-label" for="ollamaUrl">Sunucu adresi</label><input class="input" id="ollamaUrl" placeholder="http://192.168.1.25:11434" autocomplete="off">

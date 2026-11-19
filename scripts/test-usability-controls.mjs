@@ -10,7 +10,7 @@ const [html, main, css, powerHub] = await Promise.all([
 ]);
 
 for (const id of [
-  'providerSearch', 'providerFilter', 'providerFilterSummary', 'teamSelectionSummary',
+  'providerSearch', 'providerFilter', 'providerFilterSummary', 'teamSelectionSummary', 'firstRunSetup', 'firstRunSetupStatus',
   'localCoderPanel', 'skillLibraryPanel', 'openShortsPanel', 'reuseCatalogPanel',
   'snippetVaultPanel', 'agentActivityPanel', 'codeWorkspacePanel', 'projectForm'
 ]) {
@@ -23,6 +23,9 @@ assert.ok(main.includes('providerIsReady(id)'), 'Provider status filter must use
 assert.ok(main.includes('data-project-template'), 'Project templates must prefill the project form');
 assert.ok(main.includes('data-tools-jump'), 'Tool shortcuts must scroll to their sections');
 assert.ok(main.includes('section-jump-highlight'), 'Jump targets should be visibly highlighted');
+assert.ok(main.includes("demoMode=false"), 'Existing installations must migrate to real-model-only mode');
+assert.ok(main.includes("nextSettings.demoMode=false"), 'Workspace restore must never re-enable demo mode');
+assert.ok(html.includes('data-first-run-setup="cloud"') && html.includes('data-first-run-setup="device"') && html.includes('data-first-run-setup="ollama"'), 'First-run must offer API, phone GGUF and PC Ollama routes');
 assert.ok(main.includes('<details class="provider-settings">'), 'Provider settings should be collapsed by default');
 assert.ok(main.includes('</details></article>'), 'Provider details wrapper must be closed');
 assert.ok(html.includes('<details class="advanced-disclosure openshorts-advanced">'));

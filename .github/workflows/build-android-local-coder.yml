@@ -93,10 +93,12 @@ jobs:
           node --check src/openshorts-mcp.js
           node --check scripts/test-social-studio.mjs
           node --check scripts/test-openshorts.mjs
+          node --check scripts/test-no-demo-mode.mjs
           npm run test:workshop
           npm run test:chat-layout
           npm run test:plugin-marketplace
           npm run test:usability
+          npm run test:no-demo-mode
           npm run test:social-studio
           npm run test:runway-video
           npm run test:openshorts
