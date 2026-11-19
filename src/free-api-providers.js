@@ -70,7 +70,7 @@ export function isFreeApiProviderModel(providerId, modelId) {
   const model=String(modelId||'').trim();
   if(!model)return false;
   if(id==='openrouter')return model.toLowerCase()==='openrouter/free'||model.toLowerCase().endsWith(':free');
-  if(id==='apinex')return /^free\\/[a-z0-9][a-z0-9._-]{0,130}$/i.test(model);
+  if(id==='apinex')return model.toLowerCase().startsWith('free/')&&/^[a-z0-9][a-z0-9._-]{0,130}$/i.test(model.slice(5));
   const allowed=FREE_API_MODEL_ALLOWLIST[id];
   return Array.isArray(allowed)&&allowed.includes(model);
 }
