@@ -96,6 +96,7 @@ jobs:
           npm run test:workshop
           npm run test:chat-layout
           npm run test:plugin-marketplace
+          npm run test:usability
           npm run test:social-studio
           npm run test:runway-video
           npm run test:openshorts

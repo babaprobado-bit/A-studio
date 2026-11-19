@@ -116,9 +116,22 @@
         <div class="notice"><strong>Güvenlik:</strong> Android uygulamasında anahtarlar KeyStore tabanlı şifreli depoda saklanır. Yine de ele geçirilmiş/root erişimli bir cihaz veya uygulama incelemesi risktir. Kod depomuzda anahtarın yok; bu ekrana yalnızca kendi anahtarını gir. Gerçek kullanım ücretli olabilir.</div>
         <div class="panel">
           <div class="switch-row"><div><strong>Demo modu</strong><small>Varsayılan açık. Gerçek API çağrılarının önüne geçer.</small></div><label class="switch"><input type="checkbox" id="settingsDemoToggle" checked><span></span></label></div>
-          <div class="field-label spacer-label">Takım turuna katılacak AI sağlayıcılarını seç (sınır yok)</div>
-          <div class="team-chips" id="teamChips"></div>
-          <div class="row-actions"><button class="btn secondary small" id="selectAllTeam" type="button">Tüm AI sağlayıcılarını takıma ekle</button><span class="muted">İstediğin kadarını aynı anda çalıştırabilirsin.</span></div>
+          <details class="team-picker">
+            <summary><strong>AI Team motorlarını seç</strong><span id="teamSelectionSummary">Seçimler yükleniyor…</span></summary>
+            <p class="fineprint">İşaretlediğin motorlar paralel takım, sıralı zincir ve karşılaştırmada kullanılır. Gerçek modda yalnızca bağlantısı hazır olanlar çağrılır.</p>
+            <div class="team-chips" id="teamChips"></div>
+            <div class="row-actions"><button class="btn secondary small" id="selectAllTeam" type="button">Tüm AI sağlayıcılarını takıma ekle</button><span class="muted">İhtiyacın olanları seç; hepsini aynı anda çalıştırmak zorunda değilsin.</span></div>
+          </details>
+        </div>
+        <div class="provider-discovery-toolbar">
+          <label class="sr-only" for="providerSearch">Sağlayıcı veya model ara</label>
+          <input class="input" id="providerSearch" type="search" placeholder="Sağlayıcı veya model ara…">
+          <label class="sr-only" for="providerFilter">Sağlayıcı filtresi</label>
+          <select class="input" id="providerFilter">
+            <option value="all">Tüm sağlayıcılar</option><option value="ready">Bağlantısı hazır</option><option value="setup">Kurulum bekliyor</option><option value="local">Yerel modeller</option>
+          </select>
+          <p id="providerFilterSummary" class="fineprint" role="status">Sağlayıcılar listeleniyor…</p>
+          <p id="providerNoResults" class="fineprint hidden">Bu aramada sağlayıcı bulunamadı.</p>
         </div>
         <div id="providerGrid" class="stack"></div>
         <div class="panel">
@@ -136,6 +149,7 @@
         <form class="panel" id="projectForm">
           <label class="field-label" for="projectName">Proje adı</label><input class="input" id="projectName" required maxlength="100" placeholder="Behind the Door, AI Studio...">
           <label class="field-label" for="projectNotes">Notlar / görev planı</label><textarea class="input" id="projectNotes" required maxlength="20000" rows="5" placeholder="Amaç, modüller, yapılacaklar, kararlar..."></textarea>
+          <div class="project-template-row"><span class="fineprint">Hızlı başlangıç:</span><button class="btn ghost small" type="button" data-project-template="game">Oyun projesi şablonu</button><button class="btn ghost small" type="button" data-project-template="app">Uygulama projesi şablonu</button></div>
           <div class="row-actions"><button class="btn primary" type="submit">Projeyi kaydet +</button><button class="btn ghost" type="button" id="importProjectsBtn">JSON içe aktar</button><input id="importProjectsFile" type="file" accept=".json,application/json" hidden><span class="grow"></span><button class="btn secondary" type="button" id="exportProjects">Yedekle ↓</button></div>
         </form>
         <div class="panel"><div class="eyebrow">SHARED PROJECT CONTEXT</div><h2>Ajanların ortak proje hafızası</h2><p class="muted">Burada seçtiğin proje; tekli sohbet, takım, sıralı zincir, karşılaştırma ve Local Coder'ın gerçek model çağrılarına otomatik bağlam olur. Demo modu yalnızca örnek şablon üretir.</p><p id="projectContextStatus" class="fineprint">Aktif proje seçilmedi.</p><label class="team-check"><input type="checkbox" id="shareReusableContext"> En fazla 3 kod dosyasını ve 2 kod kasası parçasını da bağlama ekle</label><p class="fineprint">Bu seçenek kapalıyken dosya/kod içeriği otomatik gönderilmez. Açılırsa seçili sağlayıcıya (ör. OpenAI veya Ollama) kısa dosya parçaları gönderilebilir. Her istekte yalnızca sınırlı miktar paylaşılır.</p></div>
@@ -145,6 +159,16 @@
       <section class="screen" id="tools">
         <section class="panel plugin-store-entry"><div class="section-head"><div><div class="eyebrow">CURATED PLUGIN STORE</div><h2>REA + 32 GitHub deposu</h2></div><button id="openPluginMarketplaceFromTools" class="btn primary small" type="button">Mağazayı aç</button></div><p class="fineprint">İndirmeler yalnızca eklenti mağazasındaki sabit kaynak listesinden açılır. Skill, MCP ve masaüstü araçlarının kurulum biçimleri farklıdır.</p></section>
         <div class="page-title"><div class="eyebrow">TOOLBOX / PROMPT PLUGINS</div><h1>Araçlar ve eklentiler</h1><p>Hazır görev şablonları kullan, kendi prompt eklentilerini oluştur veya kod parçalarını dışa aktar.</p></div>
+        <nav class="tools-quick-nav" aria-label="Araçlarda hızlı geçiş">
+          <button type="button" data-tools-jump="openShortsPanel"><span>✂</span>OpenShorts</button>
+          <button type="button" data-tools-jump="localCoderPanel"><span>⌘</span>Local Coder</button>
+          <button type="button" data-tools-jump="skillLibraryPanel"><span>✳</span>Skills</button>
+          <button type="button" data-tools-jump="aiPowerHub"><span>⚡</span>AI Power Hub</button>
+          <button type="button" data-tools-jump="reuseCatalogPanel"><span>◇</span>Kaynak kataloğu</button>
+          <button type="button" data-tools-jump="snippetVaultPanel"><span>▤</span>Kod kasası</button>
+          <button type="button" data-tools-jump="agentActivityPanel"><span>◷</span>Ajan geçmişi</button>
+          <button type="button" data-tools-jump="codeWorkspacePanel"><span>⌘</span>Kod dosyaları</button>
+        </nav>
         <section class="panel openshorts-panel" id="openShortsPanel">
           <div class="section-head">
             <div><div class="eyebrow">VIDEO WORKFLOW / MCP PLUGIN</div><h2>OpenShorts · Shorts üreticisi</h2></div>
@@ -179,7 +203,9 @@
             <strong>Son iş</strong><code id="openshortsJobId">Henüz iş yok</code>
             <button id="openshortsCheckStatus" class="btn ghost small" type="button" disabled>Durumu kontrol et</button>
           </div>
-          <div class="panel openshorts-publish-panel">
+          <details class="advanced-disclosure openshorts-advanced">
+            <summary>Yayınlama ayarları ve zamanlama</summary>
+            <div class="panel openshorts-publish-panel">
             <strong>Yayınlama ayarları</strong>
             <p class="fineprint">Bağlı OpenShorts sosyal hesaplarına YouTube Shorts, TikTok ve Instagram Reels gönder veya zamanla. Her klip için gönderimden önce son onay istenir.</p>
             <div class="row-actions">
@@ -193,7 +219,8 @@
             <textarea id="openshortsPublishCaption" class="input" rows="2" maxlength="2000" placeholder="Boş bırakılırsa OpenShorts'un oluşturduğu açıklama kullanılır"></textarea>
             <label class="field-label" for="openshortsPublishAt">Zamanla (boş = şimdi)</label>
             <input id="openshortsPublishAt" class="input" type="datetime-local">
-          </div>
+            </div>
+          </details>
           <div id="openshortsClips" class="openshorts-clips" aria-live="polite"></div>
           <p class="fineprint">Yayınlama için OpenShorts hesabında YouTube, TikTok ve Instagram hesaplarını ayrıca bağlamalısın. Platformların son yayın durumunu kendi hesaplarından kontrol et.</p>
         </section>
@@ -220,7 +247,7 @@
           <div class="row-actions"><button id="loadOnDeviceModel" class="btn secondary" type="button">Belleğe yükle</button><button id="unloadOnDeviceModel" class="btn ghost small" type="button">Bellekten kapat</button><button id="deleteOnDeviceModel" class="btn ghost small danger-text" type="button">Modeli sil</button></div>
           <p id="onDeviceModelStatus" class="fineprint" role="status">Cihaz bilgileri okunuyor…</p>
         </div>
-        <div class="panel">
+        <div class="panel" id="localCoderPanel">
           <p class="muted">Planla → kod taslağı üret → incele. Modelin Ollama ile bu cihazda veya güvendiğin yerel ağdaki bilgisayarda çalışıyor olmalı.</p>
           <div class="notice compact"><strong>Gerçek durum:</strong> Model APK’ya veya siteye gömülü değil. Bu araç dosyaları otomatik yazmaz, kodu çalıştırmaz; taslağı gösterir ve sen onaylayınca Kod Alanı’na aktarır. HTTPS web sitesi yerel HTTP Ollama bağlantısını tarayıcı güvenlik kuralları nedeniyle engelleyebilir.</div>
           <label class="field-label" for="localCoderTask">Ne geliştirelim veya düzeltelim?</label>
@@ -303,8 +330,8 @@
           <div class="notice compact"><strong>Kalıcı saklama notu:</strong> Paylaşımlı kayıtların yeniden başlatma ve yeniden dağıtımlardan sonra kalması için barındırma ortamında kalıcı disk veya kalıcı bir veritabanı gerekir. Render ücretsiz web servisleri kalıcı diski desteklemez.</div>
         </div>
         <div class="section-head"><div><div class="eyebrow">REUSE INSTEAD OF REBUILD</div><h2>Açık kaynak / varlık kataloğu</h2></div></div>
-        <div class="panel"><p class="muted">Motor, kütüphane ve varlık kaynaklarına hızlı erişim. Otomatik indirme/kopyalama yok; her varlığın lisansını ayrıca kontrol et.</p><label class="field-label" for="reuseCatalogSearch">Kaynakları filtrele</label><input id="reuseCatalogSearch" class="input" type="search" placeholder="Örn. 3D, GLB, ses, CC0"><div id="reuseCatalogGrid" class="reuse-grid"></div></div>
-        <div class="section-head"><div><div class="eyebrow">PERSONAL REUSE VAULT</div><h2>Kod parçası kasası</h2></div><div class="row-actions"><button id="snippetImportBtn" class="btn ghost small" type="button">JSON içe aktar</button><input id="snippetImportFile" type="file" accept=".json,application/json" hidden><button id="snippetExportAll" class="btn secondary small" type="button">Kasayı yedekle</button></div></div>
+        <div class="panel" id="reuseCatalogPanel"><p class="muted">Motor, kütüphane ve varlık kaynaklarına hızlı erişim. Otomatik indirme/kopyalama yok; her varlığın lisansını ayrıca kontrol et.</p><label class="field-label" for="reuseCatalogSearch">Kaynakları filtrele</label><input id="reuseCatalogSearch" class="input" type="search" placeholder="Örn. 3D, GLB, ses, CC0"><div id="reuseCatalogGrid" class="reuse-grid"></div></div>
+        <div class="section-head" id="snippetVaultPanel"><div><div class="eyebrow">PERSONAL REUSE VAULT</div><h2>Kod parçası kasası</h2></div><div class="row-actions"><button id="snippetImportBtn" class="btn ghost small" type="button">JSON içe aktar</button><input id="snippetImportFile" type="file" accept=".json,application/json" hidden><button id="snippetExportAll" class="btn secondary small" type="button">Kasayı yedekle</button></div></div>
         <form id="snippetForm" class="panel"><p class="muted">Kod parçalarını kaynak ve lisans notuyla sakla; sonra başka projeye aktar.</p>
           <label class="field-label" for="snippetName">Parça adı</label><input id="snippetName" class="input" maxlength="100" required placeholder="Örn. FPS kamera kontrolü">
           <label class="field-label" for="snippetLanguage">Dil</label><select id="snippetLanguage" class="input"><option value="javascript">JavaScript</option><option value="html">HTML</option><option value="css">CSS</option><option value="python">Python</option><option value="json">JSON</option><option value="markdown">Markdown</option><option value="text">Metin</option></select>
@@ -313,7 +340,7 @@
           <label class="field-label" for="snippetCode">Kod veya metin</label><textarea id="snippetCode" class="input code-area" rows="6" maxlength="50000" required placeholder="Kendi kodunu veya lisansı uygun parçayı buraya kaydet."></textarea><button class="btn primary" type="submit">Kasaya kaydet +</button>
         </form>
         <div id="snippetList" class="stack"></div>
-        <div class="section-head"><div><div class="eyebrow">AGENT ACTIVITY</div><h2>Ajan etkinliği</h2></div><div class="row-actions"><button id="activityExport" class="btn secondary small" type="button">Geçmişi indir</button><button id="activityClear" class="btn ghost small" type="button">Geçmişi temizle</button></div></div><p class="fineprint">Tekli sohbet, paralel takım, sıralı zincir, karşılaştırma ve Local Coder işlemleri burada görünür. Bu kayıt, PC üzerinde test çalıştırıldığı anlamına gelmez.</p><div id="agentActivityList" class="stack"></div>
+        <div class="section-head" id="agentActivityPanel"><div><div class="eyebrow">AGENT ACTIVITY</div><h2>Ajan etkinliği</h2></div><div class="row-actions"><button id="activityExport" class="btn secondary small" type="button">Geçmişi indir</button><button id="activityClear" class="btn ghost small" type="button">Geçmişi temizle</button></div></div><p class="fineprint">Tekli sohbet, paralel takım, sıralı zincir, karşılaştırma ve Local Coder işlemleri burada görünür. Bu kayıt, PC üzerinde test çalıştırıldığı anlamına gelmez.</p><div id="agentActivityList" class="stack"></div>
 
         <div class="section-head"><h2>Hazır iş akışları</h2></div><div class="tool-grid" id="builtinTools"></div>
         <form class="panel" id="pluginForm">
@@ -322,7 +349,7 @@
           <button class="btn primary" type="submit">Eklentiyi kaydet</button>
         </form>
         <div class="section-head"><h2>Kayıtlı prompt eklentileri</h2><div class="row-actions"><button class="btn ghost small" id="importPluginsBtn">İçe aktar</button><input type="file" id="importPluginsFile" accept=".json,application/json" hidden><button class="btn ghost small" id="exportPlugins">Dışa aktar</button></div></div><div id="pluginList" class="stack"></div>
-        <div class="panel">
+        <div class="panel" id="codeWorkspacePanel">
           <div class="section-head"><div><div class="eyebrow">MULTI-FILE CODE WORKSPACE</div><h2>Kod dosyaları</h2></div><span class="pill">Yerel</span></div>
           <p class="fineprint">Dosyalar cihazda ayrı ayrı saklanır ve düzenlerken otomatik kaydedilir. Bu editör kodu çalıştırmaz; yedek alarak diğer cihaza taşıyabilirsin.</p>
           <label class="field-label" for="savedCodeFileSelect">Çalışma alanındaki dosya</label><select class="input" id="savedCodeFileSelect"></select>

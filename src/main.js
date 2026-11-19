@@ -414,6 +414,24 @@ async function checkOpenShortsJob(){
   finally{openShortsBusy=false;renderOpenShortsPanel();}
 }
 
+function applyProviderFilter(){
+  const query=String($('providerSearch')?.value||'').trim().toLocaleLowerCase('tr');
+  const filter=$('providerFilter')?.value||'all';
+  const cards=[...($('providerGrid')?.querySelectorAll('[data-provider-card]')||[])];
+  let visible=0;
+  cards.forEach(card=>{
+    const id=card.dataset.providerCard,provider=providers[id],model=providerModel(id);
+    const searchable=[id,provider?.name,provider?.desc,model].join(' ').toLocaleLowerCase('tr');
+    const ready=providerIsReady(id),local=id==='ollama'||id==='device';
+    const show=(!query||searchable.includes(query))&&
+      (filter==='all'||(filter==='ready'&&ready)||(filter==='setup'&&!ready)||(filter==='local'&&local));
+    card.classList.toggle('hidden',!show);
+    if(show)visible++;
+  });
+  const summary=$('providerFilterSummary');
+  if(summary)summary.textContent=visible+' / '+cards.length+' sağlayıcı gösteriliyor.';
+  $('providerNoResults')?.classList.toggle('hidden',visible>0);
+}
 function renderProviderCards(){
   const currentChatProvider=$('chatProvider')?.value||'openai';
   $('providerGrid').innerHTML=Object.entries(providers).map(([id,p])=>{
@@ -424,6 +442,7 @@ function renderProviderCards(){
       return '<article class="provider-card" data-provider-card="device"><div class="provider-head"><span class="provider-icon">'+esc(p.icon)+'</span><div class="provider-title"><h3>'+esc(p.name)+'</h3><p>'+esc(p.desc)+'</p></div><span id="state-device" class="provider-state '+(loaded?'connected':'')+'">'+(loaded?'Hazır':(nativeApp?'Model yüklenmedi':'Android gerekli'))+'</span></div><p class="fineprint">'+esc(detail)+'</p><div class="provider-help"><label class="team-check"><input type="checkbox" data-team="device" '+(isTeam?'checked':'')+'> Takım turuna ekle</label><button class="btn ghost small" type="button" data-go="tools">GGUF model yöneticisini aç</button></div></article>';
     }
     return '<article class="provider-card" data-provider-card="'+id+'"><div class="provider-head"><span class="provider-icon">'+esc(p.icon)+'</span><div class="provider-title"><h3>'+esc(p.name)+'</h3><p>'+esc(p.desc)+'</p></div><span id="state-'+id+'" class="provider-state '+(configured?'connected':'')+'">'+(configured?'Ayarlı':'Bağlı değil')+'</span></div>'+
+      '<details class="provider-settings"><summary>Bağlantı ve model ayarlarını aç</summary>'+
       '<label class="field-label" for="model-'+id+'">Model kimliği</label><input class="input" id="model-'+id+'" value="'+esc(model)+'" maxlength="140" autocomplete="off">'+
       (id==='ollama'?'':'<label class="field-label" for="key-'+id+'">API anahtarı</label><input class="input provider-key" type="password" id="key-'+id+'" placeholder="'+(configured?'Kayıtlı anahtar gizli':'Anahtarı buraya yapıştır')+'" autocomplete="new-password" autocapitalize="off" spellcheck="false">'+
         (id==='custom'?'<label class="field-label" for="endpoint-custom">API endpoint (temel adres veya tam chat/completions)</label><input class="input" id="endpoint-custom" value="'+esc(settings.customEndpoint||'')+'" maxlength="500" placeholder="https://api.ornek.com/v1" autocomplete="url">':'')+
@@ -431,9 +450,12 @@ function renderProviderCards(){
         '<div class="provider-actions"><button class="btn secondary small" data-save-key="'+id+'">Model / anahtarı kaydet</button><button class="btn ghost small" data-test-provider="'+id+'">Bağlantıyı test et</button><button class="btn ghost small danger-text" data-delete-key="'+id+'">Anahtarı sil</button></div>')+
       (id==='ollama'?'<div class="provider-help"><span class="fineprint">Adres ve model aşağıdaki yerel bağlantı bölümünde ayarlanır.</span><label class="team-check"><input type="checkbox" data-team="ollama" '+(isTeam?'checked':'')+'> Takım turuna ekle</label></div>':'')+
       (id==='apinex'?'<div class="provider-help apinex-model-tools"><button class="btn ghost small" type="button" data-load-apinex-models>Ücretsiz modelleri getir</button><select class="input" id="apinexFreeModels" aria-label="APInex ücretsiz model listesi"><option value="">Listeyi yükle</option></select><span class="fineprint">Yalnızca free/ ile başlayan model kimlikleri listelenir.</span></div>':'')+
-    '</article>';
+    '</details></article>';
   }).join('');
   $('teamChips').innerHTML=Object.entries(providers).map(([id,p])=>'<label class="chip"><input type="checkbox" data-team="'+id+'" '+(settings.team.includes(id)?'checked':'')+'>'+esc(p.name)+'</label>').join('');
+  const teamSummary=$('teamSelectionSummary');
+  if(teamSummary)teamSummary.textContent=settings.team.length+' / '+Object.keys(providers).length+' motor seçili';
+  applyProviderFilter();
   $('ollamaUrl').value=settings.ollamaUrl||''; $('ollamaModel').value=settings.ollamaModel||providers.ollama.model;
   $('chatProvider').innerHTML=Object.entries(providers).map(([id,p])=>'<option value="'+id+'">'+esc(p.name)+'</option>').join('');
   $('chatProvider').value=providers[currentChatProvider]?currentChatProvider:'openai';
@@ -1652,6 +1674,25 @@ async function clearAllLocal(){if(!confirm('Proje notları, sohbet, özel eklent
 function copyText(text){if(navigator.clipboard?.writeText){navigator.clipboard.writeText(text).then(()=>showToast('Kopyalandı.')).catch(()=>fallbackCopy(text));}else fallbackCopy(text);}
 function fallbackCopy(text){const t=document.createElement('textarea');t.value=text;t.style.position='fixed';t.style.opacity='0';document.body.append(t);t.select();try{document.execCommand('copy');showToast('Kopyalandı.');}catch(_){showToast('Kopyalanamadı; dosya olarak dışa aktarabilirsin.');}t.remove();}
 document.addEventListener('click',async e=>{
+  const projectTemplate=e.target.closest('[data-project-template]');
+  if(projectTemplate){
+    const templates={
+      game:{name:'Yeni Oyun Projesi',notes:'## Oyun fikri\nTür, tema ve oyuncunun hedefi:\n\n## Ana oyun döngüsü\nOyuncu ne yapacak?\n\n## Temel sistemler\n- Kontroller\n- Etkileşimler\n- Seviye / harita\n\n## İlk sürüm (MVP)\n- [ ]\n- [ ]\n\n## Açık sorular ve kararlar\n'},
+      app:{name:'Yeni Uygulama Projesi',notes:'## Amaç\nUygulama hangi sorunu çözüyor?\n\n## Kullanıcı akışı\n1.\n2.\n3.\n\n## Ana ekranlar ve özellikler\n-\n-\n\n## Veri ve bağlantılar\n-\n\n## İlk sürüm (MVP)\n- [ ]\n- [ ]\n\n## Test ve sonraki adımlar\n'}
+    };
+    const template=templates[projectTemplate.dataset.projectTemplate];
+    if(template){$('projectName').value=template.name;$('projectNotes').value=template.notes;$('projectName').focus();showToast('Şablon forma yerleştirildi. Düzenleyip Projeyi kaydet’e bas.');}
+    return;
+  }
+  const toolsJump=e.target.closest('[data-tools-jump]');
+  if(toolsJump){
+    const target=document.getElementById(toolsJump.dataset.toolsJump);
+    if(!target||target.hidden||target.classList.contains('hidden')){showToast('Bu bölüm bu cihazda şu anda kullanılamıyor.');return;}
+    target.scrollIntoView({behavior:'smooth',block:'start'});
+    target.classList.add('section-jump-highlight');
+    window.setTimeout(()=>target.classList.remove('section-jump-highlight'),1100);
+    return;
+  }
   const pluginTab=e.target.closest('[data-plugin-tab]');if(pluginTab){setPluginLibraryTab(pluginTab.dataset.pluginTab);return;}
   const repositoryDownload=e.target.closest('[data-plugin-download]');
   if(repositoryDownload){
@@ -1718,8 +1759,10 @@ document.addEventListener('click',async e=>{
 document.addEventListener('change',async e=>{
   if(e.target.matches('#apinexFreeModels')){const id=e.target.value;if(isFreeApinexModelId(id)){$('model-apinex').value=id;settings.models.apinex=id;await setPref(DB.settings,settings);renderProviderCards();updateDashboard();showToast('APInex ücretsiz modeli seçildi.');}return;}
   if(e.target.matches('[data-skill-toggle]')){const id=e.target.dataset.skillToggle;if(e.target.checked){if(selectedSkillIds.length>=MAX_SELECTED_SKILLS){e.target.checked=false;showToast('En fazla 8 Skill seçebilirsin.');return;}if(!selectedSkillIds.includes(id))selectedSkillIds.push(id);}else selectedSkillIds=selectedSkillIds.filter(value=>value!==id);skillProfileId='custom';await persistSkillState();renderSkillLibrary();return;}
-  if(e.target.matches('[data-team]')){const id=e.target.dataset.team;let group=[...document.querySelectorAll('[data-team="'+id+'"]')];if(e.target.checked){if(!settings.team.includes(id))settings.team.push(id);}else settings.team=settings.team.filter(x=>x!==id);settings.team=selectedTeam();group.forEach(x=>x.checked=e.target.checked);await setPref(DB.settings,settings);renderProviderCards();$('compareSelectionCount').textContent=settings.team.length+' ajan seçili';}
+  if(e.target.matches('[data-team]')){const id=e.target.dataset.team;let group=[...document.querySelectorAll('[data-team="'+id+'"]')];if(e.target.checked){if(!settings.team.includes(id))settings.team.push(id);}else settings.team=settings.team.filter(x=>x!==id);settings.team=selectedTeam();group.forEach(x=>x.checked=e.target.checked);await setPref(DB.settings,settings);renderProviderCards();$('compareSelectionCount').textContent=settings.team.length+' ajan seçili';const teamSummary=$('teamSelectionSummary');if(teamSummary)teamSummary.textContent=settings.team.length+' / '+Object.keys(providers).length+' motor seçili';}
 });
+$('providerSearch').addEventListener('input',applyProviderFilter);
+$('providerFilter').addEventListener('change',applyProviderFilter);
 $('sidebarToggleBtn').addEventListener('click',openSidebar);
 $('sidebarCloseBtn').addEventListener('click',closeSidebar);
 $('sidebarScrim').addEventListener('click',closeSidebar);

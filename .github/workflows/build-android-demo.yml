@@ -74,10 +74,11 @@ jobs:
         run: npm run build
       - name: Test Local Coder and reuse workspace
         run: npm run test:workshop
-      - name: Test AI chat layout and curated plugin marketplace
+      - name: Test UI layout, plugin marketplace and usability
         run: |
           npm run test:chat-layout
           npm run test:plugin-marketplace
+          npm run test:usability
       - name: Test Social Media Studio and OpenShorts publishing
         run: |
           npm run test:social-studio
