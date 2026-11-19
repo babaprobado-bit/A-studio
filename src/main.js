@@ -1,6 +1,6 @@
 import { Capacitor } from '@capacitor/core';
 import { APINEX_CHAT_ENDPOINT, APINEX_DEFAULT_FREE_MODEL, APINEX_MODELS_ENDPOINT, extractApinexFreeModels, isFreeApinexModelId } from './apinex-provider.js';
-import { ZAI_FREE_MODELS, MERKIUM_FREE_MODELS, NVIDIA_NIM_DEVELOPER_MODELS, REQUESTY_FREE_MODELS } from './free-api-providers.js';
+import { ZAI_FREE_MODELS, MERKIUM_FREE_MODELS, NVIDIA_NIM_DEVELOPER_MODELS, REQUESTY_FREE_MODELS, isFreeApiProviderModel } from './free-api-providers.js';
 import { connectOpenShorts, callOpenShortsTool, validateOpenShortsSourceUrl } from './openshorts-mcp.js';
 import { mountSocialStudio } from './social-studio.js';
 import { mountAiPowerHub } from './ai-power-hub.js';
@@ -43,9 +43,9 @@ let openShortsBusy = false;
 const providers = {
   openai: { name:'OpenAI', icon:'O', kind:'openai', endpoint:'https://api.openai.com/v1/chat/completions', model:'', keyUrl:'https://platform.openai.com/api-keys', desc:'GPT modelleri · Chat Completions API' },
   anthropic: { name:'Anthropic / Claude', icon:'A', kind:'anthropic', endpoint:'https://api.anthropic.com/v1/messages', model:'', keyUrl:'https://console.anthropic.com/settings/keys', desc:'Claude modelleri · Messages API' },
-  gemini: { name:'Google Gemini', icon:'G', kind:'gemini', endpoint:'https://generativelanguage.googleapis.com/v1beta/models/', model:'gemini-3.8-flash', keyUrl:'https://aistudio.google.com/apikey', desc:'Gemini modelleri · generateContent' },
+  gemini: { name:'Google Gemini', icon:'G', kind:'gemini', endpoint:'https://generativelanguage.googleapis.com/v1beta/models/', model:'gemini-2.5-flash-lite', keyUrl:'https://aistudio.google.com/apikey', desc:'Gemini modelleri · generateContent' },
   deepseek: { name:'DeepSeek', icon:'D', kind:'openai', endpoint:'https://api.deepseek.com/chat/completions', model:'', keyUrl:'https://platform.deepseek.com/api_keys', desc:'OpenAI uyumlu API · model kimliğini düzenleyebilirsin' },
-  groq: { name:'Groq', icon:'Q', kind:'openai', endpoint:'https://api.groq.com/openai/v1/chat/completions', model:'', keyUrl:'https://console.groq.com/keys', desc:'Hızlı çıkarım · kullanılabilir model listesi değişebilir' },
+  groq: { name:'Groq', icon:'Q', kind:'openai', endpoint:'https://api.groq.com/openai/v1/chat/completions', model:'openai/gpt-oss-120b', keyUrl:'https://console.groq.com/keys', desc:'Hızlı çıkarım · kullanılabilir model listesi değişebilir' },
   openrouter: { name:'OpenRouter', icon:'R', kind:'openai', endpoint:'https://openrouter.ai/api/v1/chat/completions', model:'openrouter/free', keyUrl:'https://openrouter.ai/keys', desc:'Birçok sağlayıcı için tek uyumlu API' },
   apinex: { name:'APInex · Ücretsiz Modeller', icon:'Apx', kind:'openai', endpoint:APINEX_CHAT_ENDPOINT, model:APINEX_DEFAULT_FREE_MODEL, keyUrl:'https://apinex.bond/for-ai', desc:'İsteğe bağlı üçüncü taraf API geçidi. Yalnızca free/* model kimlikleri kabul edilir; istekler APInex ve üst sağlayıcı üzerinden iletilir.' },
   nvidia: { name:'NVIDIA NIM Developer', icon:'N', kind:'openai', endpoint:'https://integrate.api.nvidia.com/v1/chat/completions', model:NVIDIA_NIM_DEVELOPER_MODELS[0], freeModels:NVIDIA_NIM_DEVELOPER_MODELS, keyUrl:'https://build.nvidia.com/', desc:'NVIDIA Developer Program · yalnızca ücretsiz hosted endpoint erişimiyle prototip, araştırma ve test; üretim için değildir.' },
@@ -234,6 +234,7 @@ function providerIsReady(id){
   if(id==='ollama')return Boolean(String(settings.ollamaUrl||'').trim()&&String(settings.ollamaModel||settings.models.ollama||providers.ollama.model||'').trim());
   const model=String(settings.models[id]||providers[id].model||'').trim();
   if(!model)return false;
+  if(!isFreeApiProviderModel(id,model))return false;
   if(providers[id].freeModels&&!providers[id].freeModels.includes(model))return false;
   if(id==='openrouter'&&!isFreeOpenRouterModel(model))return false;
   if(id==='apinex'&&!isFreeApinexModelId(model))return false;
@@ -646,6 +647,10 @@ async function fetchJson(url,options,timeoutMs=50000){
   finally{clearTimeout(timer);}
 }
 async function callProvider(id,prompt,history,options={}){
+  if(id!=='device'&&id!=='ollama'){
+    const requestedModel=String(options?.modelOverride||providerModel(id)||'').trim();
+    if(!isFreeApiProviderModel(id,requestedModel))throw new Error('Güvenlik engeli: Bu modelin ücretsiz erişimi doğrulanmadı. API isteği gönderilmedi.');
+  }
   if(id==='device'){
     if(!nativeApp)throw new Error('Telefon içi GGUF ajanı yalnızca native Android uygulamasında çalışır.');
     if(!deviceLocalCoder.loadedFileName)throw new Error('Önce Telefon içi GGUF modelini belleğe yükle.');
@@ -1189,6 +1194,7 @@ async function runApiLocalCoderWorkshop(){
     const result=await runApiLocalCoderSequence({
       providerId,
       providers,
+      modelId:providerModel(providerId),
       hasKey:Boolean(key),
       demoMode:false,
       stages,

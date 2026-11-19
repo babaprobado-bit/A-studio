@@ -53,3 +53,24 @@ export const EXTERNAL_CONNECTOR_CATALOG=Object.freeze([
 {id:'figma',name:'Figma',status:'planned',url:'https://www.figma.com/',note:'Dosya ve tasarım verisi API bağlantısı henüz yok.'},
 {id:'rea',name:'REA Companion',status:'contract',note:'Mock sözleşme ve testler var; canlı masaüstü köprüsü etkin değil.'}
 ]);
+
+// A model is allowed only when its exact ID is on a provider-specific free list.
+export const GEMINI_FREE_MODELS=Object.freeze(['gemini-2.5-flash-lite']);
+export const GROQ_FREE_MODELS=Object.freeze(['openai/gpt-oss-120b','openai/gpt-oss-20b','qwen/qwen3.8-27b']);
+export const FREE_API_MODEL_ALLOWLIST=Object.freeze({
+  gemini:GEMINI_FREE_MODELS,
+  groq:GROQ_FREE_MODELS,
+  nvidia:NVIDIA_NIM_DEVELOPER_MODELS,
+  zai:ZAI_FREE_MODELS,
+  merkium:MERKIUM_FREE_MODELS,
+  requesty:REQUESTY_FREE_MODELS
+});
+export function isFreeApiProviderModel(providerId, modelId) {
+  const id=String(providerId||'').trim().toLowerCase();
+  const model=String(modelId||'').trim();
+  if(!model)return false;
+  if(id==='openrouter')return model.toLowerCase()==='openrouter/free'||model.toLowerCase().endsWith(':free');
+  if(id==='apinex')return /^free\\/[a-z0-9][a-z0-9._-]{0,130}$/i.test(model);
+  const allowed=FREE_API_MODEL_ALLOWLIST[id];
+  return Array.isArray(allowed)&&allowed.includes(model);
+}

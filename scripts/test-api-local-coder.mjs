@@ -4,8 +4,7 @@ import { buildLocalCoderStages } from '../src/workshop-data.js';
 import { runApiLocalCoderSequence } from '../src/local-coder-api.js';
 
 const providers = {
-  openai: { name: 'OpenAI' },
-  gemini: { name: 'Gemini' },
+  gemini: { name: 'Gemini', model: 'gemini-2.5-flash-lite' },
   ollama: { name: 'Ollama' }
 };
 const stages = buildLocalCoderStages({
@@ -15,7 +14,8 @@ const stages = buildLocalCoderStages({
 });
 assert.deepEqual(stages.map(stage => stage.id), ['plan', 'code', 'review']);
 const common = {
-  providerId: 'openai',
+  providerId: 'gemini',
+  modelId:'gemini-2.5-flash-lite',
   providers,
   stages,
   confirmConsent: async message => { assert.match(message, /3/); assert.match(message, /ücret|kota/i); return true; },
@@ -44,7 +44,7 @@ let demoDisabled = false;
 let approved = false;
 let order = [];
 const cancelled = await runApiLocalCoderSequence({
-  ...common, hasKey: true, demoMode: true,
+  ...common, modelId:'gemini-2.5-flash-lite', hasKey: true, demoMode: true,
   confirmConsent: async message => { assert.match(message, /Demo modu kapanacak/); return false; },
   disableDemoMode: async () => { demoDisabled = true; },
   callProvider: async () => { calls++; return 'unexpected'; }
@@ -55,11 +55,12 @@ assert.equal(calls, 0);
 
 const success = await runApiLocalCoderSequence({
   ...common,
+  modelId:'gemini-2.5-flash-lite',
   hasKey: true,
   demoMode: true,
   confirmConsent: async message => { assert.match(message, /Demo modu kapanacak/); return true; },
   disableDemoMode: async () => { order.push('disable-demo'); demoDisabled = true; },
-  onApproved: async provider => { assert.equal(provider.name, 'OpenAI'); order.push('approved'); approved = true; },
+  onApproved: async provider => { assert.equal(provider.name, 'Gemini'); order.push('approved'); approved = true; },
   makePrompt: (stage, previous) => {
     const prompt = stage.makePrompt ? stage.makePrompt(previous) : stage.prompt;
     if (stage.id === 'code') assert.match(prompt, /reply-1/);
@@ -68,7 +69,7 @@ const success = await runApiLocalCoderSequence({
   },
   onStageStart: async stage => { order.push('start-' + stage.id); },
   callProvider: async (providerId, prompt, messages) => {
-    assert.equal(providerId, 'openai', 'provider must not silently change');
+    assert.equal(providerId, 'gemini', 'provider must not silently change');
     assert.deepEqual(messages, []);
     assert.ok(approved, 'API calls must start only after approval');
     assert.ok(prompt.length > 0);
@@ -108,7 +109,7 @@ await assert.rejects(runApiLocalCoderSequence({
     return 'first response';
   }
 }), /simulated provider error/);
-assert.deepEqual(failedProviders, ['openai', 'openai'], 'failure must stop without retry or fallback');
+assert.deepEqual(failedProviders, ['gemini', 'gemini'], 'failure must stop without retry or fallback');
 
 let emptyCalls = 0;
 await assert.rejects(runApiLocalCoderSequence({
@@ -122,6 +123,7 @@ assert.equal(emptyCalls, 1);
 
 await assert.rejects(runApiLocalCoderSequence({
   ...common,
+  modelId:'gemini-2.5-flash-lite',
   hasKey: true,
   stages: stages.slice(0, 2),
   confirmConsent: async () => true
@@ -160,3 +162,17 @@ for (const argumentText of activityArguments) {
   assert.equal(argumentText.includes('secret'), false, 'provider secret must not appear in activity logs');
 }
 console.log('API Local Coder secret-boundary checks passed.');
+
+const freeProviderSource = readFileSync(new URL('../src/free-api-providers.js', import.meta.url), 'utf8');
+assert.match(freeProviderSource, /function isFreeApiProviderModel/);
+assert.match(mainSource, /isFreeApiProviderModel\(id,requestedModel\)/,
+  'the runtime must reject unverified models before fetch');
+assert.match(apiSource, /modelId:providerModel\(providerId\)/,
+  'API Local Coder must pass its selected model to the preflight');
+const blocked = await runApiLocalCoderSequence({
+  ...common, providerId:'openai', modelId:'gpt-4o', hasKey:true,
+  confirmConsent:async()=>{throw new Error('blocked paid model must not prompt or send requests');}
+});
+assert.equal(blocked.status,'paid-model-blocked');
+assert.equal(blocked.requestCount,0);
+console.log('Free-model preflight checks passed.');

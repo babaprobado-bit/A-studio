@@ -1,3 +1,5 @@
+import { isFreeApiProviderModel } from './free-api-providers.js';
+
 const REQUIRED_STAGE_IDS = Object.freeze(['plan', 'code', 'review']);
 
 /**
@@ -8,6 +10,7 @@ export async function runApiLocalCoderSequence({
   providerId,
   providers,
   hasKey,
+  modelId,
   demoMode,
   stages,
   confirmConsent,
@@ -21,6 +24,9 @@ export async function runApiLocalCoderSequence({
   const provider = providers && providers[providerId];
   if (!provider || providerId === 'ollama') {
     return { status: 'invalid-provider', providerId, requestCount: 0, outputs: {} };
+  }
+  if (!isFreeApiProviderModel(providerId, modelId || provider.model)) {
+    return { status: 'paid-model-blocked', providerId, requestCount: 0, outputs: {} };
   }
   if (hasKey !== true) {
     return { status: 'missing-key', providerId, requestCount: 0, outputs: {} };
