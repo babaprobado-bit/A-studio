@@ -14,6 +14,8 @@ on:
       - 'scripts/patch-android-local-runtime.py'
       - '.github/workflows/build-android-local-coder.yml'
       - 'src/main.js'
+      - 'src/model-context.js'
+      - 'scripts/test-model-context.mjs'
       - 'src/apinex-provider.js'
       - 'src/plugin-catalog.js'
       - 'src/ai-power-hub.js'
@@ -85,6 +87,9 @@ jobs:
         run: npm run build
       - name: Run existing and new regression checks
         run: |
+          node --check src/model-context.js
+          node --check scripts/test-model-context.mjs
+          node --check src/main.js
           node --check src/social-studio.js
           node --check src/social-studio-automation.js
           node --check src/social-studio-core.js
@@ -94,6 +99,7 @@ jobs:
           node --check scripts/test-social-studio.mjs
           node --check scripts/test-openshorts.mjs
           node --check scripts/test-no-demo-mode.mjs
+          npm run test:model-context
           npm run test:workshop
           npm run test:chat-layout
           npm run test:plugin-marketplace
