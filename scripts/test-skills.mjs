@@ -25,7 +25,7 @@ assert.ok(SKILL_CATALOG.some(skill => skill.id === 'vidiq-discovery' && /vidiq_t
 const openshortsSkill = SKILL_CATALOG.find(skill => skill.id === 'openshorts-workflow');
 assert.ok(openshortsSkill && openshortsSkill.builtIn && openshortsSkill.license === 'MIT');
 assert.match(openshortsSkill.content, /does not search the internet/i);
-assert.match(openshortsSkill.content, /only when the user specifically requests publication/i);
+assert.match(openshortsSkill.content, /never call it unless the user specifically requests publication/i);
 
 const parsed = parseSkillMarkdown(
   '---\nname: My Skill\ndescription: A test skill\nstage: code\nlicense: MIT\nsource: Example repository\nsource_url: https://example.com/skill\nauthor: Example Author\nversion: 1.2\ncategory: testing\n---\n# My Skill\nUse small, verifiable changes.',
