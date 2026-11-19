@@ -52,7 +52,7 @@ export async function mountAiPowerHub(options={}){
       '<button type="button" class="ai-power-tab active" data-power-tab="swarm">AI Swarm</button>'+
       '<button type="button" class="ai-power-tab" data-power-tab="plugins">Plugin Library</button>'+
       '<button type="button" class="ai-power-tab" data-power-tab="openrouter">OpenRouter Multi-Chat</button>'+
-      '<button type="button" class="ai-power-tab" data-power-tab="providers">10 doğrulanmış ücretsiz sağlayıcı</button>'+
+      '<button type="button" class="ai-power-tab" data-power-tab="providers">9 doğrulanmış ücretsiz sağlayıcı</button>'+
       '<button type="button" class="ai-power-tab" data-power-tab="connectors">Bağlantılar</button></nav>'+
     '<section class="ai-power-panel" data-power-panel="swarm">'+
       '<div class="ai-power-heading"><div><div class="eyebrow">MULTI-AGENT ORCHESTRATOR</div><h3>AI Swarm</h3><p>Görevi uzman ajanlara böl, paralel çalıştır, ortak panoda bulguları paylaş ve sonuçları birleştir.</p></div><span class="pill">En fazla 10 ajan</span></div>'+

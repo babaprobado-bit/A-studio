@@ -1,6 +1,6 @@
 import { Capacitor } from '@capacitor/core';
 import { APINEX_CHAT_ENDPOINT, APINEX_DEFAULT_FREE_MODEL, APINEX_MODELS_ENDPOINT, extractApinexFreeModels, isFreeApinexModelId } from './apinex-provider.js';
-import { ZAI_FREE_MODELS, MERKIUM_FREE_MODELS, NVIDIA_NIM_DEVELOPER_MODELS } from './free-api-providers.js';
+import { ZAI_FREE_MODELS, MERKIUM_FREE_MODELS, NVIDIA_NIM_DEVELOPER_MODELS, REQUESTY_FREE_MODELS } from './free-api-providers.js';
 import { connectOpenShorts, callOpenShortsTool, validateOpenShortsSourceUrl } from './openshorts-mcp.js';
 import { mountSocialStudio } from './social-studio.js';
 import { mountAiPowerHub } from './ai-power-hub.js';
@@ -51,6 +51,7 @@ const providers = {
   nvidia: { name:'NVIDIA NIM Developer', icon:'N', kind:'openai', endpoint:'https://integrate.api.nvidia.com/v1/chat/completions', model:NVIDIA_NIM_DEVELOPER_MODELS[0], freeModels:NVIDIA_NIM_DEVELOPER_MODELS, keyUrl:'https://build.nvidia.com/', desc:'NVIDIA Developer Program · yalnızca ücretsiz hosted endpoint erişimiyle prototip, araştırma ve test; üretim için değildir.' },
   zai: { name:'Z.ai / GLM Flash', icon:'Z', kind:'openai', endpoint:'https://api.z.ai/api/paas/v4/chat/completions', model:ZAI_FREE_MODELS[0], freeModels:ZAI_FREE_MODELS, keyUrl:'https://z.ai/manage-apikey/apikey-list', desc:'Yalnızca doğrulanmış ücretsiz GLM Flash modelleri seçilebilir.' },
   merkium: { name:'Merkium · Kalıcı Ücretsiz', icon:'M', kind:'openai', endpoint:'https://chat.merkium.nl/api/v1/chat/completions', model:MERKIUM_FREE_MODELS[0], freeModels:MERKIUM_FREE_MODELS, keyUrl:'https://chat.merkium.nl/', desc:'Yedi kalıcı ücretsiz API modeli · 30 istek/dakika.' },
+  requesty: { name:'Requesty · Ücretsiz Modeller', icon:'Rq', kind:'openai', endpoint:'https://router.requesty.ai/v1/chat/completions', model:REQUESTY_FREE_MODELS[1], freeModels:REQUESTY_FREE_MODELS, keyUrl:'https://app.requesty.ai/api-keys', desc:'Yalnızca 8 sıfır ücretli model · günde 200 istek · kart gerektirmeyen Free plan.' },
   huggingface: { name:'Hugging Face Inference', icon:'H', kind:'openai', endpoint:'https://router.huggingface.co/v1/chat/completions', model:'', keyUrl:'https://huggingface.co/settings/tokens', desc:'Inference Providers · yüzlerce model için tek API' },
   custom: { name:'Özel OpenAI uyumlu API', icon:'+', kind:'openai', endpoint:'', model:'', keyUrl:'', desc:'Kendi API adresin ve model kimliğin; OpenAI chat completions uyumlu servisler' },
   ollama: { name:'LocalCoder / Ollama (PC)', icon:'⌘', kind:'ollama', endpoint:'', model:'qwen2.5-coder:1.5b', keyUrl:'https://ollama.com/', desc:'Ağdaki bilgisayarda çalışan yerel model; telefona gömülü değil' },

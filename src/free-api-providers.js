@@ -3,12 +3,11 @@ export const FREE_API_PROVIDER_CATALOG=Object.freeze([
 {id:'groq',rank:2,name:'Groq',access:'free-tier',note:'Developer Free Plan. Model başına RPM/TPM/RPD sınırları değişir; ücretli Developer planı varsayılmaz.',url:'https://console.groq.com/docs/rate-limits'},
 {id:'openrouter',rank:3,name:'OpenRouter (yalnızca :free)',access:'free-models',note:'Sadece openrouter/free ve :free kimlikleri. Ücretli model kimlikleri uygulama tarafından reddedilir; ücretsiz havuz ve limitler değişebilir.',url:'https://openrouter.ai/collections/free-models'},
 {id:'cloudflare',rank:4,name:'Cloudflare Workers AI',access:'free-tier',note:'Yalnızca Workers Free hesabının günlük 10.000 Neuron tahsisi. Free hesapta aşım başarısız olur; Workers Paid hesabında aşım ücretli olabilir.',url:'https://developers.cloudflare.com/workers-ai/platform/pricing/'},
-{id:'nvidia',rank:5,name:'NVIDIA NIM Developer Program',access:'developer-access',note:'Ücretsiz Developer Program üyeliğiyle hosted NIM API prototip, araştırma, geliştirme ve test için kullanılabilir. Üretim kullanımı ücretsiz değildir. 90 günlük AI Enterprise denemesi bu listeye dahil değildir.',url:'https://docs.api.nvidia.com/nim/docs/product'},
-{id:'zai',rank:6,name:'Z.ai / Zhipu GLM Flash',access:'free-models',note:'Resmî fiyat tablosunda GLM-4.7-Flash, GLM-4.5-Flash ve GLM-4.6V-Flash ücretsizdir. GLM-5.3-Flash ücretsiz değildir; listeye alınmaz.',url:'https://docs.z.ai/'},
+{id:'nvidia',rank:5,name:'NVIDIA NIM Developer Program',access:'developer-access',note:'Ücretsiz Developer Program erişimi, model kartında Free Endpoint olarak gösterilen NIM hosted uç noktalarında prototip ve geliştirme içindir. Üretim kullanımı ücretsiz değildir; deneme programları listeye dahil edilmez.',url:'https://build.nvidia.com/models'},
+{id:'zai',rank:6,name:'Z.ai / Zhipu GLM Flash',access:'free-models',note:'Resmî fiyat tablosunda GLM-4.7-Flash, GLM-4.5-Flash ve GLM-4.6V-Flash ücretsizdir. Diğer GLM modelleri ücretli olabilir; sadece bu üç kimlik seçilebilir.',url:'https://docs.z.ai/guides/overview/pricing'},
 {id:'merkium',rank:7,name:'Merkium',access:'permanent-free',note:'Listelenen yedi API modeli kalıcı olarak ücretsiz; kart ve faturalandırma gerekmez. 30 istek/dakika/API anahtarı.',url:'https://www.merkium.nl/docs/pricing'},
-{id:'requesty',rank:8,name:'Requesty Free Models',access:'free-plan',note:'Ücretsiz plan: yayımlanan sıfır ücretli modeller için günlük 200 istek, ödeme yöntemi gerekmiyor. Ücretsiz model havuzu değişebilir; ücretli model kimlikleri kullanılmamalı.',url:'https://www.requesty.ai/models/free'},
-{id:'sambanova',rank:9,name:'SambaNova Cloud Free Tier',access:'free-plan',note:'Free Tier yalnızca hesaba ödeme yöntemi eklenmediği durumda geçerlidir. Hesap ve model uygunluğu panelde kontrol edilmeli; ücretli modele geçiş yapılmamalı.',url:'https://cloud.sambanova.ai/'},
-{id:'apinex',rank:10,name:'APInex (free/* ağ geçidi)',access:'free-models',note:'Yalnızca free/ model kimlikleri kabul edilir. Üçüncü taraf ağ geçididir; kota ve kullanılabilirlik APInex tarafından belirlenir, sınırsız kullanım garantisi yoktur.',url:'https://apinex.bond/for-ai'}
+{id:'requesty',rank:8,name:'Requesty Free Models',access:'free-plan',note:'Ücretsiz plan: 8 yayımlanmış sıfır ücretli model, günde 200 istek ve kredi kartı gerektirmez. Ücretli modeller ve Pay-as-you-go kullanılmaz.',url:'https://www.requesty.ai/models/free'},
+{id:'apinex',rank:9,name:'APInex (free/* ağ geçidi)',access:'free-models',note:'Yalnızca free/ model kimlikleri kabul edilir. Üçüncü taraf ağ geçididir; kota ve kullanılabilirlik APInex tarafından belirlenir, sınırsız kullanım garantisi yoktur.',url:'https://apinex.bond/for-ai'}
 ]);
 export const CLOUDFLARE_FREE_MODELS=Object.freeze([
 '@cf/zai-org/glm-4.7-flash',
@@ -30,8 +29,19 @@ export const MERKIUM_FREE_MODELS=Object.freeze([
 'pluto-1.1-pro'
 ]);
 export const NVIDIA_NIM_DEVELOPER_MODELS=Object.freeze([
-'deepseek-ai/deepseek-v4-flash',
-'meta/llama-3.1-8b-instruct'
+'nvidia/nemotron-3.5-super-vl-120b-a12b',
+'nvidia/nemotron-3.5-lightning-30b-a3b',
+'z-ai/glm-5.3-flash'
+]);
+export const REQUESTY_FREE_MODELS=Object.freeze([
+'i-ling-3.1-flash',
+'nemotron-3.5-lightning-30b-a3b',
+'muse-glimmer-30b',
+'nemotron-3-nano-omni-30b-a3b-reasoning',
+'nemotron-3-ultra-550b-a55b',
+'leanstral-1-5',
+'gemma-4-31b-it',
+'nemotron-3-nano-30b-a3b'
 ]);
 export const EXTERNAL_CONNECTOR_CATALOG=Object.freeze([
 {id:'gguf',name:'Android GGUF',status:'integrated',note:'Native llama.cpp motoruyla yerel model yükleme/çalıştırma.'},
