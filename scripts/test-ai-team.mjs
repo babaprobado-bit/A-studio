@@ -182,8 +182,10 @@ assert.ok(main.includes('function currentGeneralSkillContext(maxChars=6000)'),
   'general Skills must be composed into the shared live-provider system context');
 assert.ok(main.includes("const skillContext=options.includeGeneralSkills===false?'':currentGeneralSkillContext(6000).promptText"),
   'normal provider paths must receive selected general Skills');
-assert.ok(main.includes('const systemPrompt=systemFor(id,prompt,options)'),
-  'provider adapters must share one system-context builder');
+assert.ok(main.includes('const fittedContext=fitModelContext({')
+  && main.includes('systemPrompt:systemFor(id,prompt,options)')
+  && main.includes('const systemPrompt=fittedContext.systemPrompt'),
+  'provider adapters must share the system-context builder and fit it to the model context window');
 assert.ok(main.includes("callProvider:(id,prompt,history)=>callProvider(id,prompt,history,{includeGeneralSkills:false})"),
   'API Local Coder must avoid duplicating its stage-specific Skills');
 assert.ok(main.includes("callProvider('ollama',prompt,[],{includeGeneralSkills:false})"),
