@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { normalizeSwarmFilePath, fallbackSwarmTasks, buildSwarmPlanPrompt, parseSwarmPlan, resolveSwarmConcurrency, estimateSwarmCallBudget, isRetryableSwarmError, runAgentSwarm } from '../src/agent-swarm.js';
 import { PROMPT_PLUGIN_CATALOG, EXTERNAL_CONNECTOR_CATALOG, normalizeEnabledPluginIds, filterPromptPlugins } from '../src/plugin-catalog.js';
 import { OPENROUTER_CHAT_MODEL_LIMIT, isFreeOpenRouterModelId, isZeroPriceOpenRouterModel, normalizeOpenRouterModelSelection, runOpenRouterMultiModelCalls } from '../src/openrouter-chat.js';
-import { FREE_API_PROVIDER_CATALOG, CLOUDFLARE_FREE_MODELS, ZAI_FREE_MODELS, MERKIUM_FREE_MODELS, NVIDIA_NIM_DEVELOPER_MODELS } from '../src/free-api-providers.js';
+import { FREE_API_PROVIDER_CATALOG, CLOUDFLARE_FREE_MODELS, ZAI_FREE_MODELS, MERKIUM_FREE_MODELS, NVIDIA_NIM_DEVELOPER_MODELS, REQUESTY_FREE_MODELS } from '../src/free-api-providers.js';
 import { APINEX_API_BASE_URL, APINEX_CHAT_ENDPOINT, APINEX_MODELS_ENDPOINT, APINEX_DEFAULT_FREE_MODEL, isFreeApinexModelId, extractApinexFreeModels } from '../src/apinex-provider.js';
 
 assert.equal(normalizeSwarmFilePath('src/main.js'),'src/main.js');
