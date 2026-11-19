@@ -53,7 +53,10 @@ export function fitModelContext({
   const inputBudget = Math.max(256, windowTokens - outputReserve - safety);
   const promptText = String(prompt ?? '');
   const promptTokens = estimateModelTokens(promptText);
-  const systemBudget = Math.max(0, inputBudget - promptTokens);
+  const systemBudget = Math.min(
+    Math.max(128, Math.floor(inputBudget * 0.45)),
+    Math.max(0, inputBudget - promptTokens)
+  );
   const fittedSystemPrompt = takeTokenBudget(systemPrompt, systemBudget);
   let remaining = Math.max(0, inputBudget - promptTokens - estimateModelTokens(fittedSystemPrompt));
 
