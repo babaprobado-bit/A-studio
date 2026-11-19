@@ -21,7 +21,7 @@ assert.equal(getTeamStageDetails(3,9).role,'Testçi / son kontrol');
 assert.match(getTeamStageDetails(8,9).instruction,/yeni katkı sun/);
 assert.match(main,/settings\.team=normalizeTeamSelection/);
 assert.doesNotMatch(main,/settings\.team\.slice\(0,4\)/);
-assert.match(main,/runStage:\(\{id,prompt,stage\},history\)=>settings\.demoMode\?demoAnswer\(id,prompt,stage\.role\):callProvider\(id,prompt,history\)/,'pipeline must pass the tested stage prompt and current context to each provider');
+assert.match(main,/runStage:\(\{id,prompt\},history\)=>callProvider\(id,prompt,history\)/,'pipeline must pass each computed stage prompt and current context to the real provider');
 assert.doesNotMatch(main,/stageRoles/,'no stale stageRoles reference may remain in the pipeline');
 assert.match(html,/id="selectAllTeam"/);
 assert.match(main,/normalizeOpenAiEndpoint\(settings\.customEndpoint\)/);
@@ -70,7 +70,7 @@ const pipelineEnd=main.indexOf('function renderCompareResults(results)',pipeline
 assert.ok(pipelineStart>=0&&pipelineEnd>pipelineStart,'AI Team pipeline must exist');
 const pipelineSource=main.slice(pipelineStart,pipelineEnd);
 assert.match(pipelineSource,/runSequentialTeamCalls\(\{/,'pipeline must use the tested sequential team runner');
-assert.match(pipelineSource,/runStage:\(\{id,prompt,stage\},history\)=>settings\.demoMode\?demoAnswer\(id,prompt,stage\.role\):callProvider\(id,prompt,history\)/,'pipeline must keep the computed stage role and pass each stage current history');
+assert.match(pipelineSource,/runStage:\(\{id,prompt\},history\)=>callProvider\(id,prompt,history\)/,'pipeline must send each computed stage prompt and current history to the real provider');
 assert.doesNotMatch(pipelineSource,/stageRoles/,'pipeline must not depend on an undefined legacy stageRoles array');
 assert.match(main,/function providerIsReady\(id\)/,'live team execution must skip unconfigured providers');
 
