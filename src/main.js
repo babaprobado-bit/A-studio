@@ -14,6 +14,7 @@ import './style.css';
 import { reuseCatalog, buildLocalCoderStages, extractCodeArtifact, normalizeSnippet } from './workshop-data.js';
 import { buildSharedProjectContext } from './project-context.js';
 import { buildSharedVaultContext } from './shared-vault-context.js';
+import { fitModelContext } from './model-context.js';
 import { encryptWorkspaceBackup, decryptWorkspaceBackup } from './encrypted-backup.js';
 import { SKILL_CATALOG, SKILL_PROFILES, parseSkillMarkdown, normalizeSkill, prepareSkillImportQueue, buildStageSkillContext, getProfileSkillIds, createSkillBackupState, restoreSkillBackupState, MAX_SELECTED_SKILLS, MAX_CUSTOM_SKILLS, MAX_STAGE_SKILL_CHARS } from './skill-library.js';
 import { PLUGIN_REPOSITORY_CATALOG, getPluginRepositoryArchiveUrl, getPluginRepositoryById, isAllowedPluginRepositoryDownload } from './plugin-marketplace.js';
@@ -662,17 +663,21 @@ async function callProvider(id,prompt,history,options={}){
     if(!answer)throw new Error('Telefon içi GGUF modeli boş yanıt verdi. Modeli yeniden yüklemeyi dene.');
     return answer;
   }
-  const systemPrompt=systemFor(id,prompt,options);
+  const modelForContext=id==='ollama'?(settings.ollamaModel||providerModel(id)):String(options?.modelOverride||providerModel(id)||'');
+  const configuredContextWindow=Number(options?.contextWindowTokens||settings.modelContextWindows?.[id]?.[modelForContext]||settings.modelContextWindows?.[id]||providers[id]?.contextWindowTokens||(id==='ollama'?settings.ollamaContextWindowTokens:0));
+  const fittedContext=fitModelContext({providerId:id,modelId:modelForContext,systemPrompt:systemFor(id,prompt,options),history,prompt,contextWindowTokens:configuredContextWindow,maxOutputTokens:2048});
+  const systemPrompt=fittedContext.systemPrompt;
+  const requestHistory=fittedContext.history;
   if(id==='ollama'){
     const model=(settings.ollamaModel||providerModel(id)).trim();
     if(!String(settings.ollamaUrl||'').trim()||!model)throw new Error('Ollama adresi ve model adı eksik.');
     const url=normalizeOllamaEndpoint(settings.ollamaUrl);
-    const messages=[{role:'system',content:systemPrompt}].concat(history.slice(-8).map(m=>({role:m.role,content:m.content}))).concat([{role:'user',content:prompt}]);
+    const messages=[{role:'system',content:systemPrompt}].concat(requestHistory.map(m=>({role:m.role,content:m.content}))).concat([{role:'user',content:prompt}]);
     const d=await fetchJson(url+'/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},redirect:'error',body:JSON.stringify({model,messages,stream:false,options:{temperature:0.4}})});
     const answer=d?.message?.content;if(!answer)throw new Error('Ollama yanıtında mesaj yok. Model adını ve sunucuyu kontrol et.');return answer;
   }
   const p=providers[id]; if(!p)throw new Error('Bilinmeyen AI sağlayıcısı.'); const model=String(options?.modelOverride||providerModel(id)||'').trim(); if(!model)throw new Error(p.name+' için model kimliği seçilmemiş. Ücretsiz olduğu doğrulanmış bir model kimliği gir.'); if(id==='openrouter'&&!isFreeOpenRouterModel(model))throw new Error('OpenRouter için yalnızca openrouter/free veya :free ile biten ücretsiz model kimlikleri kullanılabilir.'); if(id==='apinex'&&!isFreeApinexModelId(model))throw new Error('APInex güvenlik kontrolü: Yalnızca free/ ile başlayan model kimlikleri kullanılabilir. Ücretli model çağrısı engellendi.'); if(p.freeModels&&!p.freeModels.includes(model))throw new Error('Bu sağlayıcıda yalnızca doğrulanmış ücretsiz model kimlikleri kullanılabilir.'); const key=await getSecret(id); if(!key)throw new Error(p.name+' için API anahtarı ayarlanmamış. Modeller ekranından ekle.');
-  const msgs=history.slice(-8).filter(m=>m.role==='user'||m.role==='assistant').map(m=>({role:m.role,content:m.content})); msgs.push({role:'user',content:prompt});
+  const msgs=requestHistory.filter(m=>m.role==='user'||m.role==='assistant').map(m=>({role:m.role,content:m.content})); msgs.push({role:'user',content:prompt});
   if(p.kind==='anthropic'){
     const d=await fetchJson(p.endpoint,{method:'POST',headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model,max_tokens:2048,system:systemPrompt,messages:msgs.filter(m=>m.role==='user'||m.role==='assistant')})});
     const text=(d.content||[]).filter(x=>x.type==='text').map(x=>x.text).join('\n');if(!text)throw new Error('Claude yanıtında metin bulunamadı.');return text;
