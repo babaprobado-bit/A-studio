@@ -169,8 +169,8 @@ assert.ok(main.includes('runParallelTeamCalls({providerIds:selected,task,history
   'parallel AI Team execution must use the tested provider fan-out helper');
 assert.ok(main.includes('runSequentialTeamCalls({')&&main.includes('getHistory:()=>chatContext().slice(0,-1)'),
   'sequential pipeline UI must use the tested stage runner and refresh context between stages');
-assert.ok(main.includes('runParallelTeamCalls({')&&main.includes('callProvider:(id,task,history)=>settings.demoMode?demoAnswer(id,task):callProvider(id,task,history)'),
-  'model comparison must retain demo/live behavior through the shared fan-out helper');
+assert.ok(main.includes('runParallelTeamCalls({')&&main.includes('providerIds:selected,task:prompt,history:[],\n      callProvider\n    });'),
+  'model comparison must call only configured real providers through the shared fan-out helper');
 assert.ok(html.includes('id="selectAllTeam"'));
 assert.ok(html.includes('Tüm AI sağlayıcılarını takıma ekle'));
 assert.ok(pkg.scripts['test:ai-team']);

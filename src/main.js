@@ -464,7 +464,7 @@ function renderProviderCards(){
   $('chatProvider').value=providers[currentChatProvider]?currentChatProvider:'gemini';
   syncModeUI();
 }
-function pushMessage(role,content,meta){ chatHistory.push({role,content,provider:meta?.provider||'',mode:meta?.mode||'demo',time:new Date().toISOString()}); if(chatHistory.length>80)chatHistory=chatHistory.slice(-80); renderChat(); persistChat(); }
+function pushMessage(role,content,meta){ chatHistory.push({role,content,provider:meta?.provider||'',mode:meta?.mode||'live',time:new Date().toISOString()}); if(chatHistory.length>80)chatHistory=chatHistory.slice(-80); renderChat(); persistChat(); }
 function renderChat(){const out=$('chatMessages');if(!out)return;if(!chatHistory.length){out.innerHTML='<div class="chat-empty"><div class="chat-empty-icon">✳</div><h2>Bugün ne yapmak istiyorsun?</h2><p>Bir soru sor, dosya ekle, kod geliştir veya bir plugin seç. Yanıtlar seçtiğin gerçek AI motorundan gelir.</p></div>';}else{out.innerHTML=chatHistory.map(m=>'<article class="chat-bubble '+(m.role==='user'?'user':'assistant')+'"><div class="chat-meta">'+(m.role==='user'?'SEN':esc(m.provider||'AI STUDIO'))+' · '+(m.mode==='error'?'HATA':m.mode==='live'?'GERÇEK MODEL':'DEMO')+'</div><div class="chat-text '+(m.mode==='error'?'error':'')+'">'+esc(m.content)+'</div></article>').join('');}out.scrollTop=out.scrollHeight;renderSidebarChats();}
 function fitChatInput(){const input=$('chatInput');if(!input)return;input.style.height='auto';input.style.height=Math.min(input.scrollHeight,180)+'px';}
 let chatPersistTimer;
@@ -775,7 +775,7 @@ async function runPipeline(prompt){
     busy=false;$('chatInput').disabled=false;$('chatForm').querySelector('[type=submit]').disabled=false;$('teamRun').disabled=false;$('pipelineRun').disabled=false;syncModeUI();
   }
 }
-function renderCompareResults(results){$('compareResults').innerHTML=results.map(r=>'<article class="result-card"><div class="result-label">'+esc(providers[r.id].name)+' · '+(r.error?'HATA':r.mode==='live'?'GERÇEK MODEL':'DEMO ŞABLONU')+'</div><p>'+esc(r.error||r.answer)+'</p></article>').join('');}
+function renderCompareResults(results){$('compareResults').innerHTML=results.map(r=>'<article class="result-card"><div class="result-label">'+esc(providers[r.id].name)+' · '+(r.error?'HATA':r.mode==='live'?'GERÇEK MODEL':'YANIT')+'</div><p>'+esc(r.error||r.answer)+'</p></article>').join('');}
 async function runCompare(){
   if(busy){showToast('Başka bir ajan işi çalışıyor.');return;}
   const prompt=$('comparePrompt').value.trim();
@@ -1771,7 +1771,7 @@ document.addEventListener('click',async e=>{
   const save=e.target.closest('[data-save-key]');if(save){await saveProviderCard(save.dataset.saveKey);return;}
   const test=e.target.closest('[data-test-provider]');if(test){await testProvider(test.dataset.testProvider);return;}
   const del=e.target.closest('[data-delete-key]');if(del){const id=del.dataset.deleteKey;if(confirm(providers[id].name+' anahtarı bu uygulamadan silinsin mi?')){await deleteSecret(id);renderProviderCards();updateDashboard();showToast('Anahtar silindi.');}return;}
-  const projectActivate=e.target.closest('[data-project-activate]');if(projectActivate){const project=projectList.find(p=>p.id===projectActivate.dataset.projectActivate);if(project){activeProjectId=project.id;await setPref(DB.activeProject,activeProjectId);renderProjects();showToast('Aktif proje tüm gerçek ajan çağrılarının bağlamına eklendi. Demo modu gerçek model çalıştırmaz.');}return;}
+  const projectActivate=e.target.closest('[data-project-activate]');if(projectActivate){const project=projectList.find(p=>p.id===projectActivate.dataset.projectActivate);if(project){activeProjectId=project.id;await setPref(DB.activeProject,activeProjectId);renderProjects();showToast('Aktif proje tüm gerçek ajan çağrılarının bağlamına eklendi. ');}return;}
   const projectDel=e.target.closest('[data-project-delete]');if(projectDel){const removed=projectList.splice(Number(projectDel.dataset.projectDelete),1)[0];if(removed?.id===activeProjectId)activeProjectId=projectList[0]?.id||'';await Promise.all([setPref(DB.projects,projectList),setPref(DB.activeProject,activeProjectId)]);renderProjects();updateDashboard();return;}
   const projectExport=e.target.closest('[data-project-export]');if(projectExport){const p=projectList[Number(projectExport.dataset.projectExport)];downloadText((p.name||'proje').replace(/[^a-z0-9-_]+/gi,'_')+'.md',projectMarkdown(p));return;}
   const projectOpen=e.target.closest('[data-project-open]');if(projectOpen){const p=projectList[Number(projectOpen.dataset.projectOpen)];if(p){activeProjectId=p.id;await setPref(DB.activeProject,activeProjectId);renderProjects();go('chat');$('chatInput').value='Aktif projedeki mevcut kararları dikkate alarak en iyi sonraki adımları öner.';$('chatInput').focus();}return;}
