@@ -148,3 +148,62 @@ This file contains proposals only. Nothing below is implemented by this commit.
 5. Remaining ideas can be scheduled after dependency and scope review.
 
 **Pipeline status:** All entries start as `NEW`. The review stage must independently verify duplicates and current source before changing any item to `READY`. The implementation stage must not treat this file as approval to perform external, destructive, paid or publishing actions.
+
+---
+
+## Fresh ideas — 2026-11-20
+
+**Source snapshot before this append:** feature branch `5c05c641af7889f73f7ab4c237ddc3d96442ec86`  
+**PR #2:** open, Draft, unmerged; base `main`  
+**Main snapshot:** `aab010319b6500002844bd24b11da85dd9ca3b00`
+
+These proposals were checked against the current source modules and the ten existing ideas above. They are new proposals only; no application code or existing idea status was changed. All cloud-model paths must continue to use verified free model IDs; local Ollama/GGUF routes remain local. No silent paid fallback is allowed.
+
+### IDEA-CONTEXT-001 — Per-request context disclosure inspector
+
+- **Priority:** P0
+- **Status:** NEW
+- **Estimated scope:** M
+- **Why it is new:** `src/main.js` currently reports a project name and approximate file/snippet counts in `renderProjectContextStatus()`. The actual provider system prompt is assembled separately in `systemFor()` from project context, selected shared-vault references and general Skills. There is no per-request screen that shows the exact context sections and sizes that will accompany a specific provider call. This is broader than the separate REA disclosure rule because it covers ordinary chat, AI Team, Local Coder and other provider routes.
+- **User benefit:** Know what project notes, source files, snippets, saved references and Skills are being sent before a cloud model receives them; remove a section for one request without changing permanent settings.
+- **Technical approach:** Add a pure context-manifest builder alongside `src/project-context.js` and `src/shared-vault-context.js`. Build the manifest from the same normalized sections used to assemble the final request, with source labels, character/byte counts and the destination provider/model. Add a preview step for cloud calls with per-request include/exclude controls. Keep local GGUF/Ollama calls visibly marked as local. Do not display or serialize API keys; do not persist preview contents or create extra network requests.
+- **Dependencies:** Existing `systemFor()`, `buildSharedProjectContext()`, `buildSharedVaultContext()`, Skill context builder, provider routing and chat/Team/Local Coder confirmation UI.
+- **Risks:** Preview and actual payload could drift; sensitive text could remain in UI state; added confirmation could interrupt simple chat. Mitigate by deriving both preview and request from one immutable payload object, clearing preview state after the request, and using a compact expandable preview with a clear local/cloud label.
+- **Acceptance criteria:** The preview exactly matches the context sections sent in the request; toggling a section changes only that request; local routes are identified accurately; API keys never appear; tests cover every context source and prevent preview/request mismatch.
+
+### IDEA-PATCH-001 — Multi-file patch preview and transactional apply
+
+- **Priority:** P1
+- **Status:** NEW
+- **Estimated scope:** L
+- **Why it is new:** The code workspace stores multiple files, but `applyLocalCoderDraft()` currently replaces and saves only the active editor file. AI Swarm produces plans and results but does not write workspace files. There is no structured, reviewable multi-file patch format with stale-file conflict detection and one explicit apply operation.
+- **User benefit:** Apply a coordinated change across several workspace files without manually copying each AI result or accidentally overwriting newer edits.
+- **Technical approach:** Define a bounded patch schema containing workspace file ID/name, expected pre-change content hash, proposed content or a validated unified diff, and a short reason. Validate every target against the current workspace; reject unknown IDs, path-like names, duplicate targets, oversized payloads and stale hashes. Show a per-file diff preview, allow files to be excluded, then ask for one explicit confirmation. Persist the complete updated file list as one workspace preference value; update in-memory state only after persistence succeeds and retain the original snapshot for rollback on failure.
+- **Dependencies:** Existing `codeFiles` store, `normalizeCodeFileList()`, active-file save/load flow, Local Coder Plan/Code/Review outputs and AI Swarm result records.
+- **Risks:** Stale edits, malformed patches, partial storage failures and prompt-injected code. Mitigate with content-hash preconditions, strict size/path limits, per-file diff review, a pre-apply snapshot, no code execution and rollback if persistence fails.
+- **Acceptance criteria:** A multi-file patch can be previewed without changing files; stale hashes block apply; excluded files remain untouched; successful apply updates all selected files; failed persistence restores the prior in-memory workspace; no patch executes automatically.
+
+### IDEA-CHAT-001 — Fork a conversation from a selected message
+
+- **Priority:** P2
+- **Status:** NEW
+- **Estimated scope:** M
+- **Why it is new:** The current chat system supports creating, searching, switching and persisting separate threads through `makeChatThread()`, `createNewChat()` and `switchChatThread()`. It does not preserve parent/child lineage or create a new thread from a selected point in an existing conversation.
+- **User benefit:** Try a different prompt, model or approach from an earlier message while keeping the original conversation intact.
+- **Technical approach:** Add a “Continue from here in a new chat” action to eligible messages. Clone only the message prefix through the selected message into a new thread, add bounded parent-thread ID and fork-index metadata, and then continue in the new thread. Keep the source thread unchanged; preserve the existing thread/message caps and migrate older thread records with empty lineage fields.
+- **Dependencies:** `chatThreads`, `makeChatThread()`, `persistChatThreads()`, message renderer, sidebar thread list and workspace backup compatibility.
+- **Risks:** Duplicated sensitive conversation content, excessive storage growth and broken lineage after deletion/import. Mitigate with an explicit fork action, existing thread caps, visible parent label and safe fallback when the parent is missing.
+- **Acceptance criteria:** Forking creates a separate thread containing only the selected prefix; the original thread is unchanged; both threads can be switched independently; old backups and threads still load; deleting a parent does not corrupt the child.
+
+### IDEA-TEAM-001 — Agreement and contradiction synthesis for parallel AI Team
+
+- **Priority:** P1
+- **Status:** NEW
+- **Estimated scope:** M
+- **Why it is new:** `runParallelTeamCalls()` currently returns individual provider answers, and `runCompare()` renders them as separate result cards. The Swarm coordinator has a task-planning synthesis step, but the user-facing parallel Team/Model Compare flows do not offer a separate evidence-linked agreement and contradiction report.
+- **User benefit:** See where selected models agree, where they conflict, which claims lack support and what needs human verification instead of comparing several long answers manually.
+- **Technical approach:** After the initial parallel results are displayed, offer an optional “Synthesize answers” action. Send only successful, bounded responses to one user-selected evaluator that passes the existing free-model allowlist or is local Ollama/GGUF. Require a separate confirmation before this extra provider call. Ask for structured sections: shared conclusions, contradictions with provider attribution, unique useful points, uncertain claims and checks still needed. Preserve links between each synthesized claim and the source response; never present model agreement as proof.
+- **Dependencies:** `runParallelTeamCalls()`, Model Compare result state, `callProvider()`, `isFreeApiProviderModel()` and existing live-request consent UI.
+- **Risks:** Additional quota use, evaluator hallucinations and prompt injection embedded in model outputs. Mitigate with opt-in execution, visible request count, free/local-only evaluator selection, treating all source answers as untrusted data and retaining source attribution.
+- **Acceptance criteria:** No evaluator request occurs automatically; paid or unverified model IDs are rejected before network access; synthesis identifies the source provider for every disagreement; failed synthesis leaves original answers intact; tests cover partial failures and malicious instruction text in model outputs.
+
