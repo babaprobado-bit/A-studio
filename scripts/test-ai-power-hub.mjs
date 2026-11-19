@@ -51,7 +51,7 @@ assert.equal(result.metrics.fileConflictCount,1);
 assert.match(result.summary,/Synthesis complete/);
 
 assert.equal(PROMPT_PLUGIN_CATALOG.length,36);
-assert.equal(new Set(PROMPT_PLUGIN_CATALOG.map(item=>item.id)).size,35);
+assert.equal(new Set(PROMPT_PLUGIN_CATALOG.map(item=>item.id)).size,36);
 assert.equal(normalizeEnabledPluginIds(null).length,36);
 assert.equal(filterPromptPlugins({enabledIds:['babylon'],query:'babylon'}).length,1);
 assert.equal(filterPromptPlugins({enabledIds:['babylon'],category:'Oyun Geliştirme'}).length,6);
