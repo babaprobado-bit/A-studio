@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { GEMINI_FREE_MODELS } from '../src/free-api-providers.js';
 import { readFile } from 'node:fs/promises';
 import { DEVICE_MODEL_CATALOG, DEVICE_CHAT_LIMITS, DeviceLocalCoder, assessDeviceModel, chooseRecommendedDeviceModel, estimateMinimumAvailableRamBytes, formatModelBytes, normalizeDeviceChatMessages, normalizeModelSha256 } from '../src/device-local-coder.js';
 
@@ -54,7 +55,8 @@ assert.ok(nativeChatSource.indexOf('MAX_CHAT_MESSAGES') >= 0 && nativeChatSource
 const providerDefaultsStart = mainSource.indexOf('const providers = {');
 const providerDefaultsEnd = mainSource.indexOf('const defaultSettings', providerDefaultsStart);
 const providerDefaults = mainSource.slice(providerDefaultsStart, providerDefaultsEnd);
-assert.match(providerDefaults,/gemini: \{[^\n]*model:'gemini-2\.5-flash-lite'/);
+assert.match(providerDefaults,/gemini: \{[^\n]*model:'gemini-3\.8-flash', freeModels:GEMINI_FREE_MODELS/);
+assert.ok(GEMINI_FREE_MODELS.includes('gemini-3.8-flash'));
 assert.match(providerDefaults,/openrouter: \{[^\n]*model:'openrouter\/free'/);
 for (const paidDefault of ['gpt-5-mini','claude-sonnet-5','deepseek-chat','llama-3.3-70b-versatile','openai/gpt-oss-120b:fastest']) {
   assert.ok(!providerDefaults.includes("model:'"+paidDefault+"'"), 'paid model must not be preselected: '+paidDefault);
