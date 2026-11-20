@@ -1,3 +1,9 @@
+# AI Studio — Session 22 continuation starter
+
+Read `docs/HANDOFF/README.md`, `docs/HANDOFF/PROJECT_STATE.md`, and `docs/HANDOFF/SESSION_22_FREE_MODEL_AUDIT_2026-11-20.md` first. Latest free-model code commit: `5d1a00f8b95732ce5a398673be7614ace583a712`. Native GGUF workflow run `44691719217` is building that source commit; inspect its regression checks, Gradle packaging and artifact before claiming completion. Gemini defaults to `gemini-3.8-flash`, Groq exposes only allowlisted models, Cloudflare no longer lists the 2026-11-20-deprecated Nemotron 3 120B, and the provider directory correctly shows 9 active providers. Keep PR #2 open/Draft/unmerged and never modify `main`.
+
+---
+
 # AI Studio — Session 21 continuation starter
 
 Read `docs/HANDOFF/README.md`, `docs/HANDOFF/PROJECT_STATE.md`, and `docs/HANDOFF/SESSION_21_APINEX_PROVIDER_2026-11-18.md` first. Latest full Native GGUF APK built successfully from code commit `cd0ec2f`; workflow `44250970061`, artifact `14406301468`. Verify current APK artifact and SHA from Session 21 handoff. APK is ARM64 (`arm64-v8a`) and has not been physically tested. APInex remains an optional provider restricted to lowercase `free/*` IDs. Keep PR #2 open/Draft/unmerged and never touch `main`.

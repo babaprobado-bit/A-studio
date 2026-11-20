@@ -16,7 +16,7 @@
 - The other 27 research candidates remain disabled until exact model IDs, official $0 pricing, recurring free quota and pre-request cost protection are verified.
 
 ## Verification boundary
-- Source regression checks were updated in this change. GitHub Actions Native GGUF APK verification is required after this commit.
+- Source regression checks were updated in this change. Native GGUF workflow `44691719217` was dispatched for source commit `5d1a00f8b95732ce5a398673be7614ace583a712`; verify its final outcome and artifact before release.
 - No live provider API request, paid API call, billing action, physical-device test or offline inference test is claimed.
 
 ## Repository constraints
