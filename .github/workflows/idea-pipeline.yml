@@ -1,0 +1,59 @@
+name: AI Studio Daily Idea Pipeline
+on:
+  schedule:
+    # 00:00 / 01:00 / 02:00 Europe/Istanbul (UTC+3). Only active from the default branch.
+    - cron: '0 21 * * *'
+    - cron: '0 22 * * *'
+    - cron: '0 23 * * *'
+  workflow_dispatch:
+    inputs:
+      stage:
+        description: Run all stages or one stage manually
+        required: true
+        default: full
+        type: choice
+        options: [full, generate, review, implement]
+permissions:
+  contents: write
+  pull-requests: write
+concurrency:
+  group: ai-studio-daily-idea-pipeline
+  cancel-in-progress: false
+jobs:
+  pipeline:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ vars.IDEA_PIPELINE_BASE_BRANCH || 'feature/android-offline-skills-v1' }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Validate pipeline
+        run: |
+          node --check scripts/idea-pipeline.mjs
+          node scripts/test-idea-pipeline.mjs
+      - name: Run scheduled stage
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          IDEA_PIPELINE_BASE_BRANCH: ${{ vars.IDEA_PIPELINE_BASE_BRANCH || 'feature/android-offline-skills-v1' }}
+          EVENT_SCHEDULE: ${{ github.event.schedule }}
+          INPUT_STAGE: ${{ inputs.stage }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          if [ "$EVENT_NAME" = "schedule" ]; then
+            case "$EVENT_SCHEDULE" in
+              '0 21 * * *') STAGE=generate ;;
+              '0 22 * * *') STAGE=review ;;
+              '0 23 * * *') STAGE=implement ;;
+              *) echo "Unknown cron stage: $EVENT_SCHEDULE"; exit 1 ;;
+            esac
+          else
+            STAGE="${INPUT_STAGE:-full}"
+          fi
+          echo "Running idea pipeline stage: $STAGE"
+          node scripts/idea-pipeline.mjs "--stage=$STAGE"

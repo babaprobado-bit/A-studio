@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import { parseJson, dayIstanbul, allowedPath, validatePatch } from './idea-pipeline.mjs';
+assert.deepEqual(parseJson('```json\n{"ok":true}\n```'), {ok:true});
+assert.equal(dayIstanbul(new Date('2026-11-19T21:30:00.000Z')), '2026-11-20');
+assert.equal(allowedPath('src/feature.js'), true);
+assert.equal(allowedPath('scripts/test-feature.mjs'), true);
+assert.equal(allowedPath('docs/IDEA_PIPELINE/generated/idea.md'), true);
+for (const p of ['../escape.js','src/../bad.js','src/main.js','.github/workflows/x.yml','package.json','android/app/src/Main.kt','src\\bad.js']) assert.equal(allowedPath(p), false, p);
+assert.throws(()=>validatePatch({files:[{path:'src/x.js',content:'export default 1;'}]}), /regression test/);
+assert.equal(validatePatch({files:[{path:'src/x.js',content:'export default 1;'},{path:'scripts/test-x.mjs',content:'assert.ok(true);'}]}).files.length, 2);
+assert.throws(()=>validatePatch({files:[{path:'package.json',content:'{}'}]}), /Rejected/);
+assert.throws(()=>validatePatch({files:[{path:'src/x.js',content:'x'},{path:'src/x.js',content:'y'}]}), /Rejected/);
+assert.throws(()=>validatePatch({files:[{path:'src/x.js',content:'x'.repeat(80001)}]}), /Rejected/);
+console.log('Idea Pipeline regression suite passed.');
