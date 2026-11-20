@@ -11,8 +11,7 @@ export const FREE_API_PROVIDER_CATALOG=Object.freeze([
 ]);
 export const CLOUDFLARE_FREE_MODELS=Object.freeze([
 '@cf/zai-org/glm-4.7-flash',
-'@cf/google/gemma-4-26b-a4b-it',
-'@cf/nvidia/nemotron-3-120b-a12b'
+'@cf/google/gemma-4-26b-a4b-it'
 ]);
 export const ZAI_FREE_MODELS=Object.freeze([
 'glm-4.7-flash',
@@ -55,7 +54,12 @@ export const EXTERNAL_CONNECTOR_CATALOG=Object.freeze([
 ]);
 
 // A model is allowed only when its exact ID is on a provider-specific free list.
-export const GEMINI_FREE_MODELS=Object.freeze(['gemini-2.5-flash-lite']);
+export const GEMINI_FREE_MODELS=Object.freeze([
+  'gemini-3.8-flash',
+  'gemini-3.1-flash-lite-preview',
+  'gemini-3-flash-preview',
+  'gemini-2.5-flash-lite'
+]);
 export const GROQ_FREE_MODELS=Object.freeze(['openai/gpt-oss-120b','openai/gpt-oss-20b','qwen/qwen3.8-27b']);
 export const FREE_API_MODEL_ALLOWLIST=Object.freeze({
   gemini:GEMINI_FREE_MODELS,

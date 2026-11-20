@@ -74,7 +74,7 @@ export async function mountAiPowerHub(options={}){
       '<div class="row-actions"><button type="button" class="btn primary" id="runOpenRouterMulti">Seçili modelleri çalıştır</button><span class="grow"></span><span id="openRouterMultiStatus" class="fineprint">En az iki model seç.</span></div><div id="openRouterMultiResults" class="stack"></div>'+
       '<p class="fineprint">Seçilen her model bir API isteği ve kota kullanır. Uygulama ücretli model kimliklerini reddeder; ücretsiz model kotaları yine de sınırlıdır.</p></section>'+
     '<section class="ai-power-panel" data-power-panel="providers" hidden>'+
-      '<div class="ai-power-heading"><div><div class="eyebrow">FREE API DIRECTORY</div><h3>13 API sağlayıcısı</h3><p>Yalnızca doğrulanmış ücretsiz katman, sıfır fiyatlı model veya ücretsiz geliştirici erişimi gösterilir. Ücretli ve deneme kredili seçenekler çıkarıldı.</p></div><span class="pill">Ücretli varsayılan yok</span></div>'+
+      '<div class="ai-power-heading"><div><div class="eyebrow">FREE API DIRECTORY</div><h3>9 API sağlayıcısı</h3><p>Yalnızca doğrulanmış ücretsiz katman, sıfır fiyatlı model veya ücretsiz geliştirici erişimi gösterilir. Ücretli ve deneme kredili seçenekler çıkarıldı.</p></div><span class="pill">Ücretli varsayılan yok</span></div>'+
       '<div class="ai-provider-directory" id="freeProviderDirectory"></div>'+
       '<div class="panel ai-provider-setup"><div class="section-head"><div><div class="eyebrow">OPTIONAL FREE ROUTES</div><h3>Cloudflare Workers AI</h3></div><span class="pill">AI Team listesine otomatik eklenmez</span></div>'+
       '<p class="fineprint">İsteğe bağlı bağlantılar. API anahtarları Android güvenli deposunda tutulur. Kota/plan şartlarını sağlayıcı panelinde kontrol et.</p>'+
