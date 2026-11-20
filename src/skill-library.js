@@ -445,7 +445,7 @@ export const SKILL_PROFILES = Object.freeze({
   balanced: {
     name: 'Dengeli Geliştirme', description: 'Genel geliştirme için karışık paket.',
     skillIds: ['karpathy-guidelines','sp-clarify','sp-codebase-map','sp-minimal-diff','sp-test-first','sp-compatibility','cv-concise','cv-no-guess']
-  }
+  },
   'external-code-pack': {
     name: 'External Code Pack · Kod', description: '30 harici beceri paketindeki altı kod ve mühendislik becerisi.',
     skillIds: ['ext-karpathy-principles','ext-matt-pocock-planning','ext-ecc-universal-workflow','ext-addy-osmani-production-review','ext-superpowers-development-loop','ext-ponytail-simplifier']
