@@ -1493,7 +1493,7 @@ async function persistSkillState(){
 function renderSkillLibrary(){
   const list=$('skillLibraryList'); if(!list)return;
   const selected=new Set(selectedSkillIds);
-  const groups=['Guidelines','Superpowers','Caveman','Custom'];
+  const groups=['Guidelines','Superpowers','Caveman','Video','Code','Research','Tokens','Design','Writing & Video','Custom'];
   list.innerHTML=groups.map(group=>{
     const items=skillLibrary.filter(skill=>skill.group===group);
     if(!items.length)return '';

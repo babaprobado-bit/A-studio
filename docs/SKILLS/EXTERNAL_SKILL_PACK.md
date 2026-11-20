@@ -55,6 +55,7 @@ This pack adds **30 built-in, AI Studio-authored instruction adaptations** to th
 - Each entry has a stable `ext-*` ID, Skill Library group, stage (`plan`, `code`, `review`, or `all`), source URL, and review metadata.
 - Existing selection limits and stage context limits remain unchanged. A profile can select at most eight Skills at once.
 - Existing profiles are not silently replaced or changed.
+- The Skill Library screen now renders the original Guidelines, Superpowers, Caveman, Video, and Custom groups plus the five external-pack groups: Code, Research, Tokens, Design, and Writing & Video.
 - Overlap metadata flags entries that should complement existing Skills, not duplicate them.
 
 ## Important boundaries

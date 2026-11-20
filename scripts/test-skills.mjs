@@ -184,6 +184,13 @@ assert.equal(boundedBackup.profileId, 'balanced');
 console.log('Skill backup compatibility tests passed.');
 
 const mainUiSource = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
+const skillGroupStart = mainUiSource.indexOf('function renderSkillLibrary()');
+const skillGroupEnd = mainUiSource.indexOf('async function applySkillProfile', skillGroupStart);
+assert.ok(skillGroupStart >= 0 && skillGroupEnd > skillGroupStart, 'Skill Library group renderer must exist');
+const skillGroupRenderer = mainUiSource.slice(skillGroupStart, skillGroupEnd);
+for (const group of ['Guidelines','Superpowers','Caveman','Video','Code','Research','Tokens','Design','Writing & Video','Custom']) {
+  assert.ok(skillGroupRenderer.includes("'" + group + "'"), 'Skill Library must render the ' + group + ' group');
+}
 const previewStart = mainUiSource.indexOf('function renderSkillImportPreview()');
 const previewEnd = mainUiSource.indexOf('async function importSkillFiles(', previewStart);
 assert.ok(previewStart >= 0 && previewEnd > previewStart, 'Skill import preview renderer must exist');
