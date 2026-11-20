@@ -26,10 +26,26 @@ for (const skill of EXTERNAL_SKILL_PACK) {
 }
 assert.equal(SKILL_CATALOG.filter(skill => skill.group === 'Superpowers').length, 15);
 assert.equal(SKILL_CATALOG.filter(skill => skill.group === 'Caveman').length, 22);
-for (const id of ['karpathy','superpowers','superpowers-development','planning','review','caveman','caveman-short','balanced','openshorts','creator-automation']) {
+for (const id of ['karpathy','superpowers','superpowers-development','planning','review','caveman','caveman-short','balanced','openshorts','creator-automation','external-code-pack','external-research-pack','external-tokens-pack','external-design-pack','external-writing-video-pack']) {
   assert.ok(SKILL_PROFILES[id], 'missing profile: ' + id);
   assert.ok(SKILL_PROFILES[id].skillIds.length <= MAX_SELECTED_SKILLS, 'profile exceeds eight Skills: ' + id);
   assert.equal(getProfileSkillIds(id).length, SKILL_PROFILES[id].skillIds.length);
+}
+const externalProfileGroups = {
+  'external-code-pack': 'Code',
+  'external-research-pack': 'Research',
+  'external-tokens-pack': 'Tokens',
+  'external-design-pack': 'Design',
+  'external-writing-video-pack': 'Writing & Video'
+};
+for (const [profileId, group] of Object.entries(externalProfileGroups)) {
+  const ids = getProfileSkillIds(profileId);
+  assert.equal(ids.length, 6, profileId + ' must load exactly six Skills');
+  assert.deepEqual(
+    ids.map(id => EXTERNAL_SKILL_PACK.find(skill => skill.id === id)?.group),
+    Array(6).fill(group),
+    profileId + ' must only contain Skills from ' + group
+  );
 }
 assert.deepEqual(getProfileSkillIds('karpathy'), ['karpathy-guidelines']);
 assert.equal(getProfileSkillIds('balanced').length, MAX_SELECTED_SKILLS);
@@ -184,6 +200,10 @@ assert.equal(boundedBackup.profileId, 'balanced');
 console.log('Skill backup compatibility tests passed.');
 
 const mainUiSource = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
+const indexHtmlSource = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+for (const profileId of Object.keys(externalProfileGroups)) {
+  assert.ok(indexHtmlSource.includes('value="' + profileId + '"'), 'profile selector must expose ' + profileId);
+}
 const skillGroupStart = mainUiSource.indexOf('function renderSkillLibrary()');
 const skillGroupEnd = mainUiSource.indexOf('async function applySkillProfile', skillGroupStart);
 assert.ok(skillGroupStart >= 0 && skillGroupEnd > skillGroupStart, 'Skill Library group renderer must exist');

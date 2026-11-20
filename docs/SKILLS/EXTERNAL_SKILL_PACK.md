@@ -72,3 +72,15 @@ This pack adds **30 built-in, AI Studio-authored instruction adaptations** to th
 ## Verification
 
 Run `npm run test:skills`. Tests check total catalogue size, exact pack size, six entries per category, unique IDs, valid stages, source URLs, and metadata boundaries, alongside existing import and backup regression tests.
+
+
+## One-click category profiles
+
+The Skill Library also includes five ready-to-select profiles, each loading exactly the six entries in one category:
+- External Code Pack · Kod
+- External Research Pack · Araştırma
+- External Tokens Pack · Bağlam
+- External Design Pack · Tasarım
+- External Writing & Video Pack · İçerik
+
+All five fit the existing eight-skill selection cap. These profiles select six prompt instructions; they do not install the upstream repositories or grant tool permissions. Their IDs are persisted using the existing profile backup/restore path.
