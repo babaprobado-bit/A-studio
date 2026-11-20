@@ -411,7 +411,7 @@ export const SKILL_CATALOG = Object.freeze([
     "author": "mutonby",
     "version": "1",
     "builtIn": true
-  }
+  },
   ...EXTERNAL_SKILL_PACK
 ]);
 export const SKILL_PROFILES = Object.freeze({
