@@ -19,6 +19,8 @@ on:
       - 'src/apinex-provider.js'
       - 'src/plugin-catalog.js'
       - 'src/ai-power-hub.js'
+      - 'scripts/idea-pipeline.mjs'
+      - 'scripts/test-idea-pipeline.mjs'
       - 'scripts/test-ai-power-hub.mjs'
       - 'server/server.js'
       - 'src/social-studio.js'
@@ -124,6 +126,9 @@ jobs:
           node --check src/apinex-provider.js
           node --check scripts/test-ai-power-hub.mjs
           npm run test:ai-power-hub
+          node --check scripts/idea-pipeline.mjs
+          node --check scripts/test-idea-pipeline.mjs
+          node scripts/test-idea-pipeline.mjs
       - name: Generate Capacitor Android project
         run: npx cap add android
       - name: Prepare a smaller Gradle distribution
