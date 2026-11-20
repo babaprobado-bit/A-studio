@@ -1,3 +1,6 @@
+import { EXTERNAL_SKILL_PACK } from './skill-packs/external-skill-pack.js';
+export { EXTERNAL_SKILL_PACK };
+
 export const MAX_SELECTED_SKILLS = 8;
 export const MAX_CUSTOM_SKILLS = 100;
 export const MAX_STAGE_SKILL_CHARS = 36000;
@@ -409,6 +412,7 @@ export const SKILL_CATALOG = Object.freeze([
     "version": "1",
     "builtIn": true
   }
+  ...EXTERNAL_SKILL_PACK
 ]);
 export const SKILL_PROFILES = Object.freeze({
   'creator-automation': { name: 'Creator Automation', description: 'vidIQ ile video keşfi ve OpenShorts ile klip üretimi/yayınlama.', skillIds: ['vidiq-discovery','openshorts-workflow'] },

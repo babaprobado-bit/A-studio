@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  SKILL_CATALOG, SKILL_PROFILES, MAX_SELECTED_SKILLS, MAX_STAGE_SKILL_CHARS,
+  SKILL_CATALOG, SKILL_PROFILES, EXTERNAL_SKILL_PACK, MAX_SELECTED_SKILLS, MAX_STAGE_SKILL_CHARS,
   parseSkillMarkdown, normalizeSkill, buildStageSkillContext, getProfileSkillIds,
   createSkillBackupState, restoreSkillBackupState,
   prepareSkillImportQueue
@@ -9,7 +9,21 @@ import {
 import { encryptWorkspaceBackup, decryptWorkspaceBackup } from '../src/encrypted-backup.js';
 import { webcrypto } from 'node:crypto';
 
-assert.equal(SKILL_CATALOG.length, 40, 'starter pack adds vidIQ discovery and OpenShorts workflow Skills');
+assert.equal(SKILL_CATALOG.length, 70, '40 existing Skills plus the 30-entry external pack');
+assert.equal(EXTERNAL_SKILL_PACK.length, 30, 'external pack must contain exactly 30 original instruction adaptations');
+assert.deepEqual([...new Set(EXTERNAL_SKILL_PACK.map(skill => skill.group))].sort(), ['Code','Design','Research','Tokens','Writing & Video']);
+for (const group of ['Code','Research','Tokens','Design','Writing & Video']) {
+  assert.equal(EXTERNAL_SKILL_PACK.filter(skill => skill.group === group).length, 6, group + ' must contain six Skills');
+}
+assert.equal(new Set(EXTERNAL_SKILL_PACK.map(skill => skill.id)).size, 30, 'external Skill IDs must be unique');
+for (const skill of EXTERNAL_SKILL_PACK) {
+  assert.ok(skill.id.startsWith('ext-'));
+  assert.ok(['plan','code','review','all'].includes(skill.stage));
+  assert.ok(skill.sourceUrl.startsWith('https://github.com/'));
+  assert.equal(skill.builtIn, true);
+  assert.equal(skill.metadata.upstreamCodeIncluded, 'false');
+  assert.ok(skill.content.length > 80 && skill.content.length <= 12000);
+}
 assert.equal(SKILL_CATALOG.filter(skill => skill.group === 'Superpowers').length, 15);
 assert.equal(SKILL_CATALOG.filter(skill => skill.group === 'Caveman').length, 22);
 for (const id of ['karpathy','superpowers','superpowers-development','planning','review','caveman','caveman-short','balanced','openshorts','creator-automation']) {
