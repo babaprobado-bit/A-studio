@@ -73,7 +73,10 @@ const pipelineEnd=main.indexOf('function renderCompareResults(results)',pipeline
 assert.ok(pipelineStart>=0&&pipelineEnd>pipelineStart,'AI Team pipeline must exist');
 const pipelineSource=main.slice(pipelineStart,pipelineEnd);
 assert.match(pipelineSource,/runSequentialTeamCalls\(\{/,'pipeline must use the tested sequential team runner');
-assert.match(pipelineSource,/runStage:\(\{id,prompt\},history\)=>callProvider\(id,prompt,history\)/,'pipeline must send each computed stage prompt and current history to the real provider');
+assert.match(pipelineSource,/runStage:async\(\{id,prompt\},history\)=>\{/,'pipeline must wrap every stage with agent lifecycle hooks');
+assert.match(pipelineSource,/await callProvider\(id,prompt,history\)/,'pipeline must send each computed stage prompt and current history to the real provider');
+assert.match(pipelineSource,/source:'pipeline'/,'pipeline hook events must identify pipeline work');
+assert.match(pipelineSource,/afterAgentRun/,'pipeline must emit after-agent hooks on completion and failure');
 assert.doesNotMatch(pipelineSource,/stageRoles/,'pipeline must not depend on an undefined legacy stageRoles array');
 assert.match(main,/function providerIsReady\(id\)/,'live team execution must skip unconfigured providers');
 
