@@ -804,7 +804,11 @@ async function runTeam(prompt){
   load.className='result-card';load.innerHTML='<div class="result-label">TAKIM TURU</div><p>Seçili ajanlar çalışıyor…</p>';out.append(load);
   const history=chatContext().slice(0,-1);
   try{
-    const results=await runParallelTeamCalls({providerIds:selected,task,history,callProvider});
+    const results=await runParallelTeamCalls({providerIds:selected,task,history,callProvider:async(id,prompt,priorHistory)=>{
+      await agentHooks.emit('beforeAgentRun',{providerId:id,source:'team',taskLength:String(prompt||'').length});
+      try{const answer=await callProvider(id,prompt,priorHistory);await agentHooks.emit('afterAgentRun',{providerId:id,source:'team',status:'completed'});return answer;}
+      catch(error){await agentHooks.emit('afterAgentRun',{providerId:id,source:'team',status:'failed',detail:error?.message||'error'});throw error;}
+    }});
     load.remove();
     results.forEach(r=>pushMessage('assistant',r.error?'Hata: '+r.error:r.answer,{provider:providers[r.id].name,mode:r.error?'error':'live'}));
     for(const r of results)await logAgentActivity('Paralel ajan · '+providers[r.id].name,r.error?'Hata':'Tamamlandı',r.error||String(r.answer||'').slice(0,180));
@@ -834,7 +838,11 @@ async function runPipeline(prompt){
       providerIds:selected,
       task,
       getHistory:()=>chatContext().slice(0,-1),
-      runStage:({id,prompt},history)=>callProvider(id,prompt,history),
+      runStage:async({id,prompt},history)=>{
+        await agentHooks.emit('beforeAgentRun',{providerId:id,source:'pipeline',taskLength:String(prompt||'').length});
+        try{const answer=await callProvider(id,prompt,history);await agentHooks.emit('afterAgentRun',{providerId:id,source:'pipeline',status:'completed'});return answer;}
+        catch(error){await agentHooks.emit('afterAgentRun',{providerId:id,source:'pipeline',status:'failed',detail:error?.message||'error'});throw error;}
+      },
       onStageStart:async({id,index,stage})=>{
         const title='Aşama '+(index+1)+' · '+providers[id].name;
         await logAgentActivity('Sıralı zincir · '+title,'Çalışıyor',stage.role);
@@ -1705,7 +1713,10 @@ async function acceptSkillImport() {
 
 function skipSkillImport() {
   const entry = pendingSkillImports.shift();
-  if (entry) skillImportFailures.push(entry.fileName + ': önizlemede atlandı');
+  if (entry) {
+    skillImportFailures.push(entry.fileName + ': önizlemede atlandı');
+    agentHooks.emit('afterSkillImport',{accepted:0,skipped:true,detail:'Kullanıcı Skill önizlemesini atladı.'}).catch(()=>{});
+  }
   renderSkillImportPreview();
 }
 
