@@ -86,8 +86,8 @@ assert.ok(refreshedDynamicSkills.includedIds.includes('ecc-security-scan'));
 assert.ok(refreshedDynamicSkills.addedSkillIds.includes('ecc-agent-security'));
 assert.ok(refreshedDynamicSkills.includedIds.length<=8);
 assert.ok(refreshedDynamicSkills.charCount<=refreshedDynamicSkills.maxChars);
-assert.equal(parseSkillNeeds('Draft\\nSKILL_NEEDS: none'),'');
-assert.equal(parseSkillNeeds('Draft\\nSKILL_NEEDS: prompt injection security review'),'prompt injection security review');
+assert.equal(parseSkillNeeds('Draft\nSKILL_NEEDS: none'),'');
+assert.equal(parseSkillNeeds('Draft\nSKILL_NEEDS: prompt injection security review'),'prompt injection security review');
 const organized=organizeTaskPlan([
  {id:'build',title:'Build',role:'developer',objective:'Implement module',priority:5},
  {id:'tests',title:'Tests',role:'tester',objective:'Run regression tests',dependsOn:['build'],priority:5},
@@ -150,9 +150,9 @@ const expansionSwarm=await runAgentSwarm({
   ]});
   if(prompt.includes('Ajan katkıları'))return 'Dynamic expansion synthesis complete';
   expansionCalls.push(prompt);
-  if(prompt.includes('DYNAMIC SKILL EXPANSION'))return 'Revised settings result. CONFIDENCE: 92\\nSKILL_NEEDS: none';
-  if(prompt.includes('Alt görev: Implement local settings module'))return 'Initial settings output with a newly discovered issue.\\nSKILL_NEEDS: prompt injection security review and permission checks';
-  return 'Security review complete. CONFIDENCE: 88\\nSKILL_NEEDS: none';
+  if(prompt.includes('DYNAMIC SKILL EXPANSION'))return 'Revised settings result. CONFIDENCE: 92\nSKILL_NEEDS: none';
+  if(prompt.includes('Alt görev: Implement local settings module'))return 'Initial settings output with a newly discovered issue.\nSKILL_NEEDS: prompt injection security review and permission checks';
+  return 'Security review complete. CONFIDENCE: 88\nSKILL_NEEDS: none';
  }
 });
 const expandedWorker=expansionSwarm.results.find(item=>item.title==='Settings builder');
