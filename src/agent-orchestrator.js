@@ -3,7 +3,7 @@ export function scoreTaskComplexity(task){
  const t=String(task??'').trim().toLowerCase();if(!t)return 0;let s=0;
  if(t.length>160)s+=10;if(t.length>360)s+=12;if(t.length>700)s+=10;
  const sentence=(t.match(/[.!?;\n]+/g)||[]).length+1;if(sentence>=3)s+=8;if(sentence>=6)s+=8;
- const actions=(t.match(/\b(?:plan|build|create|implement|integrate|review|audit|test|debug|refactor|migrate|compare|automate|document|secure|optimize|design|deploy|uygula|incele)\b/g)||[]).length;s+=Math.min(24,actions*4);
+ const actions=(t.match(/\b(?:plan|build|create|add|write|update|verify|run|connect|implement|integrate|review|audit|test|debug|refactor|migrate|compare|automate|document|secure|optimize|design|deploy|uygula|ekle|yaz|güncelle|doğrula|bağla|incele)\b/g)||[]).length;s+=Math.min(24,actions*4);
  const steps=(t.match(/\b(?:first|then|after|before|finally|next|phase|step|aşama|sonra|ardından|önce)\b/g)||[]).length;s+=Math.min(16,steps*4);
  if(/\b(?:agent|multi.?agent|provider|api|database|android|memory|hook|security|architecture|workflow|pipeline)\b/.test(t))s+=10;
  if(/\b(?:also|together|ayrıca|birlikte|bunun yanında)\b/.test(t))s+=6;return clamp(s,0,100,0);
