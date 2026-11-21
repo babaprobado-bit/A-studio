@@ -25,7 +25,21 @@ export function normalizeSwarmFilePath(value){
   return parts.join('/');
 }
 export function fallbackSwarmTasks(task,maxTasks=3){
-  return createDefaultTaskPlan(task,{maxTasks:clamp(maxTasks,2,MAX_AGENTS,3)}).map((item,order)=>({...item,order:item.order??order}));
+  const limit=clamp(maxTasks,2,MAX_AGENTS,3);
+  const tasks=createDefaultTaskPlan(task,{maxTasks:limit});
+  const used=new Set(tasks.map(item=>item.id));
+  for(const [id,role,title,objective] of ROLES){
+    if(tasks.length>=limit)break;
+    if(used.has(id))continue;
+    used.add(id);
+    tasks.push({
+      id,role,title,roleGroup:classifyAgentRole({id,role,title,objective}),
+      objective:objective+' Ana görev: '+clean(task,800),
+      acceptance:['Somut bulgu veya öneri ver','Varsayım ve riski belirt','Doğrulama/test adımı yaz'],
+      files:[],dependsOn:[],priority:3,order:tasks.length
+    });
+  }
+  return organizeTaskPlan(tasks,{maxTasks:limit}).tasks.map((item,order)=>({...item,order:item.order??order}));
 }
 function createFallbackPlan(task,limit,reason){
   const organized=organizeTaskPlan(fallbackSwarmTasks(task,limit),{maxTasks:limit});

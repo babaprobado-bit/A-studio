@@ -6,7 +6,7 @@ import {selectSkillsForTask,buildTaskSkillContext,refreshTaskSkillContext} from 
 import {createAgentHookBus} from '../src/agent-hooks.js';
 import {createProjectMemoryRecord,normalizeProjectMemoryRecords,findRelevantProjectMemories,buildProjectMemoryContext,createProjectMemoryBackup,restoreProjectMemoryBackup} from '../src/agent-memory.js';
 import {scanAgentContent} from '../src/agent-shield.js';
-import {runAgentSwarm,parseSkillNeeds} from '../src/agent-swarm.js';
+import {runAgentSwarm,parseSkillNeeds,fallbackSwarmTasks} from '../src/agent-swarm.js';
 const basic='Merhaba, nasılsın?';
 const complex='Plan a multi-agent architecture. Implement orchestration and project memory. Add hooks and security checks, write tests, update docs, then verify the workflow.';
 assert.ok(scoreTaskComplexity(complex)>scoreTaskComplexity(basic));
@@ -102,6 +102,7 @@ const fallbackPlan=createDefaultTaskPlan('Build an API, add regression tests and
 assert.ok(fallbackPlan.some(item=>item.role==='builder'));
 assert.ok(fallbackPlan.some(item=>item.role==='tester'));
 assert.ok(fallbackPlan.some(item=>item.role==='security'));
+assert.equal(fallbackSwarmTasks('test',10).length,10);
 const stagedCalls=[];
 const stagedSwarm=await runAgentSwarm({
  providerIds:['gemini','groq','ollama'],task:'Implement a module and test it.',skills:SKILL_CATALOG,maxAgents:2,assignProviders:assignAgentProviders,
