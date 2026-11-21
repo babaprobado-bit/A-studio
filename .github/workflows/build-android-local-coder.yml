@@ -42,6 +42,7 @@ on:
       - 'src/agent-memory.js'
       - 'src/agent-shield.js'
       - 'src/agent-swarm.js'
+      - 'src/skill-selector.js'
       - 'scripts/test-agent-systems.mjs'
       - 'scripts/test-skills.mjs'
       - 'package.json'
