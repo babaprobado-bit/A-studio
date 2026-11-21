@@ -165,8 +165,14 @@ assert.ok(main.includes('selectConfiguredTeam(selectedTeam(),Object.keys(provide
   'configured provider filtering must use the tested readiness selector');
 assert.ok(main.includes('confirmTeamLiveCalls(selected,count=>confirm('),
   'parallel team, pipeline and model comparison must use the tested live-consent guard');
-assert.ok(main.includes('runParallelTeamCalls({providerIds:selected,task,history,callProvider})'),
-  'parallel AI Team execution must use the tested provider fan-out helper');
+const teamRunnerStart=main.indexOf('const results=await runParallelTeamCalls({');
+const teamRunnerEnd=main.indexOf('});',teamRunnerStart);
+const teamRunner=teamRunnerStart>=0&&teamRunnerEnd>teamRunnerStart
+  ?main.slice(teamRunnerStart,teamRunnerEnd+3):'';
+assert.ok(teamRunner.includes('providerIds:selected,task,history')
+  &&teamRunner.includes('callProvider:async(')
+  &&teamRunner.includes("source:'team'"),
+  'parallel AI Team execution must use the tested provider fan-out helper with lifecycle hooks');
 assert.ok(main.includes('runSequentialTeamCalls({')&&main.includes('getHistory:()=>chatContext().slice(0,-1)'),
   'sequential pipeline UI must use the tested stage runner and refresh context between stages');
 assert.ok(main.includes('runParallelTeamCalls({')&&main.includes('providerIds:selected,task:prompt,history:[],\n      callProvider\n    });'),
