@@ -68,7 +68,7 @@ export function refreshTaskSkillContext({
   const manualIds=[...new Set(Array.isArray(preferredSkillIds)?preferredSkillIds:[])];
   const manual=manualIds.map(id=>catalog.get(id)).filter(skill=>skill&&allowed(skill));
   const merged=[],seen=new Set();
-  for(const skill of [...manual,...previous,...fresh.skills]){
+  for(const skill of [...manual,...fresh.skills,...previous]){
     if(!seen.has(skill.id)&&merged.length<limit){seen.add(skill.id);merged.push(skill);}
   }
   const charLimit=Math.max(0,Math.min(24000,Number(maxChars)||10000));
