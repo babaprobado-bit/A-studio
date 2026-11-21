@@ -1,37 +1,49 @@
 const clamp=(v,min,max,d)=>{const n=Number(v);return Number.isFinite(n)?Math.max(min,Math.min(max,Math.floor(n))):d;};
+const textOf=v=>typeof v==='string'?v:[v?.title,v?.role,v?.objective,v?.description,v?.goal].filter(Boolean).join(' ').toLowerCase();
+const match=(t,re)=>re.test(t);
+const SIGNALS={
+ implementation:/\b(build|create|write|implement|integrate|develop|code|fix|refactor|add|update|olu[sş]tur|geli[sş]tir|uygula|kodla|ekle|yaz|ba[gğ]la|g[uü]ncelle)\b/i,
+ research:/\b(research|investigate|compare|evaluate|find|search|analyze|ara[sş]t[iı]r|kar[sş][iı]la[sş]t[iı]r|incele|bul|de[gğ]erlendir)\b/i,
+ planning:/\b(plan|design|architect|architecture|organize|structure|roadmap|planla|tasarla|mimar|d[uü]zenle|s[iı]rala)\b/i,
+ testing:/\b(test|verify|validate|qa|regression|debug|check|do[gğ]rula|s[iı]na|denetle|kontrol|hata ay[iı]kla)\b/i,
+ security:/\b(security|secure|privacy|permission|auth|vulnerability|threat|shield)\b|g[uü]venli\w*|gizlilik\w*|yetki\w*|zafiyet\w*/i,
+ docs:/\b(document|docs|readme|guide|manual|documentation|dok[uü]mantasyon|belgele)\b/i,
+ ux:/\b(ux|ui|interface|accessibility|usability|layout|aray[uü]z|eri[sş]ilebilirlik|tasar[iı]m)\b/i,
+ performance:/\b(performance|optimize|memory|ram|cpu|latency|speed|performans|bellek)\b/i,
+ data:/\b(database|data|schema|query|migration|veritaban[iı]|veri|[sş]ema)\b/i,
+ automation:/\b(automate|automation|workflow|pipeline|schedule|trigger|otomasyon|i[sş] ak[iı][sş][iı])\b/i
+};
+export function classifyTaskIntent(task){
+ const t=textOf(task),signals=Object.keys(SIGNALS).filter(k=>match(t,SIGNALS[k]));
+ const sensitive=match(t,/\b(password|secret|token|credential|private key|payment|billing|production|delete|wipe|security|api key|parola|sifre|odeme)\b|g[uü]venli\w*|gizlilik\w*|yetki\w*|sil\w*/i);
+ return {signals,primaryIntent:signals[0]||'general',requiresResearch:signals.includes('research'),requiresPlanning:signals.includes('planning')||signals.length>=3,requiresImplementation:signals.includes('implementation'),requiresTesting:signals.includes('implementation')||signals.includes('testing')||signals.includes('security'),requiresSecurityReview:signals.includes('security')||sensitive,requiresDocumentation:signals.includes('docs'),requiresUxReview:signals.includes('ux'),requiresPerformanceReview:signals.includes('performance'),riskLevel:sensitive?'high':signals.includes('data')?'medium':'low'};
+}
 export function scoreTaskComplexity(task){
- const t=String(task??'').trim().toLowerCase();if(!t)return 0;let s=0;
- if(t.length>160)s+=10;if(t.length>360)s+=12;if(t.length>700)s+=10;
- const sentence=(t.match(/[.!?;\n]+/g)||[]).length+1;if(sentence>=3)s+=8;if(sentence>=6)s+=8;
- const actions=(t.match(/\b(?:plan|build|create|add|write|update|verify|run|connect|implement|integrate|review|audit|test|debug|refactor|migrate|compare|automate|document|secure|optimize|design|deploy|uygula|ekle|yaz|güncelle|doğrula|bağla|incele)\b/g)||[]).length;s+=Math.min(24,actions*4);
- const steps=(t.match(/\b(?:first|then|after|before|finally|next|phase|step|aşama|sonra|ardından|önce)\b/g)||[]).length;s+=Math.min(16,steps*4);
- if(/\b(?:agent|multi.?agent|provider|api|database|android|memory|hook|security|architecture|workflow|pipeline)\b/.test(t))s+=10;
- if(/\b(?:also|together|ayrıca|birlikte|bunun yanında)\b/.test(t))s+=6;return clamp(s,0,100,0);
+ const t=textOf(task);if(!t)return 0;const words=t.split(/\s+/).length,signals=classifyTaskIntent(t),actions=(t.match(/\b(plan|build|create|add|write|update|verify|run|connect|implement|integrate|review|audit|test|debug|refactor|compare|automate|document|secure|optimize|design|deploy|incele|uygula|ekle|yaz|g[uü]ncelle|do[gğ]rula|ba[gğ]la)\b/g)||[]).length,steps=(t.match(/\b(first|then|after|before|finally|next|step|phase|sonra|ard[iı]ndan|[oö]nce|a[sş]ama)\b/g)||[]).length;
+ let score=Math.min(24,Math.floor(words/30)*8)+Math.min(20,actions*3)+Math.min(16,steps*4)+Math.min(24,Math.max(0,signals.signals.length-1)*4);
+ if(/[.!?;\n].*[.!?;\n]/s.test(t))score+=8;if(signals.riskLevel==='high')score+=8;else if(signals.riskLevel==='medium')score+=4;
+ if(/\b(android|api|provider|model|memory|hook|security|architecture|workflow|pipeline|offline|entegrasyon|mimari)\b/.test(t))score+=6;
+ return clamp(score,0,100,0);
 }
-export function shouldAutoDelegate({task,enabled=true,providerCount=0,minScore=55}={}){
- const score=scoreTaskComplexity(task),threshold=clamp(minScore,30,90,55);
- if(!enabled)return {eligible:false,score,threshold,reason:'Otomatik atama kapalı.'};
- if(providerCount<2)return {eligible:false,score,threshold,reason:'En az iki hazır ücretsiz/yerel motor gerekli.'};
- if(score<threshold)return {eligible:false,score,threshold,reason:'Görev eşiğin altında.'};
- return {eligible:true,score,threshold,reason:'Uzman ajanlara dağıtım uygun.'};
+export function selectAgentWorkflow({task,enabled=true,providerCount=0,minScore=55,maxAgents=3}={}){
+ const score=scoreTaskComplexity(task),threshold=clamp(minScore,30,90,55),intent=classifyTaskIntent(task),eligible=Boolean(enabled&&providerCount>=2&&score>=threshold),roles=[];
+ if(intent.requiresResearch)roles.push('researcher');if(intent.requiresPlanning)roles.push('architect');if(intent.requiresImplementation)roles.push('builder');if(intent.requiresTesting)roles.push('tester');if(intent.requiresSecurityReview)roles.push('security');if(intent.requiresPerformanceReview)roles.push('optimizer');if(intent.requiresUxReview)roles.push('ux');if(intent.requiresDocumentation)roles.push('documenter');if(eligible)roles.push('reviewer');
+ return {eligible,score,threshold,mode:!eligible?'single-agent':intent.requiresResearch&&!intent.requiresImplementation?'research-review':'staged-swarm',roles:roles.slice(0,clamp(maxAgents,2,10,3)),intent,riskLevel:intent.riskLevel,reason:!enabled?'Otomatik atama kapalı.':providerCount<2?'İki uygun ücretsiz/yerel motor gerekli.':score<threshold?'Görev karmaşıklık eşiğinin altında.':'Uzman görev dağıtımı uygun.'};
 }
-function roleGroup(task){
- const t=[task?.role,task?.title,task?.objective].join(' ').toLowerCase();
- if(/security|secure|audit|risk|privacy|shield|güvenlik|denetim/.test(t))return 'security';
- if(/test|qa|verification|verify|tdd|regression|testçi/.test(t))return 'test';
- if(/research|search|source|araştırma/.test(t))return 'research';
- if(/document|docs|writer|documentation|dokümantasyon/.test(t))return 'docs';
- if(/ux|ui|design|accessibility|arayüz|tasarım/.test(t))return 'ux';
- if(/performance|optimizer|memory|ram|latency|performans/.test(t))return 'performance';
- if(/architect|architecture|planner|plan|integrator|mimar/.test(t))return 'architecture';
- if(/builder|developer|coder|code|implement|kod|uygula/.test(t))return 'code';return 'general';
+export function shouldAutoDelegate({task,enabled=true,providerCount=0,minScore=55}={}){const r=selectAgentWorkflow({task,enabled,providerCount,minScore});return {eligible:r.eligible,score:r.score,threshold:r.threshold,reason:r.reason,mode:r.mode,roles:r.roles,riskLevel:r.riskLevel};}
+export function classifyAgentRole(task){const t=textOf(task);if(SIGNALS.security.test(t))return 'security';if(SIGNALS.testing.test(t))return 'test';if(SIGNALS.research.test(t))return 'research';if(SIGNALS.docs.test(t))return 'docs';if(SIGNALS.ux.test(t))return 'ux';if(SIGNALS.performance.test(t))return 'performance';if(SIGNALS.data.test(t))return 'data';if(SIGNALS.automation.test(t))return 'automation';if(SIGNALS.planning.test(t))return 'architecture';if(SIGNALS.implementation.test(t))return 'code';return 'general';}
+export function organizeTaskPlan(input,{maxTasks=10}={}){
+ const warnings=[],seen=new Set(),tasks=(Array.isArray(input)?input:[]).slice(0,clamp(maxTasks,2,10,10)).map((x,i)=>{if(!x||typeof x!=='object')return null;const id=String(x.id||'task-'+(i+1)).toLowerCase().replace(/[^a-z0-9_-]/g,'-').slice(0,48),objective=String(x.objective||x.description||x.goal||'').trim();if(!id||!objective||seen.has(id)){warnings.push('Geçersiz/yinelenen görev atlandı: '+id);return null;}seen.add(id);return {id,title:String(x.title||'Görev '+(i+1)).slice(0,100),role:String(x.role||'Uzman ajan'),roleGroup:x.roleGroup||classifyAgentRole(x),objective,acceptance:Array.isArray(x.acceptance)?x.acceptance.slice(0,6):['Somut çıktı ve doğrulama adımı ver.'],files:Array.isArray(x.files)?x.files.slice(0,8):[],dependsOn:[...new Set((Array.isArray(x.dependsOn)?x.dependsOn:Array.isArray(x.dependencies)?x.dependencies:[]).map(String))].filter(v=>v!==id),priority:clamp(x.priority,1,5,3),order:i};}).filter(Boolean);
+ const ids=new Set(tasks.map(x=>x.id));for(const x of tasks)x.dependsOn=x.dependsOn.filter(id=>{if(ids.has(id))return true;warnings.push(x.id+' bilinmeyen bağımlılığı kaldırdı: '+id);return false;});
+ const pending=new Set(ids),byId=new Map(tasks.map(x=>[x.id,x])),stages=[];while(pending.size){let ready=tasks.filter(x=>pending.has(x.id)&&x.dependsOn.every(id=>!pending.has(id)));if(!ready.length){const last=[...pending].at(-1),x=byId.get(last),dep=x.dependsOn.find(id=>pending.has(id));if(dep){x.dependsOn=x.dependsOn.filter(id=>id!==dep);warnings.push('Bağımlılık döngüsü kırıldı: '+last+' → '+dep);continue;}break;}ready.sort((a,b)=>b.priority-a.priority||a.order-b.order);stages.push(ready.map(x=>({...x,stage:stages.length})));for(const x of ready)pending.delete(x.id);}
+ return {tasks:stages.flat(),stages,warnings,stageCount:stages.length};
 }
-const affinity={security:['groq','gemini','ollama','device','openrouter','apinex'],test:['groq','ollama','device','gemini','openrouter','apinex'],research:['gemini','groq','openrouter','apinex','ollama','device'],docs:['gemini','groq','ollama','openrouter','apinex','device'],ux:['gemini','groq','ollama','device','openrouter','apinex'],performance:['ollama','device','groq','gemini','openrouter','apinex'],architecture:['gemini','groq','ollama','device','openrouter','apinex'],code:['ollama','device','groq','gemini','openrouter','apinex'],general:['groq','gemini','ollama','device','openrouter','apinex']};
-export function assignAgentProviders(tasks,providers){
- const pool=[...new Set((Array.isArray(providers)?providers:[]).filter(Boolean))].slice(1);if(!Array.isArray(tasks)||!pool.length)return [];
- const loads=new Map(pool.map(id=>[id,0]));
- return tasks.map((task,index)=>{const group=roleGroup(task),rank=(affinity[group]||affinity.general);
-  const best=pool.map((id,order)=>({id,order,fit:rank.indexOf(id)<0?0:rank.length-rank.indexOf(id),load:loads.get(id)||0})).sort((a,b)=>b.fit-a.fit||a.load-b.load||a.order-b.order)[0];
-  const load=loads.get(best.id)||0;loads.set(best.id,load+1);return {taskId:String(task?.id||'task-'+(index+1)),providerId:best.id,roleGroup:group,reason:group+' rol uyumu; önceki yük '+load};
- });
+export function createDefaultTaskPlan(task,{maxTasks=3}={}){
+ const i=classifyTaskIntent(task),raw=[],add=(id,title,role,objective,dependsOn=[],priority=3)=>raw.push({id,title,role,objective,dependsOn,priority,acceptance:['Somut çıktı ver','Varsayım ve riski belirt','Kontrol adımı yaz'],files:[]});
+ if(i.requiresResearch)add('research','Araştırma','researcher','Gereksinimleri ve seçenekleri doğrula.');if(i.requiresPlanning)add('design','Mimari plan','architect','Kapsamı ve görev sırasını belirle.',i.requiresResearch?['research']:[],3);
+ const prior=raw.length?[raw.at(-1).id]:[];if(i.requiresImplementation)add('implement','Uygulama','builder','En küçük güvenli çözümü hazırla.',prior,5);const impl=raw.find(x=>x.id==='implement');
+ if(i.requiresTesting)add('verify','Test ve doğrulama','tester','Normal, sınır ve hata senaryolarını doğrula.',impl?['implement']:prior,5);if(i.requiresSecurityReview)add('security','Güvenlik incelemesi','security','Gizlilik ve güvenlik risklerini denetle.',impl?['implement']:prior,5);if(i.requiresPerformanceReview)add('performance','Performans','optimizer','RAM, CPU ve gecikmeyi değerlendir.',impl?['implement']:prior,3);if(i.requiresUxReview)add('ux','UX incelemesi','ux','Kullanılabilirliği değerlendir.',impl?['implement']:prior,3);if(i.requiresDocumentation)add('docs','Dokümantasyon','documenter','Kullanım ve sınırlamaları belgele.',impl?['implement']:prior,2);if(raw.length<2)add('review','Son inceleme','reviewer','Çıktıyı ve kalan riskleri denetle.',raw.map(x=>x.id),2);
+ const selected=raw.sort((a,b)=>b.priority-a.priority||a.id.localeCompare(b.id)).slice(0,clamp(maxTasks,2,10,3));return organizeTaskPlan(selected,{maxTasks}).tasks;
 }
+const affinity={security:['groq','gemini','ollama','device','openrouter','apinex'],test:['groq','ollama','device','gemini','openrouter','apinex'],research:['gemini','groq','openrouter','apinex','ollama','device'],docs:['gemini','groq','ollama','openrouter','apinex','device'],ux:['gemini','groq','ollama','device','openrouter','apinex'],performance:['ollama','device','groq','gemini','openrouter','apinex'],architecture:['gemini','groq','ollama','device','openrouter','apinex'],code:['ollama','device','groq','gemini','openrouter','apinex'],data:['ollama','device','groq','gemini','openrouter','apinex'],automation:['groq','gemini','ollama','device','openrouter','apinex'],general:['groq','gemini','ollama','device','openrouter','apinex']};
+export function assignAgentProviders(tasks,providers){const pool=[...new Set((Array.isArray(providers)?providers:[]).filter(Boolean))].slice(1);if(!Array.isArray(tasks)||!pool.length)return [];const loads=new Map(pool.map(id=>[id,0]));return tasks.map((task,index)=>{const group=task?.roleGroup||classifyAgentRole(task),rank=affinity[group]||affinity.general;const best=pool.map((id,order)=>{const key=id.toLowerCase().replace(/[^a-z0-9]/g,''),alias=key.includes('ollama')?'ollama':key.includes('device')||key.includes('gguf')?'device':key.includes('groq')?'groq':key.includes('gemini')?'gemini':key.includes('openrouter')?'openrouter':key.includes('apinex')?'apinex':key;return {id,order,fit:rank.indexOf(alias)<0?0:rank.length-rank.indexOf(alias),load:loads.get(id)||0};}).sort((a,b)=>b.fit-a.fit||a.load-b.load||a.order-b.order)[0];loads.set(best.id,(loads.get(best.id)||0)+1);return {taskId:String(task?.id||'task-'+(index+1)),providerId:best.id,roleGroup:group,reason:group+' rol uyumu; mevcut yük '+(best.load||0)};});}
