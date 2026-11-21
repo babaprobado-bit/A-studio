@@ -144,7 +144,7 @@ export async function mountAiPowerHub(options={}){
     if(!task){setStatus('swarmStatus','Önce ana görevi yaz.','error');return;}
     if(team.length<2){setStatus('swarmStatus','En az iki seçili AI Team motorunun gerçek bağlantısı hazır olmalı.','error');return;}
     const count=clamp($('swarmAgentLimit').value,2,10,3),budget=estimateSwarmCallBudget(count);
-    if(!window.confirm('Swarm '+count+' ajan çalıştıracak. Beklenen '+budget.expected+', birer tekrar dahil en fazla '+budget.maximumWithRetries+' model çağrısı olabilir. Kota kullanılır. Devam?'))return;
+    if(!window.confirm('Swarm '+count+' ajan çalıştıracak. Beklenen '+budget.expected+', dinamik Skill genişletmesi ve hata tekrarları dahil en fazla '+budget.maximumWithRetries+' model çağrısı olabilir. Kota kullanılır. Devam?'))return;
     const button=$('swarmRun');button.disabled=true;$('swarmResults').innerHTML='';$('swarmBoard').innerHTML='';setStatus('swarmStatus','Koordinatör görevleri planlıyor…');
     await logActivity('AI Swarm','Başladı',count+' ajan · '+team.join(', '));
     try{

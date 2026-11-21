@@ -137,6 +137,7 @@ assert.ok(main.includes('enabledPromptPluginIds'));
 assert.ok(hub.includes('AI Swarm'));
 assert.ok(hub.includes('getSkillSelection'));
 assert.ok(hub.includes('skills:skillState.skills||[]'));
+assert.ok(hub.includes('dinamik Skill genişletmesi ve hata tekrarları dahil en fazla'));
 assert.ok(hub.includes('includeTaskSkills:false'));
 assert.ok(main.includes('getSkillSelection:()=>({skills:skillLibrary,preferredSkillIds:selectedSkillIds})'));
 assert.ok(hub.includes('OpenRouter Multi-Chat'));
