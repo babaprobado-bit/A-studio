@@ -166,15 +166,20 @@ assert.ok(main.includes('selectConfiguredTeam(selectedTeam(),Object.keys(provide
 assert.ok(main.includes('confirmTeamLiveCalls(selected,count=>confirm('),
   'parallel team, pipeline and model comparison must use the tested live-consent guard');
 const teamRunnerStart=main.indexOf('const results=await runParallelTeamCalls({');
-const teamRunnerEnd=main.indexOf('});',teamRunnerStart);
+const teamRunnerEnd=main.indexOf('    load.remove();',teamRunnerStart);
 const teamRunner=teamRunnerStart>=0&&teamRunnerEnd>teamRunnerStart
   ?main.slice(teamRunnerStart,teamRunnerEnd+3):'';
 assert.ok(teamRunner.includes('providerIds:selected,task,history')
   &&teamRunner.includes('callProvider:async(')
   &&teamRunner.includes("source:'team'"),
   'parallel AI Team execution must use the tested provider fan-out helper with lifecycle hooks');
+assert.ok(teamRunner.includes("{skillRole:'general',skillStage:'all'}"),
+  'parallel AI Team providers must receive task-aware Skill selection through the shared provider adapter');
 assert.ok(main.includes('runSequentialTeamCalls({')&&main.includes('getHistory:()=>chatContext().slice(0,-1)'),
   'sequential pipeline UI must use the tested stage runner and refresh context between stages');
+assert.ok(main.includes("const skillStage=index===0?'plan':index===1?'code':index===2||index===3?'review':'all'")
+  &&main.includes('callProvider(id,prompt,history,{skillRole,skillStage})'),
+  'each sequential stage must refresh task Skills for its planner, builder, reviewer or expert role without adding API calls');
 assert.ok(main.includes('runParallelTeamCalls({')&&main.includes('providerIds:selected,task:prompt,history:[],\n      callProvider\n    });'),
   'model comparison must call only configured real providers through the shared fan-out helper');
 assert.ok(html.includes('id="selectAllTeam"'));

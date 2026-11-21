@@ -814,7 +814,7 @@ async function runTeam(prompt){
   try{
     const results=await runParallelTeamCalls({providerIds:selected,task,history,callProvider:async(id,prompt,priorHistory)=>{
       await agentHooks.emit('beforeAgentRun',{providerId:id,source:'team',taskLength:String(prompt||'').length});
-      try{const answer=await callProvider(id,prompt,priorHistory);await agentHooks.emit('afterAgentRun',{providerId:id,source:'team',status:'completed'});return answer;}
+      try{const answer=await callProvider(id,prompt,priorHistory,{skillRole:'general',skillStage:'all'});await agentHooks.emit('afterAgentRun',{providerId:id,source:'team',status:'completed'});return answer;}
       catch(error){await agentHooks.emit('afterAgentRun',{providerId:id,source:'team',status:'failed',detail:error?.message||'error'});throw error;}
     }});
     load.remove();
@@ -846,9 +846,11 @@ async function runPipeline(prompt){
       providerIds:selected,
       task,
       getHistory:()=>chatContext().slice(0,-1),
-      runStage:async({id,prompt},history)=>{
+      runStage:async({id,prompt,index},history)=>{
+        const skillStage=index===0?'plan':index===1?'code':index===2||index===3?'review':'all';
+        const skillRole=index===0?'architect':index===1?'builder':index===2||index===3?'reviewer':'general';
         await agentHooks.emit('beforeAgentRun',{providerId:id,source:'pipeline',taskLength:String(prompt||'').length});
-        try{const answer=await callProvider(id,prompt,history);await agentHooks.emit('afterAgentRun',{providerId:id,source:'pipeline',status:'completed'});return answer;}
+        try{const answer=await callProvider(id,prompt,history,{skillRole,skillStage});await agentHooks.emit('afterAgentRun',{providerId:id,source:'pipeline',status:'completed'});return answer;}
         catch(error){await agentHooks.emit('afterAgentRun',{providerId:id,source:'pipeline',status:'failed',detail:error?.message||'error'});throw error;}
       },
       onStageStart:async({id,index,stage})=>{
