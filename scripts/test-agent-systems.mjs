@@ -101,7 +101,7 @@ assert.ok(fallbackPlan.some(item=>item.role==='tester'));
 assert.ok(fallbackPlan.some(item=>item.role==='security'));
 const stagedCalls=[];
 const stagedSwarm=await runAgentSwarm({
- providerIds:['gemini','groq','ollama'],task:'Implement a module and test it.',maxAgents:2,assignProviders:assignAgentProviders,
+ providerIds:['gemini','groq','ollama'],task:'Implement a module and test it.',skills:SKILL_CATALOG,maxAgents:2,assignProviders:assignAgentProviders,
  callProvider:async(providerId,prompt)=>{
   if(prompt.includes('Yalnızca JSON döndür'))return JSON.stringify({tasks:[
    {id:'build',title:'Code implementation',role:'developer',objective:'Implement module'},
