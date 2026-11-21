@@ -29,7 +29,7 @@ export function inferSkillStage(task,role='general',requestedStage=''){
 function scoreSkill(skill,{taskTokens,role,stage,preferredIds,activeRules}){
  const id=skill.id,group=skill.group||'',nameDescription=norm([skill.name,skill.description,skill.id,skill.metadata?.category].join(' ')),fullText=norm([nameDescription,group,skill.content?.slice(0,5000)].join(' ')),titleTokens=tokens(nameDescription),bodyTokens=tokens(skill.content?.slice(0,5000));
  let score=0;const reasons=[];
- if(preferredIds.has(id)){score+=2.5;reasons.push('kullanıcının seçtiği Skill');}
+ if(preferredIds.has(id)){score+=20;reasons.push('kullanıcının seçtiği Skill');}
  if(stage!=='all'&&skill.stage===stage){score+=2.4;reasons.push(stage+' aşaması');}else if(skill.stage==='all'){score+=0.9;reasons.push('genel kullanım');}
  for(const rule of activeRules){if(rule.ids.includes(id)){score+=7.5;reasons.push(rule.key+' uzmanlığı');}else if(rule.groups.includes(group))score+=2.2;}
  const roleRule=ROLE_ALIASES.find(item=>item.key===role);if(roleRule?.ids.includes(id)){score+=4;reasons.push(role+' rolü');}
