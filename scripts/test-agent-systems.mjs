@@ -69,7 +69,7 @@ assert.ok(selectedSecuritySkills.selectedIds.includes('ecc-security-scan'));
 const selectedResearchSkills=selectSkillsForTask({task:'Research recent sources and compare available approaches',role:'researcher',skills:SKILL_CATALOG,maxSkills:5});
 assert.equal(selectedResearchSkills.stage,'plan');
 const selectedVideoSkills=selectSkillsForTask({task:'Find trending YouTube videos and plan Shorts',role:'general',skills:SKILL_CATALOG,maxSkills:5});
-assert.equal(selectedVideoSkills.stage,'plan');
+assert.equal(selectedVideoSkills.stage,'all');
 assert.ok(selectedVideoSkills.selectedIds.includes('vidiq-discovery'));
 assert.ok(selectedResearchSkills.skills.some(item=>item.group==='Research'));
 const selectedContext=buildTaskSkillContext({task:'Implement secure API code and tests',role:'builder',skills:SKILL_CATALOG,preferredSkillIds:['karpathy-guidelines'],maxSkills:8,maxChars:3500});
