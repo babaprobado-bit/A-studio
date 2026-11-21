@@ -19,7 +19,7 @@ import { encryptWorkspaceBackup, decryptWorkspaceBackup } from './encrypted-back
 import { SKILL_CATALOG, SKILL_PROFILES, parseSkillMarkdown, normalizeSkill, prepareSkillImportQueue, buildStageSkillContext, getProfileSkillIds, createSkillBackupState, restoreSkillBackupState, MAX_SELECTED_SKILLS, MAX_CUSTOM_SKILLS, MAX_STAGE_SKILL_CHARS } from './skill-library.js';
 import { PLUGIN_REPOSITORY_CATALOG, getPluginRepositoryArchiveUrl, getPluginRepositoryById, isAllowedPluginRepositoryDownload } from './plugin-marketplace.js';
 import { runAgentSwarm, estimateSwarmCallBudget } from './agent-swarm.js';
-import { scoreTaskComplexity, shouldAutoDelegate, assignAgentProviders } from './agent-orchestrator.js';
+import { shouldAutoDelegate, assignAgentProviders } from './agent-orchestrator.js';
 import { createAgentHookBus } from './agent-hooks.js';
 import { createProjectMemoryRecord, normalizeProjectMemoryRecords, getProjectMemories, buildProjectMemoryContext, createProjectMemoryBackup, restoreProjectMemoryBackup } from './agent-memory.js';
 import { scanAgentContent } from './agent-shield.js';
@@ -751,7 +751,7 @@ async function submitChat(prompt,providerId){
     if(decision.eligible){
       const workerCount=Math.max(2,Math.min(5,Number(settings.autoAgentMaxWorkers)||3));
       const budget=estimateSwarmCallBudget(workerCount);
-      const approved=confirm('Otomatik uzman ataması: '+decision.score+'/100. Motorlar: '+pool.map(id=>providers[id].name).join(', ')+'.\n\nBeklenen istek: '+budget.expected+'. Geçici hata tekrarlarıyla üst sınır: '+budget.maxCallsWithRetries+'. Kota veya yerel cihaz kaynağı kullanılabilir. Başlatılsın mı?');
+      const approved=confirm('Otomatik uzman ataması: '+decision.score+'/100. Motorlar: '+pool.map(id=>providers[id].name).join(', ')+'.\n\nBeklenen istek: '+budget.expected+'. Geçici hata tekrarlarıyla üst sınır: '+budget.maximumWithRetries+'. Kota veya yerel cihaz kaynağı kullanılabilir. Başlatılsın mı?');
       if(approved){
         loading.querySelector('p').textContent='Görev uzman ajanlara dağıtılıyor…';
         const result=await runAgentSwarm({
@@ -1595,7 +1595,7 @@ async function persistSkillState(){
 function renderSkillLibrary(){
   const list=$('skillLibraryList'); if(!list)return;
   const selected=new Set(selectedSkillIds);
-  const groups=['Guidelines','Superpowers','Caveman','Video','Code','Research','Tokens','Design','Writing & Video','Custom'];
+  const groups=['Guidelines','Superpowers','Caveman','Video','Code','Research','Tokens','Design','Writing & Video','ECC Agent Systems','Custom'];
   list.innerHTML=groups.map(group=>{
     const items=skillLibrary.filter(skill=>skill.group===group);
     if(!items.length)return '';

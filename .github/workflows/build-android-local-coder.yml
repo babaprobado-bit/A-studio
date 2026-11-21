@@ -36,6 +36,14 @@ on:
       - 'server/workshop-smoke-test.js'
       - 'index.html'
       - 'src/skill-library.js'
+      - 'src/skill-packs/ecc-agent-systems.js'
+      - 'src/agent-orchestrator.js'
+      - 'src/agent-hooks.js'
+      - 'src/agent-memory.js'
+      - 'src/agent-shield.js'
+      - 'src/agent-swarm.js'
+      - 'scripts/test-agent-systems.mjs'
+      - 'scripts/test-skills.mjs'
       - 'package.json'
       - 'capacitor.config.json'
 
@@ -44,7 +52,7 @@ permissions:
 
 jobs:
   build-local-coder-apk:
-    name: Build AI Studio 1.1.5 Android APK (GGUF / llama.cpp)
+    name: Build AI Studio 1.1.6 Android APK (GGUF / llama.cpp)
     runs-on: ubuntu-24.04
     timeout-minutes: 100
     steps:
@@ -112,6 +120,7 @@ jobs:
           npm run test:openshorts
           npm run test:site
           npm run test:skills
+          npm run test:agent-systems
           npm run test:api-local-coder
           npm run test:ai-team
           npm run test:device-local-coder
@@ -119,6 +128,12 @@ jobs:
           node --check src/plugin-marketplace.js
           node --check scripts/test-plugin-marketplace.mjs
           node --check src/agent-swarm.js
+          node --check src/agent-orchestrator.js
+          node --check src/agent-hooks.js
+          node --check src/agent-memory.js
+          node --check src/agent-shield.js
+          node --check src/skill-packs/ecc-agent-systems.js
+          node --check scripts/test-agent-systems.mjs
           node --check src/plugin-catalog.js
           node --check src/openrouter-chat.js
           node --check src/free-api-providers.js
@@ -129,6 +144,8 @@ jobs:
           node --check scripts/idea-pipeline.mjs
           node --check scripts/test-idea-pipeline.mjs
           node scripts/test-idea-pipeline.mjs
+      - name: AgentShield repository security scan
+        run: npx --yes ecc-agentshield@1.6.0 scan --path . --format json --output agentshield-report.json
       - name: Generate Capacitor Android project
         run: npx cap add android
       - name: Prepare a smaller Gradle distribution
@@ -217,7 +234,16 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: AI-Studio-1.1.5-Full-Native-GGUF-APK
+          name: AI-Studio-1.1.6-Full-Native-GGUF-APK
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload AgentShield report
+        uses: actions/upload-artifact@v4
+        if: always() && hashFiles('agentshield-report.json') != ''
+        with:
+          name: AI-Studio-1.1.6-AgentShield-Report
+          path: agentshield-report.json
+          if-no-files-found: ignore
           retention-days: 14
