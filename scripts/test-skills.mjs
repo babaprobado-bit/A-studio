@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  SKILL_CATALOG, SKILL_PROFILES, EXTERNAL_SKILL_PACK, MAX_SELECTED_SKILLS, MAX_STAGE_SKILL_CHARS,
+  SKILL_CATALOG, SKILL_PROFILES, EXTERNAL_SKILL_PACK, ECC_AGENT_SYSTEMS_PACK, MAX_SELECTED_SKILLS, MAX_STAGE_SKILL_CHARS,
   parseSkillMarkdown, normalizeSkill, buildStageSkillContext, getProfileSkillIds,
   createSkillBackupState, restoreSkillBackupState,
   prepareSkillImportQueue
@@ -9,7 +9,11 @@ import {
 import { encryptWorkspaceBackup, decryptWorkspaceBackup } from '../src/encrypted-backup.js';
 import { webcrypto } from 'node:crypto';
 
-assert.equal(SKILL_CATALOG.length, 70, '40 existing Skills plus the 30-entry external pack');
+assert.equal(SKILL_CATALOG.length, 80, '40 starter + 30 external + 10 ECC Skills');
+assert.equal(ECC_AGENT_SYSTEMS_PACK.length,10);
+assert.ok(ECC_AGENT_SYSTEMS_PACK.every(skill=>skill.group==='ECC Agent Systems'&&skill.license==='MIT'&&skill.metadata.upstreamCodeIncluded==='false'));
+assert.equal(getProfileSkillIds('ecc-agent-systems').length,8);
+assert.equal(getProfileSkillIds('ecc-agent-security').length,8);
 assert.equal(EXTERNAL_SKILL_PACK.length, 30, 'external pack must contain exactly 30 original instruction adaptations');
 assert.deepEqual([...new Set(EXTERNAL_SKILL_PACK.map(skill => skill.group))].sort(), ['Code','Design','Research','Tokens','Writing & Video']);
 for (const group of ['Code','Research','Tokens','Design','Writing & Video']) {

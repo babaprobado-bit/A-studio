@@ -1,5 +1,6 @@
 import { EXTERNAL_SKILL_PACK } from './skill-packs/external-skill-pack.js';
-export { EXTERNAL_SKILL_PACK };
+import { ECC_AGENT_SYSTEMS_PACK } from './skill-packs/ecc-agent-systems.js';
+export { EXTERNAL_SKILL_PACK, ECC_AGENT_SYSTEMS_PACK };
 
 export const MAX_SELECTED_SKILLS = 8;
 export const MAX_CUSTOM_SKILLS = 100;
@@ -412,7 +413,8 @@ export const SKILL_CATALOG = Object.freeze([
     "version": "1",
     "builtIn": true
   },
-  ...EXTERNAL_SKILL_PACK
+  ...EXTERNAL_SKILL_PACK,
+  ...ECC_AGENT_SYSTEMS_PACK
 ]);
 export const SKILL_PROFILES = Object.freeze({
   'creator-automation': { name: 'Creator Automation', description: 'vidIQ ile video keşfi ve OpenShorts ile klip üretimi/yayınlama.', skillIds: ['vidiq-discovery','openshorts-workflow'] },
@@ -466,6 +468,8 @@ export const SKILL_PROFILES = Object.freeze({
     name: 'External Writing & Video Pack · İçerik', description: 'Altı metin, içerik planlama ve video sahnesi iş akışı becerisi.',
     skillIds: ['ext-marketing-skills-content','ext-anthropic-skills-document-work','ext-openmontage-video-pipeline','ext-humanizer-natural-writing','ext-hyperframes-scene-builder','ext-adhd-divergent-ideation']
   },
+  'ecc-agent-systems': { name: 'ECC Agent Systems', description: 'Orkestrasyon, hafıza, hook yaşam döngüsü ve doğrulama.', skillIds: ['ecc-agent-harness','ecc-team-orchestration','ecc-continuous-learning','ecc-unified-memory','ecc-agent-security','ecc-security-scan','ecc-verification-loop','ecc-tdd-workflow'] },
+  'ecc-agent-security': { name: 'ECC Agent Security', description: 'Güvenlik ve mimari denetim.', skillIds: ['ecc-agent-security','ecc-security-scan','ecc-architecture-audit','ecc-hooks-lifecycle','ecc-verification-loop','sp-secure-defaults','sp-api-contract','sp-edge-review'] }
 });
 
 function slug(value) {
