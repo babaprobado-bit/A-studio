@@ -167,8 +167,15 @@ export async function runAgentSwarm({providerIds,task,history=[],maxAgents=3,max
     }
     const completedPrerequisites=(item.dependsOn||[]).map(id=>results[taskIndex.get(id)]).filter(Boolean);
     await emit('agent_started',{agentId,title:item.title,role:item.role,providerId,roleGroup:assigned?.roleGroup||item.roleGroup||'general',stage:item.stage??0});
+    const dependencyContext=completedPrerequisites.map(result=>'### '+result.title+'\n'+(result.error?'HATA: '+result.error:clean(result.answer,2200))).join('\n\n');
+    const liveTeamContext=board.map(entry=>'['+entry.from+'] '+entry.text).join('\n');
+    const evolvingTask=[mainTask,'Güncel alt görev: '+item.title,item.objective,dependencyContext?'Ön koşul ajan çıktıları:\n'+dependencyContext:'',liveTeamContext?'Güncel takım bulguları:\n'+liveTeamContext:''].filter(Boolean).join('\n\n').slice(0,7200);
+    const previousSkillIds=completedPrerequisites.flatMap(result=>Array.isArray(result.skillIds)?result.skillIds:[]);
+    const role=item.roleGroup||classifyAgentRole(item);
+    let skillSelection=refreshTaskSkillContext({task:evolvingTask,role,skills,preferredSkillIds,previousSkillIds,maxSkills:MAX_SELECTED_SKILLS,maxChars:7600});
+    taskSkillContexts.set(item.id,skillSelection);
+    await emit('skills_refreshed',{taskId:item.id,role,stage:skillSelection.stage,refreshed:skillSelection.refreshed,previousSkillCount:previousSkillIds.length,skillIds:skillSelection.includedIds,addedSkillIds:skillSelection.addedSkillIds,addedSkillNames:skillSelection.skills.filter(skill=>skillSelection.addedSkillIds.includes(skill.id)).map(skill=>skill.name)});
     let answer='',error='',retried=false,skillExpansionError='',dynamicSkillIds=[];
-    let skillSelection=taskSkillContexts.get(item.id);
     const prompt=buildWorkerPrompt(item,mainTask,board,completedPrerequisites,skillSelection.promptText);
     for(let attempt=0;attempt<2;attempt++){
       try{answer=String(await requestProvider(providerId,prompt,history)||'').trim();if(!answer)throw new Error('Ajan boş yanıt verdi.');error='';break;}
@@ -210,7 +217,6 @@ export async function runAgentSwarm({providerIds,task,history=[],maxAgents=3,max
     }
     const confidenceMatch=answer.match(/(?:CONFIDENCE|GÜVEN):\s*(\d{1,3})/i);
     const result={agentId,providerId,title:item.title,role:item.role,answer,error,skillIds:skillSelection.includedIds,skillNames:skillSelection.skills.filter(skill=>skillSelection.includedIds.includes(skill.id)).map(skill=>skill.name),addedSkillIds:[...new Set([...(skillSelection.addedSkillIds||[]),...dynamicSkillIds])],dynamicSkillIds,skillExpansionError,confidence:confidenceMatch?clamp(confidenceMatch[1],0,100,null):null,retried};
-    results[index]=result;
     results[index]=result;
     const excerpt=clean(error||answer,320);
     board.push({from:agentId,text:excerpt});if(board.length>MAX_BOARD_MESSAGES)board.splice(0,board.length-MAX_BOARD_MESSAGES);
