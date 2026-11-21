@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {scoreTaskComplexity,shouldAutoDelegate,assignAgentProviders} from '../src/agent-orchestrator.js';
+import {scoreTaskComplexity,shouldAutoDelegate,assignAgentProviders,classifyTaskIntent,selectAgentWorkflow,organizeTaskPlan,createDefaultTaskPlan} from '../src/agent-orchestrator.js';
 import {createAgentHookBus} from '../src/agent-hooks.js';
 import {createProjectMemoryRecord,normalizeProjectMemoryRecords,findRelevantProjectMemories,buildProjectMemoryContext,createProjectMemoryBackup,restoreProjectMemoryBackup} from '../src/agent-memory.js';
 import {scanAgentContent} from '../src/agent-shield.js';
@@ -52,4 +52,51 @@ assert.equal(swarm.assignments.find(item=>item.taskId==='build').providerId,'oll
 assert.equal(swarm.assignments.find(item=>item.taskId==='tests').providerId,'groq');
 assert.ok(providerCalls.some(item=>item.providerId==='ollama'));
 assert.ok(providerCalls.some(item=>item.providerId==='groq'));
-console.log('Agent Systems tests passed, including end-to-end Swarm provider assignment.');
+assert.equal(classifyTaskIntent('API geliştir, test et ve güvenliği denetle').requiresSecurityReview,true);
+assert.equal(selectAgentWorkflow({task:complex,providerCount:3,minScore:40}).mode,'staged-swarm');
+const organized=organizeTaskPlan([
+ {id:'build',title:'Build',role:'developer',objective:'Implement module',priority:5},
+ {id:'tests',title:'Tests',role:'tester',objective:'Run regression tests',dependsOn:['build'],priority:5},
+ {id:'docs',title:'Docs',role:'documenter',objective:'Document module',priority:2}
+]);
+assert.equal(organized.stageCount,2);
+assert.deepEqual(organized.stages[0].map(item=>item.id),['build','docs']);
+assert.deepEqual(organized.stages[1].map(item=>item.id),['tests']);
+const cycle=organizeTaskPlan([{id:'a',objective:'A',dependsOn:['b']},{id:'b',objective:'B',dependsOn:['a']}]);
+assert.ok(cycle.warnings.some(item=>item.includes('döngüsü')));
+const fallbackPlan=createDefaultTaskPlan('Build an API, add regression tests and perform a security audit',{maxTasks:3});
+assert.ok(fallbackPlan.some(item=>item.role==='builder'));
+assert.ok(fallbackPlan.some(item=>item.role==='tester'));
+assert.ok(fallbackPlan.some(item=>item.role==='security'));
+const stagedCalls=[];
+const stagedSwarm=await runAgentSwarm({
+ providerIds:['gemini','groq','ollama'],task:'Implement a module and test it.',maxAgents:2,assignProviders:assignAgentProviders,
+ callProvider:async(providerId,prompt)=>{
+  if(prompt.includes('Yalnızca JSON döndür'))return JSON.stringify({tasks:[
+   {id:'build',title:'Code implementation',role:'developer',objective:'Implement module'},
+   {id:'tests',title:'Regression testing',role:'tester',objective:'Test module',dependsOn:['build']}
+  ]});
+  if(prompt.includes('Ajan katkıları'))return 'Staged synthesis completed';
+  stagedCalls.push({providerId,prompt});return 'Worker output';
+ }
+});
+assert.equal(stagedSwarm.planStages,2);
+assert.equal(stagedSwarm.metrics.completed,2);
+assert.equal(stagedCalls.length,2);
+assert.ok(stagedCalls[1].prompt.includes('Ön koşul çıktıları'));
+const failureCalls=[];
+const failedDependencySwarm=await runAgentSwarm({
+ providerIds:['gemini','groq','ollama'],task:'Implement and test a module.',maxAgents:2,assignProviders:assignAgentProviders,
+ callProvider:async(providerId,prompt)=>{
+  if(prompt.includes('Yalnızca JSON döndür'))return JSON.stringify({tasks:[
+   {id:'build',title:'Build module',role:'developer',objective:'Implement failing module'},
+   {id:'tests',title:'Dependent tests',role:'tester',objective:'Test dependent module',dependsOn:['build']}
+  ]});
+  if(prompt.includes('Ajan katkıları'))return 'Failure synthesis completed';
+  failureCalls.push(prompt);throw new Error('403 Forbidden');
+ }
+});
+assert.equal(failedDependencySwarm.metrics.failed,1);
+assert.equal(failedDependencySwarm.metrics.skipped,1);
+assert.equal(failureCalls.length,1);
+console.log('Agent Systems tests passed, including staged dependencies, role routing, cycle handling, and failed-dependency skipping.');
