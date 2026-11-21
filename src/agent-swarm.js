@@ -1,4 +1,5 @@
 import {createDefaultTaskPlan,organizeTaskPlan,classifyAgentRole} from './agent-orchestrator.js';
+import {MAX_SELECTED_SKILLS} from './skill-library.js';
 import {buildTaskSkillContext,refreshTaskSkillContext} from './skill-selector.js';
 const MAX_AGENTS = 10;
 const MAX_BOARD_MESSAGES = 24;
