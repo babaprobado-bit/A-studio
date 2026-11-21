@@ -194,6 +194,58 @@ jobs:
           path.write_text("\n".join(lines) + "\n")
           print("Gradle wrapper:", url, "| official SHA-256 pinned | networkTimeout=120000ms")
           PY
+      - name: Configure fallback Maven repositories
+        run: |
+          mkdir -p "$HOME/.gradle/init.d"
+          cat > "$HOME/.gradle/init.d/ai-studio-maven-mirrors.gradle" <<'GRADLE'
+          settingsEvaluated { settings ->
+            settings.pluginManagement.repositories {
+              maven {
+                name = 'aiStudioPluginMirror'
+                url = uri('https://maven.aliyun.com/repository/gradle-plugin')
+              }
+              maven {
+                name = 'aiStudioGoogleMirror'
+                url = uri('https://maven.aliyun.com/repository/google')
+              }
+              maven {
+                name = 'aiStudioCentralMirror'
+                url = uri('https://maven.aliyun.com/repository/public')
+              }
+            }
+            try {
+              settings.dependencyResolutionManagement.repositories {
+                maven {
+                  name = 'aiStudioGoogleMirror'
+                  url = uri('https://maven.aliyun.com/repository/google')
+                }
+                maven {
+                  name = 'aiStudioCentralMirror'
+                  url = uri('https://maven.aliyun.com/repository/public')
+                }
+              }
+            } catch (MissingPropertyException ignored) {
+              // Older Android templates may not use centralized repositories.
+            }
+          }
+          gradle.beforeProject { project ->
+            project.buildscript.repositories {
+              maven {
+                name = 'aiStudioPluginMirror'
+                url = uri('https://maven.aliyun.com/repository/gradle-plugin')
+              }
+              maven {
+                name = 'aiStudioGoogleMirror'
+                url = uri('https://maven.aliyun.com/repository/google')
+              }
+              maven {
+                name = 'aiStudioCentralMirror'
+                url = uri('https://maven.aliyun.com/repository/public')
+              }
+            }
+          }
+          GRADLE
+          echo 'Configured HTTPS Maven fallbacks for Gradle plugin and Android dependencies.'
       - name: Preserve trusted-LAN Ollama HTTP and set native bridge
         run: |
           python3 - <<'PY'
@@ -221,7 +273,7 @@ jobs:
               build_status=$?
             fi
             cat gradle-build.log
-            if ! grep -Eqi 'Received status code 5(02|03|04) from server|HTTP 5(02|03|04)|Gateway Time-out|timed out|UnknownHostException|Temporary failure in name resolution|Connection reset' gradle-build.log; then
+            if ! grep -Eqi 'Could not find|Could not resolve all artifacts|Received status code 5(02|03|04) from server|HTTP 5(02|03|04)|Gateway Time-out|timed out|UnknownHostException|Temporary failure in name resolution|Connection reset' gradle-build.log; then
               exit "$build_status"
             fi
             if [ "$attempt" -eq 3 ]; then
