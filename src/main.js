@@ -765,6 +765,7 @@ async function submitChat(prompt,providerId){
           onEvent:async event=>{
             if(event.type==='assignment_made')await logAgentActivity('Uzman ataması · '+event.taskId,'Atandı',event.providerId+' · '+event.roleGroup);
             if(event.type==='skills_selected')await logAgentActivity('Otomatik Skill seçimi · '+event.taskId,'Seçildi',event.skillNames.join(' · '));
+            if(event.type==='skills_refreshed')await logAgentActivity('Dinamik Skill yenileme · '+event.taskId,event.addedSkillNames?.length?'Yeni Skill eklendi':'Skill bağlamı güncellendi',(event.addedSkillNames||[]).join(' · ')||event.skillIds.length+' Skill etkin');
             if(event.type==='agent_started')await agentHooks.emit('beforeAgentRun',{taskId:event.agentId,providerId:event.providerId,role:event.role,source:'swarm'});
             if(event.type==='agent_completed')await agentHooks.emit('afterAgentRun',{taskId:event.agentId,providerId:event.providerId,status:event.status,source:'swarm'});
             if(event.type==='agent_retry')await logAgentActivity('Uzman ajan yeniden deniyor','Tekrar',event.reason);

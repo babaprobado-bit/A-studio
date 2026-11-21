@@ -152,7 +152,7 @@ export async function runAgentSwarm({providerIds,task,history=[],maxAgents=3,max
     const evolvingTask=[mainTask,'Güncel alt görev: '+item.title,item.objective,dependencyContext?'Ön koşul ajan çıktıları:\n'+dependencyContext:'',liveTeamContext?'Güncel takım bulguları:\n'+liveTeamContext:''].filter(Boolean).join('\n\n').slice(0,7200);
     const previousSkillIds=completedPrerequisites.flatMap(result=>Array.isArray(result.skillIds)?result.skillIds:[]);
     const role=item.roleGroup||classifyAgentRole(item);
-    const skillSelection=refreshTaskSkillContext({task:evolvingTask,role,skills,preferredSkillIds,previousSkillIds,maxSkills:MAX_SELECTED_SKILLS,maxChars:7600});
+    const skillSelection=refreshTaskSkillContext({task:evolvingTask,role,skills,preferredSkillIds,previousSkillIds,maxSkills:previousSkillIds.length?MAX_SELECTED_SKILLS:4,maxChars:7600});
     taskSkillContexts.set(item.id,skillSelection);
     await emit('skills_refreshed',{taskId:item.id,role,stage:skillSelection.stage,refreshed:skillSelection.refreshed,previousSkillCount:previousSkillIds.length,skillIds:skillSelection.includedIds,addedSkillIds:skillSelection.addedSkillIds,addedSkillNames:skillSelection.skills.filter(skill=>skillSelection.addedSkillIds.includes(skill.id)).map(skill=>skill.name)});
     const prompt=buildWorkerPrompt(item,mainTask,board,completedPrerequisites,skillSelection.promptText);
@@ -183,7 +183,7 @@ export async function runAgentSwarm({providerIds,task,history=[],maxAgents=3,max
   await emit('swarm_completed',{completed:results.filter(item=>item&&!item.error).length,failed:results.filter(item=>item?.error&&!item.skipped).length,skipped:results.filter(item=>item?.skipped).length,workerCount:tasks.length,stageCount:taskStages.length});
   const completedSkillIds=results.flatMap(item=>Array.isArray(item?.skillIds)?item.skillIds:[]);
   const synthesisContext=[mainTask,...results.map(item=>item.title+'\n'+clean(item.error||item.answer,900))].join('\n\n').slice(0,7200);
-  const synthesisSkills=refreshTaskSkillContext({task:synthesisContext,role:'reviewer',stage:'review',skills,preferredSkillIds,previousSkillIds:completedSkillIds,maxSkills:MAX_SELECTED_SKILLS,maxChars:7600});
+  const synthesisSkills=refreshTaskSkillContext({task:synthesisContext,role:'reviewer',stage:'review',skills,preferredSkillIds,previousSkillIds:[...new Set(completedSkillIds)].slice(0,4),maxSkills:MAX_SELECTED_SKILLS,maxChars:7600});
   await emit('skills_refreshed',{taskId:'coordinator-synthesis',role:'reviewer',stage:synthesisSkills.stage,refreshed:synthesisSkills.refreshed,previousSkillCount:completedSkillIds.length,skillIds:synthesisSkills.includedIds,addedSkillIds:synthesisSkills.addedSkillIds,addedSkillNames:synthesisSkills.skills.filter(item=>synthesisSkills.addedSkillIds.includes(item.id)).map(item=>item.name)});
   let summary='',summaryError='';
   try{summary=String(await callProvider(providers[0],buildSynthesisPrompt(mainTask,tasks,results,board,synthesisSkills.promptText),history)||'').trim();if(!summary)throw new Error('Koordinatör sentezi boş yanıt verdi.');}

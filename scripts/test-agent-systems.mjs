@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 import {scoreTaskComplexity,shouldAutoDelegate,assignAgentProviders,classifyTaskIntent,selectAgentWorkflow,organizeTaskPlan,createDefaultTaskPlan} from '../src/agent-orchestrator.js';
 import {SKILL_CATALOG} from '../src/skill-library.js';
 import {selectSkillsForTask,buildTaskSkillContext,refreshTaskSkillContext} from '../src/skill-selector.js';
@@ -136,4 +137,6 @@ const failedDependencySwarm=await runAgentSwarm({
 assert.equal(failedDependencySwarm.metrics.failed,1);
 assert.equal(failedDependencySwarm.metrics.skipped,1);
 assert.equal(failureCalls.length,1);
-console.log('Agent Systems tests passed, including staged dependencies, role routing, cycle handling, and failed-dependency skipping.');
+const mainSource=readFileSync(new URL('../src/main.js',import.meta.url),'utf8');
+assert.ok(mainSource.includes("event.type==='skills_refreshed'"),'Swarm dynamic Skill refresh must be visible in agent activity');
+console.log('Agent Systems tests passed, including staged dependencies, dynamic Skill refresh, role routing, cycle handling, and failed-dependency skipping.');
