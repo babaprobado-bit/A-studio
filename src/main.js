@@ -1247,7 +1247,7 @@ async function deleteSelectedDeviceModel(){
 async function generateWithDeviceModel(basePrompt,maxTokens,stageId='all'){
   const contextSize=Number($('onDeviceContextSize')?.value||2048);
   const totalCharBudget=Math.max(1200,Math.floor((contextSize-maxTokens-128)*3.1));
-  const systemFull=systemFor('device',basePrompt,{includeGeneralSkills:false});
+  const systemFull=systemFor('device',basePrompt,{includeGeneralSkills:false,includeTaskSkills:false});
   const systemBudget=Math.min(systemFull.length,Math.floor(totalCharBudget*0.25));
   const systemText=systemFull.slice(0,systemBudget);
   const userBudget=Math.max(500,totalCharBudget-systemText.length-80);

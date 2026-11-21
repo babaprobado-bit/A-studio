@@ -23,7 +23,7 @@ export function inferSkillStage(task,role='general',requestedStage=''){
  if(['plan','code','review','all'].includes(requestedStage))return requestedStage;
  const roleText=norm(role).replace(/[^a-z]/g,'');if(ROLE_STAGE[roleText])return ROLE_STAGE[roleText];
  const hits=ROLE_ALIASES.filter(item=>item.pattern.test(norm(task))).map(item=>item.key);
- if(hits.length===1)return ['research','planning'].includes(hits[0])?'plan':['test','security','docs','performance','ux'].includes(hits[0])?'review':'code';
+ if(hits.length===1){const key=hits[0];if(['research','planning','video'].includes(key))return 'plan';if(['test','security','docs','performance','ux'].includes(key))return 'review';if(['code','api'].includes(key))return 'code';}
  return 'all';
 }
 function scoreSkill(skill,{taskTokens,role,stage,preferredIds,activeRules}){
