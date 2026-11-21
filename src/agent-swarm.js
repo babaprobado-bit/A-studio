@@ -85,7 +85,7 @@ export function resolveSwarmConcurrency({requested=2,isNative=false,deviceInfo=n
 }
 export function estimateSwarmCallBudget(workerCount){
   const n=clamp(workerCount,2,MAX_AGENTS,3);
-  return {expected:n+2,maximumWithRetries:n*2+2,retryAllowance:n};
+  return {expected:n+2,maximumWithRetries:n*4+2,retryAllowance:n*2,dynamicSkillAllowance:n};
 }
 export function isRetryableSwarmError(error){
   const message=String(error?.message||error||'');
