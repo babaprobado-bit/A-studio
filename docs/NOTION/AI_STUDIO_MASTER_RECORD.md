@@ -1957,3 +1957,15 @@ Agnes AI ve [Glhf.chat](http://Glhf.chat) için model adları doğrulanana kadar
 <page url="https://app.notion.com/p/41d7b0fa543b81628993d9b7f53b7c83">
 Ücretsiz Model Kataloğu ve Görev Dağılımı (düzenli, 2026-11-20)
 </page>
+
+
+## F. Dynamic task-aware Skill selection (2026-11-21)
+
+- The Skill selector is not limited to one static selection at task start. refreshTaskSkillContext() re-scores the catalog when each dependency-ready Swarm worker begins, using the current subtask, role, completed prerequisite outputs and bounded team-board findings.
+- User-selected Skills keep priority. Compatible prior Skills from prerequisite agents are retained, while new matches can be added. Initial worker context starts with up to four Skills to reserve room for newly discovered needs; the hard limit remains eight.
+- Example: an implementation result that identifies prompt-injection or permission concerns can cause the following security/test worker to receive ecc-agent-security and ecc-security-scan.
+- The final synthesis stage refreshes its reviewer Skills using the worker outputs.
+- skills_refreshed events and addedSkillIds/retainedSkillIds are returned by Swarm and recorded in Agent Activity.
+- This is local deterministic matching and does not make additional model/API calls. Existing provider free-model guards and Swarm call budgets remain.
+- Verification: test-agent-systems, test-skills, test-ai-team, test-chat-layout, test-model-context, test-usability-controls, test-no-demo-mode, and workshop-smoke-test passed in the remote Node workspace. Android workflow 44934388701 was still running at the checkpoint; APK packaging/artifact was not yet confirmed.
+- Session handoff: docs/HANDOFF/SESSION_24_DYNAMIC_SKILL_REFRESH_2026-11-21.md. PR #2 remains open/Draft; main remains unchanged at aab010319b6500002844bd24b11da85dd9ca3b00.
