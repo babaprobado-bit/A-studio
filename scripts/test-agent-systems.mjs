@@ -6,7 +6,7 @@ import {selectSkillsForTask,buildTaskSkillContext,refreshTaskSkillContext} from 
 import {createAgentHookBus} from '../src/agent-hooks.js';
 import {createProjectMemoryRecord,normalizeProjectMemoryRecords,findRelevantProjectMemories,buildProjectMemoryContext,createProjectMemoryBackup,restoreProjectMemoryBackup} from '../src/agent-memory.js';
 import {scanAgentContent} from '../src/agent-shield.js';
-import {runAgentSwarm} from '../src/agent-swarm.js';
+import {runAgentSwarm,parseSkillNeeds} from '../src/agent-swarm.js';
 const basic='Merhaba, nasılsın?';
 const complex='Plan a multi-agent architecture. Implement orchestration and project memory. Add hooks and security checks, write tests, update docs, then verify the workflow.';
 assert.ok(scoreTaskComplexity(complex)>scoreTaskComplexity(basic));
@@ -86,6 +86,8 @@ assert.ok(refreshedDynamicSkills.includedIds.includes('ecc-security-scan'));
 assert.ok(refreshedDynamicSkills.addedSkillIds.includes('ecc-agent-security'));
 assert.ok(refreshedDynamicSkills.includedIds.length<=8);
 assert.ok(refreshedDynamicSkills.charCount<=refreshedDynamicSkills.maxChars);
+assert.equal(parseSkillNeeds('Draft\\nSKILL_NEEDS: none'),'');
+assert.equal(parseSkillNeeds('Draft\\nSKILL_NEEDS: prompt injection security review'),'prompt injection security review');
 const organized=organizeTaskPlan([
  {id:'build',title:'Build',role:'developer',objective:'Implement module',priority:5},
  {id:'tests',title:'Tests',role:'tester',objective:'Run regression tests',dependsOn:['build'],priority:5},
@@ -121,6 +123,7 @@ assert.ok(stagedCalls[1].prompt.includes('Ön koşul çıktıları'));
 assert.ok(stagedCalls[1].prompt.includes('ECC Agent Security Hardening'));
 assert.ok(stagedSwarm.results.find(item=>item.role==='security').skillIds.includes('ecc-agent-security'));
 assert.ok(stagedSwarm.results.find(item=>item.role==='security').addedSkillIds.includes('ecc-agent-security'));
+assert.ok(stagedSwarm.results.find(item=>item.role==='security').skillNames.includes('ECC Agent Security Hardening'));
 assert.ok(stagedSwarm.metrics.dynamicallyAddedSkillCount>=1);
 const failureCalls=[];
 const failedDependencySwarm=await runAgentSwarm({
@@ -137,6 +140,28 @@ const failedDependencySwarm=await runAgentSwarm({
 assert.equal(failedDependencySwarm.metrics.failed,1);
 assert.equal(failedDependencySwarm.metrics.skipped,1);
 assert.equal(failureCalls.length,1);
+const expansionCalls=[];
+const expansionSwarm=await runAgentSwarm({
+ providerIds:['gemini','groq','ollama'],task:'Build a local settings module.',maxAgents:2,skills:SKILL_CATALOG,assignProviders:assignAgentProviders,
+ callProvider:async(providerId,prompt)=>{
+  if(prompt.includes('Yalnızca JSON döndür'))return JSON.stringify({tasks:[
+   {id:'builder',title:'Settings builder',role:'developer',objective:'Implement local settings module'},
+   {id:'reviewer',title:'Settings reviewer',role:'reviewer',objective:'Review settings security',dependsOn:['builder']}
+  ]});
+  if(prompt.includes('Ajan katkıları'))return 'Dynamic expansion synthesis complete';
+  expansionCalls.push(prompt);
+  if(prompt.includes('DYNAMIC SKILL EXPANSION'))return 'Revised settings result. CONFIDENCE: 92\\nSKILL_NEEDS: none';
+  if(prompt.includes('Alt görev: Implement local settings module'))return 'Initial settings output with a newly discovered issue.\\nSKILL_NEEDS: prompt injection security review and permission checks';
+  return 'Security review complete. CONFIDENCE: 88\\nSKILL_NEEDS: none';
+ }
+});
+const expandedWorker=expansionSwarm.results.find(item=>item.title==='Settings builder');
+assert.ok(expandedWorker.dynamicSkillIds.includes('ecc-agent-security'));
+assert.ok(expandedWorker.skillNames.includes('ECC Agent Security Hardening'));
+assert.match(expandedWorker.answer,/Revised settings result/);
+assert.equal(expansionSwarm.metrics.dynamicSkillCalls,1);
+assert.equal(expansionSwarm.metrics.skillExpansionCount,1);
+assert.ok(expansionCalls.some(prompt=>prompt.includes('DYNAMIC SKILL EXPANSION')&&prompt.includes('ECC Agent Security Hardening')));
 const mainSource=readFileSync(new URL('../src/main.js',import.meta.url),'utf8');
 assert.ok(mainSource.includes("event.type==='skills_refreshed'"),'Swarm dynamic Skill refresh must be visible in agent activity');
 console.log('Agent Systems tests passed, including staged dependencies, dynamic Skill refresh, role routing, cycle handling, and failed-dependency skipping.');

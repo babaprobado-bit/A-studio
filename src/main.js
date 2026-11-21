@@ -754,7 +754,7 @@ async function submitChat(prompt,providerId){
     if(decision.eligible){
       const workerCount=Math.max(2,Math.min(5,Number(settings.autoAgentMaxWorkers)||3));
       const budget=estimateSwarmCallBudget(workerCount);
-      const approved=confirm('Otomatik uzman ataması: '+decision.score+'/100. Motorlar: '+pool.map(id=>providers[id].name).join(', ')+'.\n\nBeklenen istek: '+budget.expected+'. Geçici hata tekrarlarıyla üst sınır: '+budget.maximumWithRetries+'. Kota veya yerel cihaz kaynağı kullanılabilir. Başlatılsın mı?');
+      const approved=confirm('Otomatik uzman ataması: '+decision.score+'/100. Motorlar: '+pool.map(id=>providers[id].name).join(', ')+'.\n\nBeklenen istek: '+budget.expected+'. Dinamik ek Skill çağrısı ve hata tekrarlarıyla üst sınır: '+budget.maximumWithRetries+'. Kota veya yerel cihaz kaynağı kullanılabilir. Başlatılsın mı?');
       if(approved){
         loading.querySelector('p').textContent='Görev uzman ajanlara dağıtılıyor…';
         const result=await runAgentSwarm({
@@ -765,6 +765,8 @@ async function submitChat(prompt,providerId){
           onEvent:async event=>{
             if(event.type==='assignment_made')await logAgentActivity('Uzman ataması · '+event.taskId,'Atandı',event.providerId+' · '+event.roleGroup);
             if(event.type==='skills_selected')await logAgentActivity('Otomatik Skill seçimi · '+event.taskId,'Seçildi',event.skillNames.join(' · '));
+            if(event.type==='skills_expanded')await logAgentActivity('Ajan ek Skill istedi · '+event.taskId,'Eklendi',event.skillNames.join(' · '));
+            if(event.type==='skills_expansion_failed')await logAgentActivity('Ajan ek Skill istedi · '+event.taskId,'Başarısız',event.reason);
             if(event.type==='skills_refreshed')await logAgentActivity('Dinamik Skill yenileme · '+event.taskId,event.addedSkillNames?.length?'Yeni Skill eklendi':'Skill bağlamı güncellendi',(event.addedSkillNames||[]).join(' · ')||event.skillIds.length+' Skill etkin');
             if(event.type==='agent_started')await agentHooks.emit('beforeAgentRun',{taskId:event.agentId,providerId:event.providerId,role:event.role,source:'swarm'});
             if(event.type==='agent_completed')await agentHooks.emit('afterAgentRun',{taskId:event.agentId,providerId:event.providerId,status:event.status,source:'swarm'});
@@ -2125,6 +2127,7 @@ async function init(){
   });
   await mountAiPowerHub({
     root:$('tools'),getSettings:()=>settings,saveSettings:()=>setPref(DB.settings,settings),
+    getSkillSelection:()=>({skills:skillLibrary,preferredSkillIds:selectedSkillIds}),
     getConfiguredTeam:()=>configuredTeam(),callProvider:(id,prompt,history,callOptions)=>callProvider(id,prompt,history,callOptions),
     getSecret,saveSecret,deleteSecret,isDemo:()=>false,notify:showToast,
     logActivity:logAgentActivity,go,getDeviceInfo:()=>deviceLocalState?.device||null,nativeApp,getSystemPrompt:()=>settings.systemPrompt

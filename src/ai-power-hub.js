@@ -43,6 +43,7 @@ export async function mountAiPowerHub(options={}){
   const getDeviceInfo=options.getDeviceInfo||(()=>null);
   const nativeApp=options.nativeApp===true;
   const getSystemPrompt=options.getSystemPrompt||(()=>'Türkçe ve uygulanabilir yanıt ver.');
+  const getSkillSelection=options.getSkillSelection||(()=>({skills:[],preferredSkillIds:[]}));
 
   const host=document.createElement('section');
   host.id='aiPowerHub';host.className='ai-power-hub';
@@ -147,10 +148,13 @@ export async function mountAiPowerHub(options={}){
     const button=$('swarmRun');button.disabled=true;$('swarmResults').innerHTML='';$('swarmBoard').innerHTML='';setStatus('swarmStatus','Koordinatör görevleri planlıyor…');
     await logActivity('AI Swarm','Başladı',count+' ajan · '+team.join(', '));
     try{
-      const result=await runAgentSwarm({providerIds:team,task,history:[],maxAgents:count,maxConcurrency:clamp($('swarmConcurrency').value,1,4,2),isNative,deviceInfo:getDeviceInfo(),callProvider,
+      const skillState=getSkillSelection()||{};
+      const result=await runAgentSwarm({providerIds:team,task,history:[],maxAgents:count,maxConcurrency:clamp($('swarmConcurrency').value,1,4,2),isNative,deviceInfo:getDeviceInfo(),callProvider:(id,prompt,history)=>callProvider(id,prompt,history,{includeTaskSkills:false}),skills:skillState.skills||[],preferredSkillIds:skillState.preferredSkillIds||[],
         onEvent:async event=>{
           if(event.type==='agent_started')setStatus('swarmStatus',event.agentId+' başladı: '+event.title);
-          if(event.type==='agent_retry')setStatus('swarmStatus',event.agentId+' geçici hatada bir kez yeniden deneniyor.');
+          if(event.type==='agent_retry')setStatus('swarmStatus',event.agentId+' geçici hatada yeniden deneniyor.');
+          if(event.type==='skills_refreshed'&&event.addedSkillNames?.length)setStatus('swarmStatus',event.taskId+' yeni Skill ekledi: '+event.addedSkillNames.join(', '));
+          if(event.type==='skills_expanded')setStatus('swarmStatus',event.agentId+' ek Skill ile yanıtını güncelliyor: '+event.skillNames.join(', '));
           if(event.type==='plan_fallback')setStatus('swarmStatus','Yedek plan kullanıldı: '+event.reason);
           if(event.type==='agent_broadcast'){
             const card=document.createElement('article');card.className='ai-power-board-message';
@@ -159,7 +163,7 @@ export async function mountAiPowerHub(options={}){
           }
           await logActivity('Swarm · '+(event.agentId||event.type),event.type,String(event.title||event.reason||event.text||'').slice(0,240));
         }});
-      $('swarmResults').innerHTML=result.results.map(item=>'<article class="ai-power-result"><div class="reuse-top"><strong>'+esc(item.title)+'</strong><span class="pill">'+(item.error?'Hata':'Tamamlandı')+(item.retried?' · tekrarlandı':'')+'</span></div><p class="fineprint">'+esc(item.role)+' · '+esc(item.providerId)+(item.confidence===null?'':' · güven '+item.confidence+'/100')+'</p><pre>'+esc(item.error||item.answer)+'</pre></article>').join('');
+      $('swarmResults').innerHTML=result.results.map(item=>'<article class="ai-power-result"><div class="reuse-top"><strong>'+esc(item.title)+'</strong><span class="pill">'+(item.error?'Hata':'Tamamlandı')+(item.retried?' · tekrarlandı':'')+'</span></div><p class="fineprint">'+esc(item.role)+' · '+esc(item.providerId)+(item.confidence===null?'':' · güven '+item.confidence+'/100')+(item.skillNames?.length?' · Skills: '+esc(item.skillNames.join(', ')):'')+'</p><pre>'+esc(item.error||item.answer)+'</pre></article>').join('');
       const summary=document.createElement('article');summary.className='ai-power-result ai-power-summary';
       const heading=document.createElement('h4');heading.textContent='Koordinatör sentezi';
       const pre=document.createElement('pre');pre.textContent=result.summary;summary.append(heading,pre);$('swarmResults').prepend(summary);

@@ -20,7 +20,7 @@ assert.equal(parseSwarmPlan('not json',{task:'x',maxTasks:2}).usedFallback,true)
 assert.equal(resolveSwarmConcurrency({requested:4,isNative:true}),2);
 assert.equal(resolveSwarmConcurrency({requested:4,isNative:true,deviceInfo:{availableMemoryBytes:300*1024**2}}),1);
 assert.equal(resolveSwarmConcurrency({requested:4,isNative:false}),4);
-assert.deepEqual(estimateSwarmCallBudget(3),{expected:5,maximumWithRetries:8,retryAllowance:3});
+assert.deepEqual(estimateSwarmCallBudget(3),{expected:5,maximumWithRetries:14,retryAllowance:6,dynamicSkillAllowance:3});
 assert.equal(isRetryableSwarmError(new Error('HTTP 503')),true);
 assert.equal(isRetryableSwarmError(new Error('HTTP 401 invalid API key')),false);
 
@@ -135,6 +135,10 @@ assert.ok(main.includes('providers[id].freeModels&&!providers[id].freeModels.inc
 assert.ok(main.includes('APInex güvenlik kontrolü'));
 assert.ok(main.includes('enabledPromptPluginIds'));
 assert.ok(hub.includes('AI Swarm'));
+assert.ok(hub.includes('getSkillSelection'));
+assert.ok(hub.includes('skills:skillState.skills||[]'));
+assert.ok(hub.includes('includeTaskSkills:false'));
+assert.ok(main.includes('getSkillSelection:()=>({skills:skillLibrary,preferredSkillIds:selectedSkillIds})'));
 assert.ok(hub.includes('OpenRouter Multi-Chat'));
 assert.doesNotMatch(hub,/Cohere Trial|cohereTrial/i);
 assert.ok(hub.includes('Cloudflare Workers AI'));

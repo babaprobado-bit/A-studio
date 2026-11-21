@@ -89,8 +89,28 @@ function buildWorkerPrompt(task,mainTask,board,completedPrerequisites=[],skillCo
     task.files.length?'İlgili göreli dosyalar (yalnızca incele/öner): '+task.files.join(', '):'Dosya yolu verilmedi; yol uydurma.',
     board.length?'Paylaşılan takım panosu:\n'+board.map(item=>'['+item.from+'] '+item.text).join('\n'):'Takım panosu henüz boş.',
     'Çıktı: bulgular, çözüm/kod taslağı, riskler/varsayımlar, test planı. Dosya değiştirdiğini veya test çalıştırdığını iddia etme.',
+    'Yanıtında mevcut Skill talimatlarının yetmediği ve gerçekten gerekli yeni bir uzmanlık varsa son satıra SKILL_NEEDS: kısa, virgülle ayrılmış alanlar yaz. Gerekmiyorsa SKILL_NEEDS: none yaz. Araç, API anahtarı veya model erişimi isteme.',
     'Son satır: CONFIDENCE: 0-100',
     skillContext
+  ].filter(Boolean).join('\n\n');
+}
+export function parseSkillNeeds(answer){
+  const match=String(answer??'').match(/(?:^|\n)\s*SKILL_NEEDS\s*:\s*([^\r\n]*)/i);
+  const value=clean(match?.[1]||'',320);
+  if(!value||/^(none|no|n\/?a|yok|gerekmiyor|none required)$/i.test(value))return '';
+  return value;
+}
+function stripSkillNeeds(answer){return String(answer??'').replace(/(?:^|\n)\s*SKILL_NEEDS\s*:[^\r\n]*/gi,'').trim();}
+function buildSkillExpansionPrompt(task,mainTask,previousAnswer,skillContext,discoveryText){
+  return [
+    'DYNAMIC SKILL EXPANSION: Bu görev için ek uzmanlık talimatları seçildi.',
+    'Ana görev: '+clean(mainTask,1800),
+    'Alt görev: '+clean(task.objective,1000),
+    'Eksik uzmanlık: '+clean(discoveryText,320),
+    'Önceki taslak: '+clean(previousAnswer,4200),
+    'Yeni Skill talimatlarını uygula. Doğru kısımları koru, yalnızca ilgili eksikleri geliştir. Dosya değiştirdiğini veya test çalıştırdığını iddia etme.',
+    skillContext,
+    'Tamamlanmış sonucu döndür. Bu görev için başka Skill genişletmesi isteme; son satırda SKILL_NEEDS: none yaz.'
   ].filter(Boolean).join('\n\n');
 }
 function buildSynthesisPrompt(task,plan,results,board,skillContext=''){
@@ -112,13 +132,14 @@ export async function runAgentSwarm({providerIds,task,history=[],maxAgents=3,max
   if(providers.length<2)throw new Error('Swarm için en az iki hazır AI motoru gerekir.');
   const concurrency=resolveSwarmConcurrency({requested:maxConcurrency,isNative,deviceInfo});
   const started=Date.now(),board=[],results=[],lockedFiles=new Set(),fileOwners=new Map();
-  let retryCount=0;
+  let retryCount=0,dynamicSkillCalls=0,skillExpansionCount=0,modelCallCount=0;
+  const requestProvider=async(...args)=>{modelCallCount++;return callProvider(...args);};
   const emit=async(type,data={})=>{try{await onEvent({type,at:Date.now(),...data});}catch{}};
   await emit('swarm_started',{coordinatorId:providers[0],workerCount,concurrency});
   const planningSkills=buildTaskSkillContext({task:mainTask,role:'architect',stage:'plan',skills,preferredSkillIds,maxSkills:4,maxChars:7600});
   await emit('skills_selected',{taskId:'coordinator-plan',role:'architect',stage:planningSkills.stage,skillIds:planningSkills.includedIds,skillNames:planningSkills.skills.map(item=>item.name)});
   let plan;
-  try{const raw=await callProvider(providers[0],buildSwarmPlanPrompt(mainTask,workerCount,planningSkills.promptText),history);plan=parseSwarmPlan(raw,{task:mainTask,maxTasks:workerCount});}
+  try{const raw=await requestProvider(providers[0],buildSwarmPlanPrompt(mainTask,workerCount,planningSkills.promptText),history);plan=parseSwarmPlan(raw,{task:mainTask,maxTasks:workerCount});}
   catch(error){plan={tasks:fallbackSwarmTasks(mainTask,workerCount),usedFallback:true,reason:clean(error?.message||'Koordinatör yanıt vermedi.',300)};}
   if(plan.usedFallback)await emit('plan_fallback',{reason:plan.reason});
   const tasks=plan.tasks.slice(0,workerCount);
@@ -146,27 +167,55 @@ export async function runAgentSwarm({providerIds,task,history=[],maxAgents=3,max
     }
     const completedPrerequisites=(item.dependsOn||[]).map(id=>results[taskIndex.get(id)]).filter(Boolean);
     await emit('agent_started',{agentId,title:item.title,role:item.role,providerId,roleGroup:assigned?.roleGroup||item.roleGroup||'general',stage:item.stage??0});
-    let answer='',error='',retried=false;
-    const dependencyContext=completedPrerequisites.map(result=>'### '+result.title+'\n'+(result.error?'HATA: '+result.error:clean(result.answer,2200))).join('\n\n');
-    const liveTeamContext=board.map(entry=>'['+entry.from+'] '+entry.text).join('\n');
-    const evolvingTask=[mainTask,'Güncel alt görev: '+item.title,item.objective,dependencyContext?'Ön koşul ajan çıktıları:\n'+dependencyContext:'',liveTeamContext?'Güncel takım bulguları:\n'+liveTeamContext:''].filter(Boolean).join('\n\n').slice(0,7200);
-    const previousSkillIds=completedPrerequisites.flatMap(result=>Array.isArray(result.skillIds)?result.skillIds:[]);
-    const role=item.roleGroup||classifyAgentRole(item);
-    const skillSelection=refreshTaskSkillContext({task:evolvingTask,role,skills,preferredSkillIds,previousSkillIds,maxSkills:previousSkillIds.length?MAX_SELECTED_SKILLS:4,maxChars:7600});
-    taskSkillContexts.set(item.id,skillSelection);
-    await emit('skills_refreshed',{taskId:item.id,role,stage:skillSelection.stage,refreshed:skillSelection.refreshed,previousSkillCount:previousSkillIds.length,skillIds:skillSelection.includedIds,addedSkillIds:skillSelection.addedSkillIds,addedSkillNames:skillSelection.skills.filter(skill=>skillSelection.addedSkillIds.includes(skill.id)).map(skill=>skill.name)});
+    let answer='',error='',retried=false,skillExpansionError='',dynamicSkillIds=[];
+    let skillSelection=taskSkillContexts.get(item.id);
     const prompt=buildWorkerPrompt(item,mainTask,board,completedPrerequisites,skillSelection.promptText);
     for(let attempt=0;attempt<2;attempt++){
-      try{answer=String(await callProvider(providerId,prompt,history)||'').trim();if(!answer)throw new Error('Ajan boş yanıt verdi.');error='';break;}
+      try{answer=String(await requestProvider(providerId,prompt,history)||'').trim();if(!answer)throw new Error('Ajan boş yanıt verdi.');error='';break;}
       catch(err){error=clean(err?.message||'Ajan çağrısı başarısız.',500);if(attempt===0&&isRetryableSwarmError(err)){retried=true;retryCount++;await emit('agent_retry',{agentId,reason:error});continue;}break;}
     }
+    if(!error){
+      const needs=parseSkillNeeds(answer),previousAnswer=stripSkillNeeds(answer);
+      if(needs){
+        const expanded=refreshTaskSkillContext({
+          task:evolvingTask+'\nYeni uzmanlık ihtiyacı: '+needs,
+          role:'general',stage:'all',skills,preferredSkillIds,
+          previousSkillIds:skillSelection.includedIds,maxSkills:MAX_SELECTED_SKILLS,maxChars:7600
+        });
+        if(expanded.addedSkillIds.length){
+          let revised='',revisionError='';
+          await emit('skills_expansion_started',{agentId,taskId:item.id,needs,addedSkillIds:expanded.addedSkillIds});
+          for(let attempt=0;attempt<2;attempt++){
+            dynamicSkillCalls++;
+            try{
+              revised=String(await requestProvider(providerId,buildSkillExpansionPrompt(item,mainTask,previousAnswer,expanded.promptText,needs),history)||'').trim();
+              if(!revised)throw new Error('Ek Skill talimatlarıyla gelen yanıt boş.');
+              revisionError='';break;
+            }catch(err){
+              revisionError=clean(err?.message||'Dinamik Skill genişletmesi başarısız.',500);
+              if(attempt===0&&isRetryableSwarmError(err)){retried=true;retryCount++;await emit('agent_retry',{agentId,reason:revisionError,phase:'skill-expansion'});continue;}
+              break;
+            }
+          }
+          if(revised&&!revisionError){
+            answer=stripSkillNeeds(revised);skillSelection=expanded;taskSkillContexts.set(item.id,expanded);
+            dynamicSkillIds=[...expanded.addedSkillIds];skillExpansionCount++;
+            await emit('skills_expanded',{agentId,taskId:item.id,needs,skillIds:dynamicSkillIds,skillNames:expanded.skills.filter(skill=>dynamicSkillIds.includes(skill.id)).map(skill=>skill.name)});
+          }else{
+            skillExpansionError=revisionError;answer=previousAnswer;
+            await emit('skills_expansion_failed',{agentId,taskId:item.id,reason:skillExpansionError,retainedInitialAnswer:true});
+          }
+        }else answer=previousAnswer;
+      }else answer=previousAnswer;
+    }
     const confidenceMatch=answer.match(/(?:CONFIDENCE|GÜVEN):\s*(\d{1,3})/i);
-    const result={agentId,providerId,title:item.title,role:item.role,answer,error,skillIds:skillSelection.includedIds,addedSkillIds:skillSelection.addedSkillIds,confidence:confidenceMatch?clamp(confidenceMatch[1],0,100,null):null,retried};
+    const result={agentId,providerId,title:item.title,role:item.role,answer,error,skillIds:skillSelection.includedIds,skillNames:skillSelection.skills.filter(skill=>skillSelection.includedIds.includes(skill.id)).map(skill=>skill.name),addedSkillIds:[...new Set([...(skillSelection.addedSkillIds||[]),...dynamicSkillIds])],dynamicSkillIds,skillExpansionError,confidence:confidenceMatch?clamp(confidenceMatch[1],0,100,null):null,retried};
+    results[index]=result;
     results[index]=result;
     const excerpt=clean(error||answer,320);
     board.push({from:agentId,text:excerpt});if(board.length>MAX_BOARD_MESSAGES)board.splice(0,board.length-MAX_BOARD_MESSAGES);
     await emit('agent_broadcast',{from:agentId,text:excerpt});
-    await emit('agent_completed',{agentId,title:item.title,status:error?'failed':'completed',error,retried});
+    await emit('agent_completed',{agentId,title:item.title,status:error?'failed':'completed',error,retried,dynamicSkillIds,skillExpansionError});
   };
   for(const stage of taskStages){
     let nextIndex=0;
@@ -186,14 +235,14 @@ export async function runAgentSwarm({providerIds,task,history=[],maxAgents=3,max
   const synthesisSkills=refreshTaskSkillContext({task:synthesisContext,role:'reviewer',stage:'review',skills,preferredSkillIds,previousSkillIds:[...new Set(completedSkillIds)].slice(0,4),maxSkills:MAX_SELECTED_SKILLS,maxChars:7600});
   await emit('skills_refreshed',{taskId:'coordinator-synthesis',role:'reviewer',stage:synthesisSkills.stage,refreshed:synthesisSkills.refreshed,previousSkillCount:completedSkillIds.length,skillIds:synthesisSkills.includedIds,addedSkillIds:synthesisSkills.addedSkillIds,addedSkillNames:synthesisSkills.skills.filter(item=>synthesisSkills.addedSkillIds.includes(item.id)).map(item=>item.name)});
   let summary='',summaryError='';
-  try{summary=String(await callProvider(providers[0],buildSynthesisPrompt(mainTask,tasks,results,board,synthesisSkills.promptText),history)||'').trim();if(!summary)throw new Error('Koordinatör sentezi boş yanıt verdi.');}
+  try{summary=String(await requestProvider(providers[0],buildSynthesisPrompt(mainTask,tasks,results,board,synthesisSkills.promptText),history)||'').trim();if(!summary)throw new Error('Koordinatör sentezi boş yanıt verdi.');}
   catch(error){summaryError=clean(error?.message||'Sentez başarısız.',400);summary='## Birleştirilmiş sonuç\n'+results.map(item=>'### '+item.title+'\n'+(item.error?'Hata: '+item.error:item.answer)).join('\n\n')+'\n\nKoordinatör sentezi alınamadı; ajan katkıları ayrı ayrı incelenmeli.';}
   return {coordinatorId:providers[0],plan:tasks,planStages:taskStages.length,planWarnings:plan.warnings||[],planFallback:plan.usedFallback,results,summary,summaryError,assignments,skillSelections:[{taskId:'coordinator-plan',role:'architect',stage:planningSkills.stage,skillIds:planningSkills.includedIds,skillNames:planningSkills.skills.map(item=>item.name)},{taskId:'coordinator-synthesis',role:'reviewer',stage:synthesisSkills.stage,skillIds:synthesisSkills.includedIds,skillNames:synthesisSkills.skills.map(item=>item.name)},...tasks.map(item=>({taskId:item.id,role:item.roleGroup||item.role,stage:taskSkillContexts.get(item.id)?.stage,skillIds:taskSkillContexts.get(item.id)?.includedIds||[],skillNames:taskSkillContexts.get(item.id)?.skills.map(skill=>skill.name)||[],addedSkillIds:taskSkillContexts.get(item.id)?.addedSkillIds||[]}))],metrics:{
     workerCount:tasks.length,completed:results.filter(item=>item&&!item.error).length,failed:results.filter(item=>item?.error&&!item.skipped).length,skipped:results.filter(item=>item?.skipped).length,
-    retryCount,elapsedMs:Date.now()-started,fileConflictCount:tasks.reduce((sum,item)=>sum+item.files.length,0)-new Set(tasks.flatMap(item=>item.files)).size,
+    retryCount,dynamicSkillCalls,skillExpansionCount,modelCallCount,elapsedMs:Date.now()-started,fileConflictCount:tasks.reduce((sum,item)=>sum+item.files.length,0)-new Set(tasks.flatMap(item=>item.files)).size,
     selectedSkillCount:planningSkills.includedIds.length+synthesisSkills.includedIds.length+[...taskSkillContexts.values()].reduce((sum,item)=>sum+item.includedIds.length,0),
     dynamicallyAddedSkillCount:synthesisSkills.addedSkillIds.length+[...taskSkillContexts.values()].reduce((sum,item)=>sum+item.addedSkillIds.length,0),
-    expectedCalls:tasks.length+2,maxCallsWithRetries:tasks.length*2+2,stageCount:taskStages.length
+    expectedCalls:tasks.length+2,maxCallsWithRetries:tasks.length*4+2,stageCount:taskStages.length
   }};
 }
 export const SWARM_LIMITS=Object.freeze({maxAgents:MAX_AGENTS,defaultAgents:3,defaultConcurrency:2});
