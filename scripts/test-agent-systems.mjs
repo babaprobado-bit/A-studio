@@ -118,8 +118,8 @@ assert.equal(stagedSwarm.metrics.completed,2);
 assert.equal(stagedCalls.length,2);
 assert.ok(stagedCalls[1].prompt.includes('Ön koşul çıktıları'));
 assert.ok(stagedCalls[1].prompt.includes('ECC Agent Security Hardening'));
-assert.ok(stagedSwarm.results.find(item=>item.title==='Test and audit module').skillIds.includes('ecc-agent-security'));
-assert.ok(stagedSwarm.results.find(item=>item.title==='Test and audit module').addedSkillIds.includes('ecc-agent-security'));
+assert.ok(stagedSwarm.results.find(item=>item.role==='security').skillIds.includes('ecc-agent-security'));
+assert.ok(stagedSwarm.results.find(item=>item.role==='security').addedSkillIds.includes('ecc-agent-security'));
 assert.ok(stagedSwarm.metrics.dynamicallyAddedSkillCount>=1);
 const failureCalls=[];
 const failedDependencySwarm=await runAgentSwarm({
