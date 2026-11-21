@@ -54,3 +54,44 @@ export function buildTaskSkillContext(options={}){
  const promptText=blocks.length?header+blocks.join('\n\n')+footer:'';
  return {...selection,promptText,includedIds,excludedIds,charCount:promptText.length,maxChars,omittedByChars:excludedIds.length>0};
 }
+
+export function refreshTaskSkillContext({
+  task='',role='general',stage='',skills=[],preferredSkillIds=[],previousSkillIds=[],
+  maxSkills=MAX_SELECTED_SKILLS,maxChars=10000,minScore=0.8
+}={}){
+  const limit=Math.max(1,Math.min(MAX_SELECTED_SKILLS,Math.floor(Number(maxSkills)||MAX_SELECTED_SKILLS)));
+  const fresh=selectSkillsForTask({task,role,stage,skills,preferredSkillIds,maxSkills:limit,minScore});
+  const catalog=new Map((Array.isArray(skills)?skills:[]).map(item=>normalizeSkill(item)).filter(Boolean).map(item=>[item.id,item]));
+  const allowed=skill=>fresh.stage==='all'||skill.stage==='all'||skill.stage===fresh.stage;
+  const priorIds=[...new Set(Array.isArray(previousSkillIds)?previousSkillIds:[])];
+  const previous=priorIds.map(id=>catalog.get(id)).filter(skill=>skill&&allowed(skill));
+  const manualIds=[...new Set(Array.isArray(preferredSkillIds)?preferredSkillIds:[])];
+  const manual=manualIds.map(id=>catalog.get(id)).filter(skill=>skill&&allowed(skill));
+  const merged=[],seen=new Set();
+  for(const skill of [...manual,...previous,...fresh.skills]){
+    if(!seen.has(skill.id)&&merged.length<limit){seen.add(skill.id);merged.push(skill);}
+  }
+  const charLimit=Math.max(0,Math.min(24000,Number(maxChars)||10000));
+  const header='\n\n--- AI STUDIO DYNAMIC SKILLS ('+fresh.stage.toUpperCase()+'/'+String(role).toUpperCase()+') ---\n';
+  const footer='\n--- END DYNAMIC SKILLS ---';
+  const budget=Math.max(0,charLimit-header.length-footer.length);
+  const blocks=[];let used=0;const includedIds=[],excludedIds=[];
+  for(const item of merged){
+    const block='### '+item.name+' ['+item.stage+']\n'+item.content;
+    const separator=blocks.length?'\n\n':'';
+    const remaining=budget-used-separator.length;
+    if(remaining<100){excludedIds.push(item.id);continue;}
+    const clipped=block.length>remaining?block.slice(0,remaining):block;
+    blocks.push(clipped);used+=separator.length+clipped.length;includedIds.push(item.id);
+    if(clipped.length<block.length){excludedIds.push(item.id);break;}
+  }
+  const promptText=blocks.length?header+blocks.join('\n\n')+footer:'';
+  const previousSet=new Set(priorIds);
+  const addedSkillIds=includedIds.filter(id=>!previousSet.has(id));
+  const retainedSkillIds=includedIds.filter(id=>previousSet.has(id));
+  return {
+    ...fresh,skills:merged,selectedIds:merged.map(item=>item.id),includedIds,excludedIds,
+    promptText,charCount:promptText.length,maxChars:charLimit,omittedByChars:excludedIds.length>0,
+    previousSkillIds:priorIds,addedSkillIds,retainedSkillIds,refreshed:priorIds.length>0
+  };
+}

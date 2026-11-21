@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {scoreTaskComplexity,shouldAutoDelegate,assignAgentProviders,classifyTaskIntent,selectAgentWorkflow,organizeTaskPlan,createDefaultTaskPlan} from '../src/agent-orchestrator.js';
 import {SKILL_CATALOG} from '../src/skill-library.js';
-import {selectSkillsForTask,buildTaskSkillContext} from '../src/skill-selector.js';
+import {selectSkillsForTask,buildTaskSkillContext,refreshTaskSkillContext} from '../src/skill-selector.js';
 import {createAgentHookBus} from '../src/agent-hooks.js';
 import {createProjectMemoryRecord,normalizeProjectMemoryRecords,findRelevantProjectMemories,buildProjectMemoryContext,createProjectMemoryBackup,restoreProjectMemoryBackup} from '../src/agent-memory.js';
 import {scanAgentContent} from '../src/agent-shield.js';
@@ -77,6 +77,14 @@ assert.ok(selectedContext.includedIds.length<=8);
 assert.ok(selectedContext.charCount<=3500);
 assert.ok(selectedContext.promptText.includes('AI STUDIO AUTO-SELECTED SKILLS'));
 assert.ok(selectedContext.includedIds.includes('karpathy-guidelines'));
+const initialDynamicSkills=refreshTaskSkillContext({task:'Implement API code and add tests',role:'builder',skills:SKILL_CATALOG,maxSkills:4});
+const refreshedDynamicSkills=refreshTaskSkillContext({task:'Implement API code; previous output identified prompt injection vulnerability, missing permissions and security audit gaps',role:'security',skills:SKILL_CATALOG,previousSkillIds:initialDynamicSkills.includedIds,maxSkills:8});
+assert.equal(refreshedDynamicSkills.stage,'review');
+assert.ok(refreshedDynamicSkills.includedIds.includes('ecc-agent-security'));
+assert.ok(refreshedDynamicSkills.includedIds.includes('ecc-security-scan'));
+assert.ok(refreshedDynamicSkills.addedSkillIds.includes('ecc-agent-security'));
+assert.ok(refreshedDynamicSkills.includedIds.length<=8);
+assert.ok(refreshedDynamicSkills.charCount<=refreshedDynamicSkills.maxChars);
 const organized=organizeTaskPlan([
  {id:'build',title:'Build',role:'developer',objective:'Implement module',priority:5},
  {id:'tests',title:'Tests',role:'tester',objective:'Run regression tests',dependsOn:['build'],priority:5},
@@ -97,16 +105,22 @@ const stagedSwarm=await runAgentSwarm({
  callProvider:async(providerId,prompt)=>{
   if(prompt.includes('Yalnızca JSON döndür'))return JSON.stringify({tasks:[
    {id:'build',title:'Code implementation',role:'developer',objective:'Implement module'},
-   {id:'tests',title:'Regression testing',role:'tester',objective:'Test module',dependsOn:['build']}
+   {id:'tests',title:'Regression testing',role:'security',objective:'Test and audit module',dependsOn:['build']}
   ]});
   if(prompt.includes('Ajan katkıları'))return 'Staged synthesis completed';
-  stagedCalls.push({providerId,prompt});return 'Worker output';
+  stagedCalls.push({providerId,prompt});
+  if(prompt.includes('Alt görev: Implement module'))return 'Implementation found a prompt injection vulnerability and missing permission checks.';
+  return 'Worker output';
  }
 });
 assert.equal(stagedSwarm.planStages,2);
 assert.equal(stagedSwarm.metrics.completed,2);
 assert.equal(stagedCalls.length,2);
 assert.ok(stagedCalls[1].prompt.includes('Ön koşul çıktıları'));
+assert.ok(stagedCalls[1].prompt.includes('ECC Agent Security Hardening'));
+assert.ok(stagedSwarm.results.find(item=>item.title==='Test and audit module').skillIds.includes('ecc-agent-security'));
+assert.ok(stagedSwarm.results.find(item=>item.title==='Test and audit module').addedSkillIds.includes('ecc-agent-security'));
+assert.ok(stagedSwarm.metrics.dynamicallyAddedSkillCount>=1);
 const failureCalls=[];
 const failedDependencySwarm=await runAgentSwarm({
  providerIds:['gemini','groq','ollama'],task:'Implement and test a module.',maxAgents:2,assignProviders:assignAgentProviders,
