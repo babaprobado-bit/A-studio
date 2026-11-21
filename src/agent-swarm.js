@@ -94,7 +94,7 @@ function buildSynthesisPrompt(task,plan,results,board){
     'Sonuç, önerilen adımlar, ayrışan görüşler, doğrulama durumu ve kalan riskleri yaz. Öneri; dosya değişikliği veya test başarısı kanıtı değildir.'
   ].join('\n\n');
 }
-export async function runAgentSwarm({providerIds,task,history=[],maxAgents=3,maxConcurrency=2,isNative=false,deviceInfo=null,callProvider,onEvent=async()=>{}}){
+export async function runAgentSwarm({providerIds,task,history=[],maxAgents=3,maxConcurrency=2,isNative=false,deviceInfo=null,callProvider,onEvent=async()=>{},assignProviders=null}){
   if(!Array.isArray(providerIds)||typeof callProvider!=='function')throw new TypeError('Swarm için providerIds ve callProvider gerekir.');
   const providers=[...new Set(providerIds.filter(item=>typeof item==='string'&&item.trim()))];
   const mainTask=clean(task,3000),workerCount=clamp(maxAgents,2,MAX_AGENTS,3);
@@ -110,10 +110,18 @@ export async function runAgentSwarm({providerIds,task,history=[],maxAgents=3,max
   catch(error){plan={tasks:fallbackSwarmTasks(mainTask,workerCount),usedFallback:true,reason:clean(error?.message||'Koordinatör yanıt vermedi.',300)};}
   if(plan.usedFallback)await emit('plan_fallback',{reason:plan.reason});
   const tasks=plan.tasks.slice(0,workerCount);
+  let assignments=[];
+  if(typeof assignProviders==='function'){
+    try{assignments=assignProviders(tasks,providers)||[];}catch(error){await emit('assignment_fallback',{reason:clean(error?.message||'Uzman ataması başarısız.',240)});}
+  }
+  const assignmentMap=new Map((Array.isArray(assignments)?assignments:[]).filter(item=>item&&tasks.some(taskItem=>taskItem.id===item.taskId)&&providers.includes(item.providerId)).map(item=>[item.taskId,item]));
+  assignments=tasks.map((item,index)=>assignmentMap.get(item.id)||({taskId:item.id,providerId:providers[1+(index%(providers.length-1))],roleGroup:'general',reason:'Dengeli varsayılan atama'}));
+  for(const assignment of assignments)await emit('assignment_made',{taskId:assignment.taskId,providerId:assignment.providerId,roleGroup:assignment.roleGroup,reason:assignment.reason});
   for(const item of tasks)for(const file of item.files){const previous=fileOwners.get(file);if(previous)await emit('file_conflict',{file,firstTask:previous,secondTask:item.id});else fileOwners.set(file,item.id);}
   const execute=async(item,index)=>{
-    const providerId=providers[1+(index%(providers.length-1))],agentId='agent-'+(index+1);
-    await emit('agent_started',{agentId,title:item.title,role:item.role,providerId});
+    const assigned=assignmentMap.get(item.id)||assignments[index];
+    const providerId=providers.includes(assigned?.providerId)?assigned.providerId:providers[1+(index%(providers.length-1))],agentId='agent-'+(index+1);
+    await emit('agent_started',{agentId,title:item.title,role:item.role,providerId,roleGroup:assigned?.roleGroup||'general'});
     let answer='',error='',retried=false;
     const prompt=buildWorkerPrompt(item,mainTask,board);
     for(let attempt=0;attempt<2;attempt++){
@@ -141,7 +149,7 @@ export async function runAgentSwarm({providerIds,task,history=[],maxAgents=3,max
   let summary='',summaryError='';
   try{summary=String(await callProvider(providers[0],buildSynthesisPrompt(mainTask,tasks,results,board),history)||'').trim();if(!summary)throw new Error('Koordinatör sentezi boş yanıt verdi.');}
   catch(error){summaryError=clean(error?.message||'Sentez başarısız.',400);summary='## Birleştirilmiş sonuç\n'+results.map(item=>'### '+item.title+'\n'+(item.error?'Hata: '+item.error:item.answer)).join('\n\n')+'\n\nKoordinatör sentezi alınamadı; ajan katkıları ayrı ayrı incelenmeli.';}
-  return {coordinatorId:providers[0],planFallback:plan.usedFallback,results,summary,summaryError,metrics:{
+  return {coordinatorId:providers[0],planFallback:plan.usedFallback,results,summary,summaryError,assignments,metrics:{
     workerCount:tasks.length,completed:results.filter(item=>item&&!item.error).length,failed:results.filter(item=>item&&item.error).length,
     retryCount,elapsedMs:Date.now()-started,fileConflictCount:tasks.reduce((sum,item)=>sum+item.files.length,0)-new Set(tasks.flatMap(item=>item.files)).size,
     expectedCalls:tasks.length+2,maxCallsWithRetries:tasks.length*2+2

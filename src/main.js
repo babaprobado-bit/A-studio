@@ -18,6 +18,11 @@ import { fitModelContext } from './model-context.js';
 import { encryptWorkspaceBackup, decryptWorkspaceBackup } from './encrypted-backup.js';
 import { SKILL_CATALOG, SKILL_PROFILES, parseSkillMarkdown, normalizeSkill, prepareSkillImportQueue, buildStageSkillContext, getProfileSkillIds, createSkillBackupState, restoreSkillBackupState, MAX_SELECTED_SKILLS, MAX_CUSTOM_SKILLS, MAX_STAGE_SKILL_CHARS } from './skill-library.js';
 import { PLUGIN_REPOSITORY_CATALOG, getPluginRepositoryArchiveUrl, getPluginRepositoryById, isAllowedPluginRepositoryDownload } from './plugin-marketplace.js';
+import { runAgentSwarm, estimateSwarmCallBudget } from './agent-swarm.js';
+import { scoreTaskComplexity, shouldAutoDelegate, assignAgentProviders } from './agent-orchestrator.js';
+import { createAgentHookBus } from './agent-hooks.js';
+import { createProjectMemoryRecord, normalizeProjectMemoryRecords, getProjectMemories, buildProjectMemoryContext, createProjectMemoryBackup, restoreProjectMemoryBackup } from './agent-memory.js';
+import { scanAgentContent } from './agent-shield.js';
 
 const $ = (id) => document.getElementById(id);
 const DB = {
@@ -29,6 +34,7 @@ const DB = {
   plugins: 'ai-studio-prompt-plugins-v2',
   snippets: 'ai-studio-snippet-v1',
   activity: 'ai-studio-agent-activity-v1',
+  agentMemory: 'ai-studio-agent-memory-v1',
   codeFiles: 'ai-studio-code-files-v1',
   skills: 'ai-studio-skills-v1',
   pluginDownloads: 'ai-studio-plugin-repo-downloads-v1'
@@ -69,6 +75,13 @@ const defaultSettings = {
   localCoderApiProvider: 'openai',
   shareReusableContext: false,
   shareVaultContext: false,
+  autoAgentAssignment: true,
+  autoAgentMinComplexity: 55,
+  autoAgentMaxWorkers: 3,
+  agentMemoryEnabled: true,
+  shareAgentMemory: false,
+  agentHooksEnabled: true,
+  agentShieldEnabled: true,
   vaultBaseUrl: '',
   systemPrompt: 'Yanıtlarını açık ve uygulanabilir yaz. Bilmediğin şeyi uydurma. Kod istenince küçük, test edilebilir adımlar öner.'
 };
@@ -84,6 +97,7 @@ let downloadedPluginRepoIds = [];
 let activePluginLibraryTab = 'store';
 let reusableSnippets = [];
 let agentActivity = [];
+let agentMemoryRecords = [];
 let sharedVaultItems = [];
 let sharedVaultAgents = [];
 let codeFiles = [];
@@ -99,6 +113,10 @@ let codeFileLoadLock = false;
 let busy = false;
 let toastTimer;
 const runtimeKeys = Object.create(null);
+const agentHooks = createAgentHookBus({ isEnabled: () => settings.agentHooksEnabled !== false });
+agentHooks.on('*', async event => {
+  await logAgentActivity('Hook · ' + event.event, 'Tetiklendi', String(event.detail || event.taskId || event.projectId || '').slice(0, 180));
+});
 const builtinTools = [
   { id:'plan', name:'Görevi böl', icon:'✳', desc:'Büyük fikri küçük işlere ayır.', prompt:'Şu görevi net, sıralı ve test edilebilir adımlara böl. Önce MVP ve riskleri belirt.\n\nGörev: {{gorev}}' },
   { id:'debug', name:'Hata ayıkla', icon:'⌁', desc:'Belirti, olası neden ve test.', prompt:'Bu kodu hata ayıklama gözüyle incele. Önce gözlenen sorunu açıklığa kavuştur, olası nedenleri sırala, en küçük düzeltmeyi ve testini ver. Kodu çalıştırmadıysan bunu belirt.\n\nGörev / kod: {{gorev}}' },
@@ -110,7 +128,7 @@ const builtinTools = [
 function clone(x){ return JSON.parse(JSON.stringify(x)); }
 function esc(x){ return String(x ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function showToast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'),3200); }
-function go(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('active',s.id===id)); document.querySelectorAll('.nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.tab===id)); window.scrollTo({top:0,behavior:'smooth'}); }
+function go(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('active',s.id===id)); document.querySelectorAll('.nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.tab===id)); if(id==='tools'&&typeof renderAgentSystems==='function')renderAgentSystems(); window.scrollTo({top:0,behavior:'smooth'}); }
 function downloadText(name,content,type='text/plain;charset=utf-8'){ const blob=new Blob([content],{type}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),1500); }
 async function getPref(key,fallback){try{const r=await Preferences.get({key}); return r.value==null?fallback:JSON.parse(r.value);}catch(_){return fallback;}}
 async function setPref(key,value){await Preferences.set({key,value:JSON.stringify(value)});}
@@ -634,10 +652,12 @@ function systemFor(id,task='',options={}){
   const context=getSharedProjectContext();
   const vaultContext=buildSharedVaultContext({items:sharedVaultItems,task,enabled:settings.shareVaultContext===true});
   const skillContext=options.includeGeneralSkills===false?'':currentGeneralSkillContext(6000).promptText;
+  const memoryContext=settings.agentMemoryEnabled!==false&&settings.shareAgentMemory===true?buildProjectMemoryContext(agentMemoryRecords,activeProjectId,task,{maxRecords:3,maxChars:2600}):'';
   return settings.systemPrompt+'\nSağlayıcı rolü: '+providers[id].name+'. Yanıtları Türkçe ve uygulanabilir yaz; var olmayan test sonuçlarını iddia etme.'
     +(context?'\n\n'+context:'')
     +(vaultContext?'\n\n'+vaultContext:'')
-    +(skillContext?'\n\n'+skillContext:'');
+    +(skillContext?'\n\n'+skillContext:'')
+    +(memoryContext?'\n\n'+memoryContext:'');
 }
 async function fetchJson(url,options,timeoutMs=50000){
   const controller=new AbortController(); const timer=setTimeout(()=>controller.abort(),timeoutMs);
@@ -697,10 +717,22 @@ async function callProvider(id,prompt,history,options={}){
   const text=Array.isArray(message)?message.map(x=>x.text||'').join('\n'):message;
   if(!text)throw new Error('Yanıtta metin bulunamadı. Model kimliğinin bu API üzerinde kullanılabildiğini doğrula.');return text;
 }
+function scanPromptBeforeSend(text,source='user-prompt'){
+  if(settings.agentShieldEnabled===false)return true;
+  const report=scanAgentContent(text,{source});
+  if(report.blocked){
+    showToast('AgentShield isteği engelledi: '+report.findings.filter(item=>item.severity==='critical'||item.severity==='high').map(item=>item.message).slice(0,2).join(' '));
+    logAgentActivity('AgentShield','Engellendi',report.summary).catch(()=>{});
+    return false;
+  }
+  if(report.findings.length)logAgentActivity('AgentShield','Uyarı',report.summary).catch(()=>{});
+  return true;
+}
 async function submitChat(prompt,providerId){
   if(busy)return;
   const text=String(prompt||'').trim();
   if(!text)return;
+  if(!scanPromptBeforeSend(text,'user-prompt'))return;
   if(!providerIsReady(providerId)){
     showToast(providers[providerId].name+' bağlantısı hazır değil. Önce kurulumunu tamamla; mesaj gönderilmedi.');
     openFirstRunSetup(providerId==='ollama'?'ollama':providerId==='device'?'device':providerId==='openrouter'?'openrouter':'cloud');
@@ -710,22 +742,55 @@ async function submitChat(prompt,providerId){
   pushMessage('user',text,{mode:'live'});
   const out=$('chatMessages'),loading=document.createElement('article');
   loading.className='result-card';loading.innerHTML='<div class="result-label">GERÇEK MODEL YANITI</div><p>Seçili sağlayıcıdan yanıt bekleniyor…</p>';out.append(loading);
-  await logAgentActivity('Tekli sohbet · '+providers[providerId].name,'Başladı',text);
+  await logAgentActivity('Tekli sohbet · '+providers[providerId].name,'Başladı','Görev uzunluğu: '+text.length);
   try{
-    const answer=await callProvider(providerId,text,chatContext().slice(0,-1));
-    loading.remove();pushMessage('assistant',answer,{provider:providers[providerId].name,mode:'live'});
-    await logAgentActivity('Tekli sohbet · '+providers[providerId].name,'Tamamlandı','Gerçek model yanıt verdi. '+answer.slice(0,180));
+    await agentHooks.emit('beforeAgentRun',{providerId,source:'chat',taskLength:text.length});
+    const pool=[...new Set([providerId,...configuredTeam().filter(id=>id!==providerId)])];
+    const decision=shouldAutoDelegate({task:text,enabled:settings.autoAgentAssignment!==false,providerCount:pool.length,minScore:settings.autoAgentMinComplexity});
+    let answer='',answerProvider=providers[providerId].name;
+    if(decision.eligible){
+      const workerCount=Math.max(2,Math.min(5,Number(settings.autoAgentMaxWorkers)||3));
+      const budget=estimateSwarmCallBudget(workerCount);
+      const approved=confirm('Otomatik uzman ataması: '+decision.score+'/100. Motorlar: '+pool.map(id=>providers[id].name).join(', ')+'.\n\nBeklenen istek: '+budget.expected+'. Geçici hata tekrarlarıyla üst sınır: '+budget.maxCallsWithRetries+'. Kota veya yerel cihaz kaynağı kullanılabilir. Başlatılsın mı?');
+      if(approved){
+        loading.querySelector('p').textContent='Görev uzman ajanlara dağıtılıyor…';
+        const result=await runAgentSwarm({
+          providerIds:pool,task:text,history:chatContext().slice(0,-1),maxAgents:workerCount,
+          maxConcurrency:nativeApp?2:3,isNative:nativeApp,deviceInfo:deviceLocalState?.device||null,
+          callProvider,assignProviders:assignAgentProviders,
+          onEvent:async event=>{
+            if(event.type==='assignment_made')await logAgentActivity('Uzman ataması · '+event.taskId,'Atandı',event.providerId+' · '+event.roleGroup);
+            if(event.type==='agent_started')await agentHooks.emit('beforeAgentRun',{taskId:event.agentId,providerId:event.providerId,role:event.role,source:'swarm'});
+            if(event.type==='agent_completed')await agentHooks.emit('afterAgentRun',{taskId:event.agentId,providerId:event.providerId,status:event.status,source:'swarm'});
+            if(event.type==='agent_retry')await logAgentActivity('Uzman ajan yeniden deniyor','Tekrar',event.reason);
+          }
+        });
+        answer=result.summary;answerProvider='AI Studio Agent Swarm';
+        await logAgentActivity('Otomatik Agent Atama',result.metrics.failed?'Kısmi başarı':'Tamamlandı',result.metrics.completed+'/'+result.metrics.workerCount+' uzman · '+result.metrics.expectedCalls+' beklenen çağrı · '+result.metrics.retryCount+' tekrar');
+      }else{
+        await logAgentActivity('Otomatik Agent Atama','Atlandı','Onay verilmedi; tek model yanıtı kullanılacak.');
+      }
+    }else if(settings.autoAgentAssignment!==false){
+      await logAgentActivity('Otomatik Agent Atama','Tekli sohbet',decision.score+'/100 · '+decision.reason);
+    }
+    if(!answer)answer=await callProvider(providerId,text,chatContext().slice(0,-1));
+    await agentHooks.emit('afterAgentRun',{providerId,source:'chat',status:'completed'});
+    loading.remove();pushMessage('assistant',answer,{provider:answerProvider,mode:'live'});
+    await logAgentActivity('Tekli sohbet · '+answerProvider,'Tamamlandı','Model yanıtı alındı. '+answer.slice(0,160));
   }catch(err){
+    await agentHooks.emit('afterAgentRun',{providerId,source:'chat',status:'failed',detail:err?.message||'error'});
     loading.remove();pushMessage('assistant','Hata: '+(err?.message||'Bilinmeyen hata')+'\n\nGerçek yanıt alınmadı. Modeli, anahtarı, kotayı ve bağlantıyı kontrol et.',{provider:providers[providerId].name,mode:'error'});
     await logAgentActivity('Tekli sohbet · '+providers[providerId].name,'Hata',err?.message||'Bilinmeyen hata');
   }finally{
     busy=false;$('chatInput').disabled=false;$('chatForm').querySelector('[type=submit]').disabled=false;$('chatInput').focus();syncModeUI();
   }
 }
+
 async function runTeam(prompt){
   if(busy)return;
   const task=String(prompt||'').trim(),chosen=selectedTeam();
   if(!task){showToast('Önce takımın görevini yaz.');return;}
+  if(!scanPromptBeforeSend(task,'team-prompt'))return;
   if(!chosen.length){showToast('Önce Modeller ekranından takım ajanı seç.');return;}
   const selected=configuredTeam();
   const skipped=chosen.length-selected.length;
@@ -752,6 +817,7 @@ async function runPipeline(prompt){
   if(busy)return;
   const task=String(prompt||'').trim(),chosen=selectedTeam();
   if(!task){showToast('Önce iş akışının görevini yaz.');return;}
+  if(!scanPromptBeforeSend(task,'pipeline-prompt'))return;
   if(chosen.length<2){showToast('Sıralı zincir için en az iki ajan seç.');go('models');return;}
   const selected=configuredTeam();
   const skipped=chosen.length-selected.length;
@@ -857,6 +923,42 @@ function renderAgentActivity(){
   if(!agentActivity.length){out.innerHTML='<div class="panel"><p class="muted">Henüz Local Coder çalıştırılmadı. Her aşama burada tarihçeye eklenir.</p></div>';return;}
   out.innerHTML=agentActivity.slice(0,12).map(item=>'<article class="activity-card"><div class="reuse-top"><strong>'+esc(item.event)+'</strong><span class="pill">'+esc(item.status)+'</span></div><time>'+esc(new Date(item.time||Date.now()).toLocaleString('tr-TR'))+'</time><p>'+esc(item.detail||'')+'</p></article>').join('');
 }
+function renderAgentSystems(){
+  const project=getActiveProject(),status=$('agentSystemsStatus');
+  if(status)status.textContent=project?'Aktif proje: '+project.name+' · Hafıza bu projeye özel.':'Hafıza için önce Projeler ekranından bir proje seç.';
+  const enabled=$('agentMemoryEnabled');if(enabled)enabled.checked=settings.agentMemoryEnabled!==false;
+  const share=$('shareAgentMemory');if(share){share.checked=settings.shareAgentMemory===true;share.disabled=settings.agentMemoryEnabled===false;}
+  const auto=$('autoAgentAssignment');if(auto)auto.checked=settings.autoAgentAssignment!==false;
+  const threshold=$('autoAgentMinComplexity');if(threshold)threshold.value=String(settings.autoAgentMinComplexity??55);
+  const workers=$('autoAgentMaxWorkers');if(workers)workers.value=String(settings.autoAgentMaxWorkers??3);
+  const hooks=$('agentHooksEnabled');if(hooks)hooks.checked=settings.agentHooksEnabled!==false;
+  const shield=$('agentShieldEnabled');if(shield)shield.checked=settings.agentShieldEnabled!==false;
+  const save=$('agentMemorySave');if(save)save.disabled=!project||settings.agentMemoryEnabled===false;
+  const list=$('agentMemoryList');if(!list)return;
+  const records=getProjectMemories(agentMemoryRecords,activeProjectId);
+  if(!records.length){list.innerHTML='<p class="fineprint">Bu projede henüz hafıza kaydı yok.</p>';return;}
+  list.innerHTML=records.slice(0,12).map(item=>'<article class="activity-card"><div class="reuse-top"><strong>'+esc(item.title)+'</strong><button class="btn danger small" type="button" data-memory-delete="'+esc(item.id)+'">Sil</button></div><p>'+esc(item.content)+'</p><time>'+esc(new Date(item.createdAt||Date.now()).toLocaleString('tr-TR'))+'</time></article>').join('');
+}
+async function saveAgentSystemSetting(key,value){settings[key]=value;await setPref(DB.settings,settings);renderAgentSystems();}
+async function saveAgentMemory(){
+  if(settings.agentMemoryEnabled===false){showToast('Önce yerel proje hafızasını etkinleştir.');return;}
+  const project=getActiveProject();if(!project){showToast('Hafıza kaydı için önce bir proje seç.');return;}
+  const result=createProjectMemoryRecord({projectId:project.id,title:$('agentMemoryTitle').value,content:$('agentMemoryContent').value,tags:$('agentMemoryTags').value.split(','),source:'user'});
+  if(!result.ok){showToast(result.reason);return;}
+  if(getProjectMemories(agentMemoryRecords,project.id).length>=40){showToast('Bu proje için 40 kayıt sınırı dolu. Önce eski kayıt sil.');return;}
+  await agentHooks.emit('beforeMemoryWrite',{projectId:project.id,chars:result.record.content.length,detail:'Kullanıcı proje hafızasına kayıt ekliyor.'});
+  agentMemoryRecords=normalizeProjectMemoryRecords([result.record,...agentMemoryRecords]);await setPref(DB.agentMemory,agentMemoryRecords);
+  await agentHooks.emit('afterMemoryWrite',{projectId:project.id,memoryId:result.record.id,detail:'Proje hafızası cihazda saklandı.'});
+  $('agentMemoryTitle').value='';$('agentMemoryContent').value='';$('agentMemoryTags').value='';renderAgentSystems();showToast('Proje hafızası cihaza kaydedildi.');
+}
+function exportAgentMemory(){downloadText('ai-studio-agent-memory.json',JSON.stringify(createProjectMemoryBackup(agentMemoryRecords),null,2),'application/json;charset=utf-8');}
+async function importAgentMemory(file){
+  if(!file||file.size>1000000)throw new Error('Hafıza yedeği 1 MB sınırını aşamaz.');
+  const parsed=JSON.parse(await file.text()),restored=restoreProjectMemoryBackup(parsed,agentMemoryRecords);
+  agentMemoryRecords=restored.records;await setPref(DB.agentMemory,agentMemoryRecords);renderAgentSystems();
+  showToast(restored.imported+' kayıt içe aktarıldı; '+restored.rejected+' kayıt atlandı.');
+}
+
 async function persistSnippetRecord(raw,notify=true){
   const cleaned=normalizeSnippet(raw);if(!cleaned)throw new Error('Ad ve kod/metin boş olamaz; kaynak URL varsa HTTPS olmalı.');
   cleaned.id=crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random());cleaned.updated=new Date().toISOString();reusableSnippets.unshift(cleaned);reusableSnippets=reusableSnippets.slice(0,100);await setPref(DB.snippets,reusableSnippets);renderSnippetVault();if(notify)showToast('Kod parçası kasaya kaydedildi.');
@@ -1547,13 +1649,16 @@ function renderSkillImportPreview() {
 }
 
 async function importSkillFiles(fileList) {
+  await agentHooks.emit('beforeSkillImport',{fileCount:fileList?.length||0,detail:'Skill import kuyruğu hazırlanıyor.'});
   const result = await prepareSkillImportQueue(fileList, customSkills);
   pendingSkillImports = result.queue;
   skillImportFailures = result.errors;
   if (!pendingSkillImports.length) {
+    await agentHooks.emit('afterSkillImport',{queued:0,failed:skillImportFailures.length,detail:'Geçerli Skill kuyruğa alınmadı.'});
     if (skillImportFailures.length) showToast('Skill içe aktarılamadı: ' + skillImportFailures.slice(0, 3).join(' · '));
     return;
   }
+  await agentHooks.emit('afterSkillImport',{queued:pendingSkillImports.length,failed:skillImportFailures.length,detail:'Skill dosyaları önizlemeye alındı.'});
   renderSkillImportPreview();
 }
 
@@ -1569,6 +1674,16 @@ function nextSkillImportId(item) {
 async function acceptSkillImport() {
   const entry = pendingSkillImports.shift();
   if (!entry) return;
+  if (settings.agentShieldEnabled !== false) {
+    const report = scanAgentContent(entry.skill.content,{source:'imported-skill'});
+    if (report.blocked) {
+      skillImportFailures.push(entry.fileName + ': AgentShield güvenlik taramasında durduruldu.');
+      await agentHooks.emit('afterSkillImport',{accepted:0,blocked:true,detail:'Güvenlik taraması Skill kaydını engelledi.'});
+      showToast('AgentShield bu Skill’i engelledi; kaydedilmedi.');
+      renderSkillImportPreview();
+      return;
+    }
+  }
   if (customSkills.length >= MAX_CUSTOM_SKILLS) {
     skillImportFailures.push(entry.fileName + ': özel Skill sınırı dolu');
     renderSkillImportPreview();
@@ -1582,6 +1697,7 @@ async function acceptSkillImport() {
   const autoSelected = selectedNow.length < MAX_SELECTED_SKILLS;
   selectedSkillIds = (autoSelected ? [...selectedNow, saved.id] : selectedNow).slice(0, MAX_SELECTED_SKILLS);
   await persistSkillState();
+  await agentHooks.emit('afterSkillImport',{accepted:1,blocked:false,detail:'Skill güvenlik taramasından sonra metin olarak kaydedildi.'});
   renderSkillLibrary();
   showToast(autoSelected ? 'Skill kaydedildi ve seçildi.' : 'Skill kaydedildi. Sekiz Skill sınırı dolu; seçmek için birini kaldır.');
   renderSkillImportPreview();
@@ -1859,6 +1975,18 @@ $('openshortsForceLowQuality').addEventListener('click',()=>startOpenShortsJob(t
 $('openshortsCheckStatus').addEventListener('click',checkOpenShortsJob);
 $('openshortsClips').addEventListener('click',event=>{const button=event.target.closest('[data-openshorts-publish]');if(!button)return;const index=Number(button.dataset.openshortsPublish);if(!Number.isInteger(index)||index<0)return;publishOpenShortsClip(index).catch(error=>setOpenShortsStatus(error.message||'Yayınlama başlatılamadı.','error'));});
 $('skillProfileSelect').addEventListener('change',e=>applySkillProfile(e.target.value));
+$('autoAgentAssignment').addEventListener('change',e=>saveAgentSystemSetting('autoAgentAssignment',e.target.checked));
+$('autoAgentMinComplexity').addEventListener('change',e=>saveAgentSystemSetting('autoAgentMinComplexity',Math.max(30,Math.min(90,Number(e.target.value)||55))));
+$('autoAgentMaxWorkers').addEventListener('change',e=>saveAgentSystemSetting('autoAgentMaxWorkers',Math.max(2,Math.min(5,Number(e.target.value)||3))));
+$('agentMemoryEnabled').addEventListener('change',e=>saveAgentSystemSetting('agentMemoryEnabled',e.target.checked));
+$('shareAgentMemory').addEventListener('change',e=>saveAgentSystemSetting('shareAgentMemory',e.target.checked));
+$('agentHooksEnabled').addEventListener('change',e=>saveAgentSystemSetting('agentHooksEnabled',e.target.checked));
+$('agentShieldEnabled').addEventListener('change',e=>saveAgentSystemSetting('agentShieldEnabled',e.target.checked));
+$('agentMemorySave').addEventListener('click',()=>saveAgentMemory().catch(error=>showToast('Hafıza kaydedilemedi: '+(error.message||'hata'))));
+$('agentMemoryExport').addEventListener('click',exportAgentMemory);
+$('agentMemoryImportBtn').addEventListener('click',()=>$('agentMemoryImportFile').click());
+$('agentMemoryImportFile').addEventListener('change',async e=>{try{if(e.target.files?.[0])await importAgentMemory(e.target.files[0]);}catch(error){showToast('Hafıza yedeği alınamadı: '+(error.message||'dosya biçimini kontrol et.'));}e.target.value='';});
+$('agentMemoryList').addEventListener('click',async e=>{const button=e.target.closest('[data-memory-delete]');if(!button)return;agentMemoryRecords=agentMemoryRecords.filter(item=>item.id!==button.dataset.memoryDelete);await setPref(DB.agentMemory,agentMemoryRecords);renderAgentSystems();showToast('Hafıza kaydı silindi.');});
 $('skillImportBtn').addEventListener('click',()=>$('skillImportFiles').click());
 $('skillImportFiles').addEventListener('change',async e=>{if(e.target.files?.length)await importSkillFiles(e.target.files);e.target.value='';});
 $('skillImportAccept').addEventListener('click',acceptSkillImport);
@@ -1962,7 +2090,7 @@ async function init(){
   settings.demoMode=false;
   try{await setPref(DB.settings,settings);}catch(_){}
   if(!nativeApp){showToast('Tarayıcıda API anahtarları yalnızca açık oturumda tutulur.');}
-  await initKeys();await initOpenShortsKey(); projectList=await getPref(DB.projects,[]);activeProjectId=await getPref(DB.activeProject,'');chatHistory=await getPref(DB.chat,[]);const savedThreadState=await getPref(DB.threads,{});chatThreads=Array.isArray(savedThreadState?.items)?savedThreadState.items:[];downloadedPluginRepoIds=(await getPref(DB.pluginDownloads,[])).filter(id=>getPluginRepositoryById(id)?.repository);activeChatThreadId=typeof savedThreadState?.activeId==='string'?savedThreadState.activeId:'';userPlugins=await getPref(DB.plugins,[]);const storedSkills=await getPref(DB.skills,{});customSkills=(Array.isArray(storedSkills?.customSkills)?storedSkills.customSkills:[]).map(skill=>normalizeSkill(skill)).filter(Boolean).slice(-100);skillLibrary=[...SKILL_CATALOG,...customSkills];skillProfileId=storedSkills?.profileId==='custom'?'custom':(SKILL_PROFILES[storedSkills?.profileId]?storedSkills.profileId:'karpathy');const validSkillIds=new Set(skillLibrary.map(skill=>skill.id));selectedSkillIds=(Array.isArray(storedSkills?.selectedSkillIds)?storedSkills.selectedSkillIds:[]).filter(id=>validSkillIds.has(id)).slice(0,MAX_SELECTED_SKILLS);if(!selectedSkillIds.length)selectedSkillIds=getProfileSkillIds(skillProfileId);reusableSnippets=await getPref(DB.snippets,[]);agentActivity=await getPref(DB.activity,[]);codeFiles=normalizeCodeFileList(await getPref(DB.codeFiles,[]),true);if(!codeFiles.length)codeFiles=[makeCodeFile()];activeCodeFileId=codeFiles[0].id;await setPref(DB.codeFiles,codeFiles);
+  await initKeys();await initOpenShortsKey(); projectList=await getPref(DB.projects,[]);activeProjectId=await getPref(DB.activeProject,'');chatHistory=await getPref(DB.chat,[]);const savedThreadState=await getPref(DB.threads,{});chatThreads=Array.isArray(savedThreadState?.items)?savedThreadState.items:[];downloadedPluginRepoIds=(await getPref(DB.pluginDownloads,[])).filter(id=>getPluginRepositoryById(id)?.repository);activeChatThreadId=typeof savedThreadState?.activeId==='string'?savedThreadState.activeId:'';userPlugins=await getPref(DB.plugins,[]);const storedSkills=await getPref(DB.skills,{});customSkills=(Array.isArray(storedSkills?.customSkills)?storedSkills.customSkills:[]).map(skill=>normalizeSkill(skill)).filter(Boolean).slice(-100);skillLibrary=[...SKILL_CATALOG,...customSkills];skillProfileId=storedSkills?.profileId==='custom'?'custom':(SKILL_PROFILES[storedSkills?.profileId]?storedSkills.profileId:'karpathy');const validSkillIds=new Set(skillLibrary.map(skill=>skill.id));selectedSkillIds=(Array.isArray(storedSkills?.selectedSkillIds)?storedSkills.selectedSkillIds:[]).filter(id=>validSkillIds.has(id)).slice(0,MAX_SELECTED_SKILLS);if(!selectedSkillIds.length)selectedSkillIds=getProfileSkillIds(skillProfileId);reusableSnippets=await getPref(DB.snippets,[]);agentActivity=await getPref(DB.activity,[]);agentMemoryRecords=normalizeProjectMemoryRecords(await getPref(DB.agentMemory,[]));codeFiles=normalizeCodeFileList(await getPref(DB.codeFiles,[]),true);if(!codeFiles.length)codeFiles=[makeCodeFile()];activeCodeFileId=codeFiles[0].id;await setPref(DB.codeFiles,codeFiles);
   if(!Array.isArray(projectList))projectList=[];if(!projectList.some(p=>p&&p.id===activeProjectId))activeProjectId=projectList[0]?.id||'';await setPref(DB.activeProject,activeProjectId);if(!Array.isArray(chatHistory))chatHistory=[];if(!Array.isArray(userPlugins))userPlugins=[];if(!Array.isArray(reusableSnippets))reusableSnippets=[];if(!Array.isArray(agentActivity))agentActivity=[];
   await ensureChatThreads();renderProviderCards();renderProjects();renderChat();renderSidebarChats();renderBuiltinTools();renderPlugins();renderComposerPlugins();renderOpenShortsPanel();await mountSocialStudio({
     generateText:async prompt=>{
@@ -1982,8 +2110,10 @@ async function init(){
     getSecret,saveSecret,deleteSecret,isDemo:()=>false,notify:showToast,
     logActivity:logAgentActivity,go,getDeviceInfo:()=>deviceLocalState?.device||null,nativeApp,getSystemPrompt:()=>settings.systemPrompt
   });
-  renderSkillLibrary();renderPluginMarketplace();renderReuseCatalog();renderSnippetVault();renderAgentActivity();loadActiveCodeFile();syncModeUI();updateDashboard();$('compareSelectionCount').textContent=settings.team.length+' ajan seçili';
+  renderSkillLibrary();renderPluginMarketplace();renderReuseCatalog();renderSnippetVault();renderAgentActivity();renderAgentSystems();loadActiveCodeFile();syncModeUI();updateDashboard();$('compareSelectionCount').textContent=settings.team.length+' ajan seçili';
   syncLocalCoderEngineUI();await refreshDeviceLocalModels(true);
   if(!nativeApp){$('nativeVaultPanel')?.classList.add('hidden');await loadSharedVault({quiet:true});}else{$('sharedVaultPanel')?.classList.add('hidden');$('nativeVaultPanel')?.classList.remove('hidden');await loadNativeVault({quiet:true});}
+  await agentHooks.emit('sessionStart',{projectId:activeProjectId,detail:'AI Studio oturumu başladı.'});
 }
+window.addEventListener('pagehide',()=>{agentHooks.emit('sessionEnd',{projectId:activeProjectId,detail:'AI Studio oturumu kapanıyor.'}).catch(()=>{});});
 prepareBrowserFeatures().then(init).catch(()=>showToast('Başlangıç ayarları okunamadı; sayfayı yenileyebilirsin.'));
