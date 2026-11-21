@@ -62,6 +62,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+      - name: AgentShield repository security scan
+        run: npx --yes ecc-agentshield@1.6.0 scan --path . --format json --output agentshield-report.json
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
@@ -144,8 +146,6 @@ jobs:
           node --check scripts/idea-pipeline.mjs
           node --check scripts/test-idea-pipeline.mjs
           node scripts/test-idea-pipeline.mjs
-      - name: AgentShield repository security scan
-        run: npx --yes ecc-agentshield@1.6.0 scan --path . --format json --output agentshield-report.json
       - name: Generate Capacitor Android project
         run: npx cap add android
       - name: Prepare a smaller Gradle distribution
