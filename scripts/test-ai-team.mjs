@@ -192,11 +192,11 @@ assert.ok(main.includes('const fittedContext=fitModelContext({')
   && main.includes('systemPrompt:systemFor(id,prompt,options)')
   && main.includes('const systemPrompt=fittedContext.systemPrompt'),
   'provider adapters must share the system-context builder and fit it to the model context window');
-assert.ok(main.includes("callProvider:(id,prompt,history)=>callProvider(id,prompt,history,{includeGeneralSkills:false})"),
+assert.ok(main.includes("callProvider:(id,prompt,history)=>callProvider(id,prompt,history,{includeGeneralSkills:false,includeTaskSkills:false})"),
   'API Local Coder must avoid duplicating its stage-specific Skills');
-assert.ok(main.includes("callProvider('ollama',prompt,[],{includeGeneralSkills:false})"),
+assert.ok(main.includes("callProvider('ollama',prompt,[],{includeGeneralSkills:false,includeTaskSkills:false})"),
   'Ollama Local Coder must avoid duplicating its stage-specific Skills');
-assert.ok(main.includes("systemFor('device',basePrompt,{includeGeneralSkills:false})"),
+assert.ok(main.includes("systemFor('device',basePrompt,{includeGeneralSkills:false,includeTaskSkills:false})"),
   'device Local Coder must avoid duplicating its stage-specific Skills');
 assert.ok(main.includes("content:$('codePad')?.value??file.content"),
   'the latest unsaved editor content must be included in opt-in shared project context');
