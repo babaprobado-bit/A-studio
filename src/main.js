@@ -17,6 +17,7 @@ import { buildSharedVaultContext } from './shared-vault-context.js';
 import { fitModelContext } from './model-context.js';
 import { encryptWorkspaceBackup, decryptWorkspaceBackup } from './encrypted-backup.js';
 import { SKILL_CATALOG, SKILL_PROFILES, parseSkillMarkdown, normalizeSkill, prepareSkillImportQueue, buildStageSkillContext, getProfileSkillIds, createSkillBackupState, restoreSkillBackupState, MAX_SELECTED_SKILLS, MAX_CUSTOM_SKILLS, MAX_STAGE_SKILL_CHARS } from './skill-library.js';
+import { buildTaskSkillContext } from './skill-selector.js';
 import { PLUGIN_REPOSITORY_CATALOG, getPluginRepositoryArchiveUrl, getPluginRepositoryById, isAllowedPluginRepositoryDownload } from './plugin-marketplace.js';
 import { runAgentSwarm, estimateSwarmCallBudget } from './agent-swarm.js';
 import { shouldAutoDelegate, assignAgentProviders } from './agent-orchestrator.js';
@@ -652,11 +653,13 @@ function systemFor(id,task='',options={}){
   const context=getSharedProjectContext();
   const vaultContext=buildSharedVaultContext({items:sharedVaultItems,task,enabled:settings.shareVaultContext===true});
   const skillContext=options.includeGeneralSkills===false?'':currentGeneralSkillContext(6000).promptText;
+  const taskSkillContext=options.includeTaskSkills===false?'':buildTaskSkillContext({task,role:options.skillRole||'general',stage:options.skillStage||'',skills:skillLibrary,preferredSkillIds:selectedSkillIds,maxSkills:4,maxChars:8000}).promptText;
   const memoryContext=settings.agentMemoryEnabled!==false&&settings.shareAgentMemory===true?buildProjectMemoryContext(agentMemoryRecords,activeProjectId,task,{maxRecords:3,maxChars:2600}):'';
   return settings.systemPrompt+'\nSağlayıcı rolü: '+providers[id].name+'. Yanıtları Türkçe ve uygulanabilir yaz; var olmayan test sonuçlarını iddia etme.'
     +(context?'\n\n'+context:'')
     +(vaultContext?'\n\n'+vaultContext:'')
     +(skillContext?'\n\n'+skillContext:'')
+    +(taskSkillContext?'\n\n'+taskSkillContext:'')
     +(memoryContext?'\n\n'+memoryContext:'');
 }
 async function fetchJson(url,options,timeoutMs=50000){
@@ -756,10 +759,12 @@ async function submitChat(prompt,providerId){
         loading.querySelector('p').textContent='Görev uzman ajanlara dağıtılıyor…';
         const result=await runAgentSwarm({
           providerIds:pool,task:text,history:chatContext().slice(0,-1),maxAgents:workerCount,
+          skills:skillLibrary,preferredSkillIds:selectedSkillIds,
           maxConcurrency:nativeApp?2:3,isNative:nativeApp,deviceInfo:deviceLocalState?.device||null,
-          callProvider,assignProviders:assignAgentProviders,
+          callProvider:(id,prompt,history)=>callProvider(id,prompt,history,{includeTaskSkills:false}),assignProviders:assignAgentProviders,
           onEvent:async event=>{
             if(event.type==='assignment_made')await logAgentActivity('Uzman ataması · '+event.taskId,'Atandı',event.providerId+' · '+event.roleGroup);
+            if(event.type==='skills_selected')await logAgentActivity('Otomatik Skill seçimi · '+event.taskId,'Seçildi',event.skillNames.join(' · '));
             if(event.type==='agent_started')await agentHooks.emit('beforeAgentRun',{taskId:event.agentId,providerId:event.providerId,role:event.role,source:'swarm'});
             if(event.type==='agent_completed')await agentHooks.emit('afterAgentRun',{taskId:event.agentId,providerId:event.providerId,status:event.status,source:'swarm'});
             if(event.type==='agent_retry')await logAgentActivity('Uzman ajan yeniden deniyor','Tekrar',event.reason);
@@ -1247,7 +1252,7 @@ async function generateWithDeviceModel(basePrompt,maxTokens,stageId='all'){
   const systemText=systemFull.slice(0,systemBudget);
   const userBudget=Math.max(500,totalCharBudget-systemText.length-80);
   const skillBudget=Math.max(0,userBudget-basePrompt.length-100);
-  const skills=currentSkillContext(stageId,skillBudget);
+  const skills=currentSkillContext(stageId,skillBudget,basePrompt);
   let userText=basePrompt+(skills.promptText?'\n\n'+skills.promptText:'');
   let wasTrimmed=false;
   if(userText.length>userBudget){userText=userText.slice(0,userBudget);wasTrimmed=true;}
@@ -1323,10 +1328,10 @@ async function runApiLocalCoderWorkshop(){
       },
       makePrompt:(stage,previous)=>{
         const basePrompt=stage.makePrompt?stage.makePrompt(previous):stage.prompt;
-        const skillContext=currentSkillContext(stage.id,MAX_STAGE_SKILL_CHARS);
+        const skillContext=currentSkillContext(stage.id,MAX_STAGE_SKILL_CHARS,basePrompt);
         return basePrompt+(skillContext.promptText?'\n\n'+skillContext.promptText:'');
       },
-      callProvider:(id,prompt,history)=>callProvider(id,prompt,history,{includeGeneralSkills:false}),
+      callProvider:(id,prompt,history)=>callProvider(id,prompt,history,{includeGeneralSkills:false,includeTaskSkills:false}),
       onStageStart:async stage=>{
         $('localCoderStatus').textContent=stage.title+' · '+providers[providerId].name+' çalışıyor…';
         await logAgentActivity('API '+stage.title,'Çalışıyor',providers[providerId].name);
@@ -1367,7 +1372,7 @@ async function runLocalCoderWorkshop(){
 async function runLocalCoderWorkshopOllama(){
  if(busy){showToast('Başka bir ajan zinciri çalışıyor.');return;}const task=$('localCoderTask').value.trim();if(!task){showToast('Önce Local Coder görevini yaz.');return;}if(!settings.ollamaUrl){showToast('Önce Modeller ekranından Ollama adresini ayarla.');go('models');return;}
  const sourceCode=$('localCoderUseCode').checked?$('codePad').value.slice(0,10000):'';const stages=buildLocalCoderStages({task,language:$('codeLanguage').value,sourceCode});let previous='';busy=true;$('localCoderRun').disabled=true;$('localCoderRun').textContent='Yerel ajan çalışıyor…';$('localCoderStatus').textContent='Ollama modeline bağlanılıyor; küçük bilgisayarda yanıt yavaş gelebilir.';$('localCoderReview').value='';$('localCoderOutput').value='';
- try{await logAgentActivity('Local Coder','Başladı',task);for(const stage of stages){$('localCoderStatus').textContent=stage.title+' çalışıyor…';await logAgentActivity(stage.title,'Çalışıyor',task);const basePrompt=stage.makePrompt?stage.makePrompt(previous):stage.prompt;const skillContext=currentSkillContext(stage.id);const prompt=basePrompt+(skillContext.promptText?'\n\n'+skillContext.promptText:'');const answer=await callProvider('ollama',prompt,[],{includeGeneralSkills:false});if(stage.id==='code')$('localCoderOutput').value=extractCodeArtifact(answer);if(stage.id==='review')$('localCoderReview').value=answer;previous=answer;await logAgentActivity(stage.title,'Tamamlandı',answer.slice(0,220));} $('localCoderStatus').textContent='Zincir bitti. Taslağı gözden geçir; otomatik test çalıştırılmadı.';await logAgentActivity('Local Coder','Tamamlandı','Kod taslağı ve inceleme notları hazır; dosyalar otomatik değiştirilmedi.');showToast('Local Coder tamamlandı. Taslağı inceleyip gerekirse Kod Alanı’na aktar.');}
+ try{await logAgentActivity('Local Coder','Başladı',task);for(const stage of stages){$('localCoderStatus').textContent=stage.title+' çalışıyor…';await logAgentActivity(stage.title,'Çalışıyor',task);const basePrompt=stage.makePrompt?stage.makePrompt(previous):stage.prompt;const skillContext=currentSkillContext(stage.id,MAX_STAGE_SKILL_CHARS,basePrompt);const prompt=basePrompt+(skillContext.promptText?'\n\n'+skillContext.promptText:'');const answer=await callProvider('ollama',prompt,[],{includeGeneralSkills:false,includeTaskSkills:false});if(stage.id==='code')$('localCoderOutput').value=extractCodeArtifact(answer);if(stage.id==='review')$('localCoderReview').value=answer;previous=answer;await logAgentActivity(stage.title,'Tamamlandı',answer.slice(0,220));} $('localCoderStatus').textContent='Zincir bitti. Taslağı gözden geçir; otomatik test çalıştırılmadı.';await logAgentActivity('Local Coder','Tamamlandı','Kod taslağı ve inceleme notları hazır; dosyalar otomatik değiştirilmedi.');showToast('Local Coder tamamlandı. Taslağı inceleyip gerekirse Kod Alanı’na aktar.');}
  catch(error){$('localCoderStatus').textContent='Zincir durdu; ayarları ve Ollama bağlantısını kontrol et.';await logAgentActivity('Local Coder','Hata',error.message||'Bilinmeyen yerel model hatası');showToast('Local Coder çalışamadı: '+(error.message||'Ollama bağlantısını kontrol et.'));}
  finally{busy=false;$('localCoderRun').disabled=false;$('localCoderRun').textContent='Yerel ajan zincirini çalıştır';}
 }
@@ -1594,8 +1599,10 @@ async function revokeSharedVaultAgent(id) {
 function getSelectedSkills(){
   return skillLibrary.filter(skill=>selectedSkillIds.includes(skill.id)).slice(0,MAX_SELECTED_SKILLS);
 }
-function currentSkillContext(stageId,maxChars=MAX_STAGE_SKILL_CHARS){
-  return buildStageSkillContext(getSelectedSkills(),stageId,{maxSkills:MAX_SELECTED_SKILLS,maxChars:Math.min(MAX_STAGE_SKILL_CHARS,Math.max(0,Number(maxChars)||0))});
+function currentSkillContext(stageId,maxChars=MAX_STAGE_SKILL_CHARS,task=''){
+  const budget=Math.min(MAX_STAGE_SKILL_CHARS,Math.max(0,Number(maxChars)||0));
+  if(task)return buildTaskSkillContext({task,role:stageId==='plan'?'architect':stageId==='code'?'builder':'reviewer',stage:stageId,skills:skillLibrary,preferredSkillIds:selectedSkillIds,maxSkills:MAX_SELECTED_SKILLS,maxChars:budget});
+  return buildStageSkillContext(getSelectedSkills(),stageId,{maxSkills:MAX_SELECTED_SKILLS,maxChars:budget});
 }
 async function persistSkillState(){
   await setPref(DB.skills,{customSkills,selectedSkillIds:selectedSkillIds.slice(0,MAX_SELECTED_SKILLS),profileId:skillProfileId});

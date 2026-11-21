@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import {scoreTaskComplexity,shouldAutoDelegate,assignAgentProviders,classifyTaskIntent,selectAgentWorkflow,organizeTaskPlan,createDefaultTaskPlan} from '../src/agent-orchestrator.js';
+import {SKILL_CATALOG} from '../src/skill-library.js';
+import {selectSkillsForTask,buildTaskSkillContext} from '../src/skill-selector.js';
 import {createAgentHookBus} from '../src/agent-hooks.js';
 import {createProjectMemoryRecord,normalizeProjectMemoryRecords,findRelevantProjectMemories,buildProjectMemoryContext,createProjectMemoryBackup,restoreProjectMemoryBackup} from '../src/agent-memory.js';
 import {scanAgentContent} from '../src/agent-shield.js';
@@ -37,6 +39,7 @@ const providerCalls=[];
 const swarm=await runAgentSwarm({
  providerIds:['gemini','groq','ollama'],
  task:'Implement a coordinated code change, test edge cases and document the result.',
+ skills:SKILL_CATALOG,preferredSkillIds:['karpathy-guidelines'],
  maxAgents:2,
  assignProviders:assignAgentProviders,
  callProvider:async(providerId,prompt)=>{
@@ -48,12 +51,29 @@ const swarm=await runAgentSwarm({
 });
 assert.equal(swarm.results.length,2);
 assert.equal(swarm.metrics.completed,2);
+assert.ok(swarm.results.find(item=>item.title==='Code implementation').skillIds.length>0);
 assert.equal(swarm.assignments.find(item=>item.taskId==='build').providerId,'ollama');
 assert.equal(swarm.assignments.find(item=>item.taskId==='tests').providerId,'groq');
 assert.ok(providerCalls.some(item=>item.providerId==='ollama'));
 assert.ok(providerCalls.some(item=>item.providerId==='groq'));
 assert.equal(classifyTaskIntent('API geliştir, test et ve güvenliği denetle').requiresSecurityReview,true);
 assert.equal(selectAgentWorkflow({task:complex,providerCount:3,minScore:40}).mode,'staged-swarm');
+const selectedCodeSkills=selectSkillsForTask({task:'Implement a REST API endpoint and add regression tests',role:'builder',skills:SKILL_CATALOG,maxSkills:5});
+assert.equal(selectedCodeSkills.stage,'code');
+assert.ok(selectedCodeSkills.selectedIds.includes('sp-api-contract'));
+assert.ok(selectedCodeSkills.selectedIds.includes('sp-test-first'));
+const selectedSecuritySkills=selectSkillsForTask({task:'Audit prompt injection, secrets and permissions',role:'security',skills:SKILL_CATALOG,maxSkills:5});
+assert.equal(selectedSecuritySkills.stage,'review');
+assert.ok(selectedSecuritySkills.selectedIds.includes('ecc-agent-security'));
+assert.ok(selectedSecuritySkills.selectedIds.includes('ecc-security-scan'));
+const selectedResearchSkills=selectSkillsForTask({task:'Research recent sources and compare available approaches',role:'researcher',skills:SKILL_CATALOG,maxSkills:5});
+assert.equal(selectedResearchSkills.stage,'plan');
+assert.ok(selectedResearchSkills.skills.some(item=>item.group==='Research'));
+const selectedContext=buildTaskSkillContext({task:'Implement secure API code and tests',role:'builder',skills:SKILL_CATALOG,preferredSkillIds:['karpathy-guidelines'],maxSkills:8,maxChars:3500});
+assert.ok(selectedContext.includedIds.length<=8);
+assert.ok(selectedContext.charCount<=3500);
+assert.ok(selectedContext.promptText.includes('AI STUDIO AUTO-SELECTED SKILLS'));
+assert.ok(selectedContext.includedIds.includes('karpathy-guidelines'));
 const organized=organizeTaskPlan([
  {id:'build',title:'Build',role:'developer',objective:'Implement module',priority:5},
  {id:'tests',title:'Tests',role:'tester',objective:'Run regression tests',dependsOn:['build'],priority:5},
