@@ -1,3 +1,4 @@
+import {createDefaultTaskPlan,organizeTaskPlan,classifyAgentRole} from './agent-orchestrator.js';
 const MAX_AGENTS = 10;
 const MAX_BOARD_MESSAGES = 24;
 const ROLES = [
@@ -22,17 +23,19 @@ export function normalizeSwarmFilePath(value){
   return parts.join('/');
 }
 export function fallbackSwarmTasks(task,maxTasks=3){
-  return ROLES.slice(0,clamp(maxTasks,2,MAX_AGENTS,3)).map(([id,role,title,objective],order)=>({
-    id,role,title,objective:objective+' Ana görev: '+clean(task,800),
-    acceptance:['Somut bulgu veya öneri ver','Varsayım ve riski belirt','Doğrulama/test adımı yaz'],files:[],order
-  }));
+  return createDefaultTaskPlan(task,{maxTasks:clamp(maxTasks,2,MAX_AGENTS,3)}).map((item,order)=>({...item,order:item.order??order}));
+}
+function createFallbackPlan(task,limit,reason){
+  const organized=organizeTaskPlan(fallbackSwarmTasks(task,limit),{maxTasks:limit});
+  return {...organized,usedFallback:true,reason};
 }
 export function buildSwarmPlanPrompt(task,maxTasks=3){
   const count=clamp(maxTasks,2,MAX_AGENTS,3);
   return [
-    'AI Studio Swarm koordinatörüsün. İşi bağımsız, çakışması az ve doğrulanabilir alt görevlere ayır.',
-    'Yalnızca JSON döndür: {"tasks":[{"id":"kisa-id","title":"başlık","role":"uzman","objective":"tek görev","acceptance":["kontrol"],"files":["relative/path"]}]}',
-    'Tam olarak '+count+' görev üret. Bilmediğin dosya yollarını files içine koyma. Ajanlar dosya değiştiremez, komut çalıştıramaz; analiz ve taslak üretir.',
+    'AI Studio Swarm koordinatörüsün. Önce görevin türünü ve riskini belirle; sonra yalnızca gerekli uzman rolleriyle doğrulanabilir alt görevlere böl.',
+    'Yalnızca JSON döndür: {"tasks":[{"id":"kisa-id","title":"başlık","role":"uzman","objective":"tek görev","acceptance":["kontrol"],"files":["relative/path"],"dependsOn":["onceki-id"],"priority":1}]}',
+    'Tam olarak '+count+' görev üret. priority 1-5 arasıdır. dependsOn yalnızca listedeki görev IDlerini içersin. Bağımsız işleri paralel, ön koşulu olan işleri sıralı planla. Kod görevi varsa test; hassas/güvenlik işi varsa güvenlik incelemesi ekle. Bilmediğin dosya yolunu yazma.',
+    'Ajanlar dosya değiştiremez veya komut çalıştıramaz; analiz ve taslak üretir.',
     'Ana görev: '+clean(task,3000)
   ].join('\n');
 }
@@ -41,9 +44,9 @@ export function parseSwarmPlan(raw,{task='',maxTasks=3}={}){
   const source=clean(raw,20000).replace(/^\x60\x60\x60(?:json)?\s*/i,'').replace(/\s*\x60\x60\x60$/,'');
   let data;
   try{const a=source.indexOf('{'),b=source.lastIndexOf('}');if(a<0||b<=a)throw new Error();data=JSON.parse(source.slice(a,b+1));}
-  catch{return {tasks:fallbackSwarmTasks(task,limit),usedFallback:true,reason:'Koordinatör geçerli JSON planı üretmedi.'};}
+  catch{return createFallbackPlan(task,limit,'Koordinatör geçerli JSON planı üretmedi.');}
   const incoming=Array.isArray(data)?data:data?.tasks;
-  if(!Array.isArray(incoming))return {tasks:fallbackSwarmTasks(task,limit),usedFallback:true,reason:'Plan içinde görev listesi bulunamadı.'};
+  if(!Array.isArray(incoming))return createFallbackPlan(task,limit,'Plan içinde görev listesi bulunamadı.');
   const seen=new Set();
   const tasks=incoming.slice(0,limit).map((item,index)=>{
     if(!item||typeof item!=='object')return null;
@@ -52,10 +55,10 @@ export function parseSwarmPlan(raw,{task='',maxTasks=3}={}){
     if(!id||!title||!objective||seen.has(id))return null;seen.add(id);
     const acceptance=Array.isArray(item.acceptance)?item.acceptance.map(x=>clean(x,200)).filter(Boolean).slice(0,5):[];
     const files=Array.isArray(item.files)?[...new Set(item.files.map(normalizeSwarmFilePath).filter(Boolean))].slice(0,8):[];
-    return {id,title,role:clean(item.role||'Uzman ajan',60),objective,acceptance:acceptance.length?acceptance:['Somut bulgu, risk ve test önerisi ver.'],files,order:index};
+    return {id,title,role:clean(item.role||'Uzman ajan',60),roleGroup:classifyAgentRole(item),objective,acceptance:acceptance.length?acceptance:['Somut bulgu, risk ve test önerisi ver.'],files,dependsOn:Array.isArray(item.dependsOn)?item.dependsOn:Array.isArray(item.dependencies)?item.dependencies:[],priority:item.priority??3,order:index};
   }).filter(Boolean);
-  if(tasks.length<2)return {tasks:fallbackSwarmTasks(task,limit),usedFallback:true,reason:'En az iki güvenilir alt görev çıkarılamadı.'};
-  return {tasks,usedFallback:false,reason:''};
+  if(tasks.length<2)return createFallbackPlan(task,limit,'En az iki güvenilir alt görev çıkarılamadı.');
+  return {...organizeTaskPlan(tasks,{maxTasks:limit}),usedFallback:false,reason:''};
 }
 export function resolveSwarmConcurrency({requested=2,isNative=false,deviceInfo=null}={}){
   let limit=clamp(requested,1,isNative?3:4,2);
@@ -72,11 +75,13 @@ export function isRetryableSwarmError(error){
   if(/\b(400|401|402|403|404)\b|invalid.?api.?key|unauthorized|insufficient.?credit|billing/i.test(message))return false;
   return /\b(408|425|429|500|502|503|504)\b|timeout|timed out|temporar|rate.?limit|network|fetch failed|connection reset|ağa erişilemedi|zaman aşımına uğradı/i.test(message);
 }
-function buildWorkerPrompt(task,mainTask,board){
+function buildWorkerPrompt(task,mainTask,board,completedPrerequisites=[]){
   return [
     'AI Studio Swarm uzman ajanısın. Rol: '+task.role+'.',
     'Ana görev: '+clean(mainTask,2500),
     'Alt görev: '+task.objective,
+    task.dependsOn?.length?'Ön koşul görevleri: '+task.dependsOn.join(', '):'Bağımsız görev.',
+    completedPrerequisites.length?'Ön koşul çıktıları:\n'+completedPrerequisites.map(item=>'### '+item.title+'\n'+(item.error?'HATA: '+item.error:item.answer)).join('\n\n'):'',
     'Kabul ölçütleri:\n- '+task.acceptance.join('\n- '),
     task.files.length?'İlgili göreli dosyalar (yalnızca incele/öner): '+task.files.join(', '):'Dosya yolu verilmedi; yol uydurma.',
     board.length?'Paylaşılan takım panosu:\n'+board.map(item=>'['+item.from+'] '+item.text).join('\n'):'Takım panosu henüz boş.',
@@ -102,7 +107,7 @@ export async function runAgentSwarm({providerIds,task,history=[],maxAgents=3,max
   if(providers.length<2)throw new Error('Swarm için en az iki hazır AI motoru gerekir.');
   const concurrency=resolveSwarmConcurrency({requested:maxConcurrency,isNative,deviceInfo});
   const started=Date.now(),board=[],results=[],lockedFiles=new Set(),fileOwners=new Map();
-  let retryCount=0,nextIndex=0;
+  let retryCount=0;
   const emit=async(type,data={})=>{try{await onEvent({type,at:Date.now(),...data});}catch{}};
   await emit('swarm_started',{coordinatorId:providers[0],workerCount,concurrency});
   let plan;
@@ -110,6 +115,8 @@ export async function runAgentSwarm({providerIds,task,history=[],maxAgents=3,max
   catch(error){plan={tasks:fallbackSwarmTasks(mainTask,workerCount),usedFallback:true,reason:clean(error?.message||'Koordinatör yanıt vermedi.',300)};}
   if(plan.usedFallback)await emit('plan_fallback',{reason:plan.reason});
   const tasks=plan.tasks.slice(0,workerCount);
+  const taskIndex=new Map(tasks.map((item,index)=>[item.id,index]));
+  const taskStages=(plan.stages?.length?plan.stages:[tasks]).map(stage=>stage.filter(item=>taskIndex.has(item.id))).filter(stage=>stage.length);
   let assignments=[];
   if(typeof assignProviders==='function'){
     try{assignments=assignProviders(tasks,providers)||[];}catch(error){await emit('assignment_fallback',{reason:clean(error?.message||'Uzman ataması başarısız.',240)});}
@@ -121,9 +128,18 @@ export async function runAgentSwarm({providerIds,task,history=[],maxAgents=3,max
   const execute=async(item,index)=>{
     const assigned=assignmentMap.get(item.id)||assignments[index];
     const providerId=providers.includes(assigned?.providerId)?assigned.providerId:providers[1+(index%(providers.length-1))],agentId='agent-'+(index+1);
-    await emit('agent_started',{agentId,title:item.title,role:item.role,providerId,roleGroup:assigned?.roleGroup||'general'});
+    const failedDependencies=(item.dependsOn||[]).filter(id=>{const dependencyIndex=taskIndex.get(id);return dependencyIndex!==undefined&&results[dependencyIndex]?.error;});
+    if(failedDependencies.length){
+      const error='Bağımlı görev başarısız olduğu için atlandı: '+failedDependencies.join(', ');
+      results[index]={agentId,providerId,title:item.title,role:item.role,answer:'',error,skipped:true,retried:false,confidence:null};
+      await emit('agent_skipped',{agentId,title:item.title,failedDependencies});
+      await emit('agent_completed',{agentId,title:item.title,status:'skipped',error});
+      return;
+    }
+    const completedPrerequisites=(item.dependsOn||[]).map(id=>results[taskIndex.get(id)]).filter(Boolean);
+    await emit('agent_started',{agentId,title:item.title,role:item.role,providerId,roleGroup:assigned?.roleGroup||item.roleGroup||'general',stage:item.stage??0});
     let answer='',error='',retried=false;
-    const prompt=buildWorkerPrompt(item,mainTask,board);
+    const prompt=buildWorkerPrompt(item,mainTask,board,completedPrerequisites);
     for(let attempt=0;attempt<2;attempt++){
       try{answer=String(await callProvider(providerId,prompt,history)||'').trim();if(!answer)throw new Error('Ajan boş yanıt verdi.');error='';break;}
       catch(err){error=clean(err?.message||'Ajan çağrısı başarısız.',500);if(attempt===0&&isRetryableSwarmError(err)){retried=true;retryCount++;await emit('agent_retry',{agentId,reason:error});continue;}break;}
@@ -136,23 +152,26 @@ export async function runAgentSwarm({providerIds,task,history=[],maxAgents=3,max
     await emit('agent_broadcast',{from:agentId,text:excerpt});
     await emit('agent_completed',{agentId,title:item.title,status:error?'failed':'completed',error,retried});
   };
-  const worker=async()=>{
-    while(nextIndex<tasks.length){
-      const index=nextIndex++,item=tasks[index];
-      while(item.files.some(file=>lockedFiles.has(file)))await new Promise(resolve=>setTimeout(resolve,15));
-      item.files.forEach(file=>lockedFiles.add(file));
-      try{await execute(item,index);}finally{item.files.forEach(file=>lockedFiles.delete(file));}
-    }
-  };
-  await Promise.all(Array.from({length:Math.min(concurrency,tasks.length)},()=>worker()));
-  await emit('swarm_completed',{completed:results.filter(item=>item&&!item.error).length,workerCount:tasks.length});
+  for(const stage of taskStages){
+    let nextIndex=0;
+    const worker=async()=>{
+      while(nextIndex<stage.length){
+        const item=stage[nextIndex++],index=taskIndex.get(item.id);
+        while(item.files.some(file=>lockedFiles.has(file)))await new Promise(resolve=>setTimeout(resolve,15));
+        item.files.forEach(file=>lockedFiles.add(file));
+        try{await execute(item,index);}finally{item.files.forEach(file=>lockedFiles.delete(file));}
+      }
+    };
+    await Promise.all(Array.from({length:Math.min(concurrency,stage.length)},()=>worker()));
+  }
+  await emit('swarm_completed',{completed:results.filter(item=>item&&!item.error).length,failed:results.filter(item=>item?.error&&!item.skipped).length,skipped:results.filter(item=>item?.skipped).length,workerCount:tasks.length,stageCount:taskStages.length});
   let summary='',summaryError='';
   try{summary=String(await callProvider(providers[0],buildSynthesisPrompt(mainTask,tasks,results,board),history)||'').trim();if(!summary)throw new Error('Koordinatör sentezi boş yanıt verdi.');}
   catch(error){summaryError=clean(error?.message||'Sentez başarısız.',400);summary='## Birleştirilmiş sonuç\n'+results.map(item=>'### '+item.title+'\n'+(item.error?'Hata: '+item.error:item.answer)).join('\n\n')+'\n\nKoordinatör sentezi alınamadı; ajan katkıları ayrı ayrı incelenmeli.';}
-  return {coordinatorId:providers[0],planFallback:plan.usedFallback,results,summary,summaryError,assignments,metrics:{
-    workerCount:tasks.length,completed:results.filter(item=>item&&!item.error).length,failed:results.filter(item=>item&&item.error).length,
+  return {coordinatorId:providers[0],plan:tasks,planStages:taskStages.length,planWarnings:plan.warnings||[],planFallback:plan.usedFallback,results,summary,summaryError,assignments,metrics:{
+    workerCount:tasks.length,completed:results.filter(item=>item&&!item.error).length,failed:results.filter(item=>item?.error&&!item.skipped).length,skipped:results.filter(item=>item?.skipped).length,
     retryCount,elapsedMs:Date.now()-started,fileConflictCount:tasks.reduce((sum,item)=>sum+item.files.length,0)-new Set(tasks.flatMap(item=>item.files)).size,
-    expectedCalls:tasks.length+2,maxCallsWithRetries:tasks.length*2+2
+    expectedCalls:tasks.length+2,maxCallsWithRetries:tasks.length*2+2,stageCount:taskStages.length
   }};
 }
 export const SWARM_LIMITS=Object.freeze({maxAgents:MAX_AGENTS,defaultAgents:3,defaultConcurrency:2});
