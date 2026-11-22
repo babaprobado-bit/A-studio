@@ -22,7 +22,8 @@ This file contains proposals only. Nothing below is implemented by this commit.
 ### IDEA-REA-001 — Live REA Companion pairing and read-only bridge
 
 - **Priority:** P0
-- **Status:** NEW
+- **Status:** BLOCKED
+- **Review rationale:** REA Companion is still explicitly non-downloadable and the marketplace says the real Android companion connection is not implemented. The repository contains a read-only contract/validator, but no companion host or tested transport. Resume only after a documented host transport and pairing contract are available.
 - **Estimated scope:** XL
 - **Why it is new:** `src/rea-companion-contract.js` already validates protocol v1 and the read-only operations `project.overview`, `files.inspect` and `symbols.search`. The plugin catalog and marketplace still identify REA as contract/mock-only; the live companion connection is not implemented.
 - **User benefit:** Use the user's desktop REA project-analysis capability from AI Studio without giving a phone app unrestricted access to the computer.
@@ -34,7 +35,8 @@ This file contains proposals only. Nothing below is implemented by this commit.
 ### IDEA-AUTO-001 — GitHub-backed three-stage Project Idea Pipeline
 
 - **Priority:** P0
-- **Status:** NEW
+- **Status:** REVIEWED
+- **Review rationale:** This description is partly stale: scripts/idea-pipeline.mjs and .github/workflows/idea-pipeline.yml already provide generator, reviewer and executor stages for GitHub Actions. The remaining distinct work is an in-app WorkManager/status/authorization experience; scheduled GitHub Actions only run from the default branch, so the requested branch-only cron cannot be assumed active. Re-scope before implementation to avoid rebuilding the existing pipeline.
 - **Estimated scope:** XL
 - **Why it is new:** The README explicitly lists unattended agents that continuously invent tasks as not implemented. GitHub is still marked planned in the connector registry; the current Power Hub Swarm is a bounded, user-started run rather than a persistent scheduled pipeline.
 - **User benefit:** Make the requested idea → review → implementation cycle visible and manageable inside AI Studio, with every idea traceable to a GitHub record.
@@ -46,7 +48,8 @@ This file contains proposals only. Nothing below is implemented by this commit.
 ### IDEA-OPENSHORTS-001 — Local video upload and approved clip recutting
 
 - **Priority:** P1
-- **Status:** NEW
+- **Status:** BLOCKED
+- **Review rationale:** The client allowlist recognizes create_upload and recut_clip as optional tools, but the current UI does not expose them and no verified live server tool schema, file-size/type limits or upload-retention contract is present in this source snapshot. Do not invent argument shapes or upload limits. Reopen after the OpenShorts server contract is documented and can be tested with a mock.
 - **Estimated scope:** L
 - **Why it is new:** `src/openshorts-mcp.js` recognizes optional `create_upload` and `recut_clip` tools, but the Creator Studio Clips UI currently accepts a source URL and does not expose local-file upload or recutting controls.
 - **User benefit:** Process a video already on the device and refine an existing clip without finding a public HTTPS URL first.
@@ -58,7 +61,8 @@ This file contains proposals only. Nothing below is implemented by this commit.
 ### IDEA-PROVIDER-001 — Free-provider health and observed-quota ledger
 
 - **Priority:** P1
-- **Status:** NEW
+- **Status:** REVIEWED
+- **Review rationale:** The provider catalog and free-model allowlists exist, but no shared passive health ledger or cooldown policy is present. A safe first slice is local observations only (latency, response class and real Retry-After when supplied); reported quota must remain unknown when not returned. The proposal currently spans several provider call paths and fallback behavior, so narrow the adapter integration and prove that no paid model can be selected before marking READY.
 - **Estimated scope:** M
 - **Why it is new:** AI Studio has a ranked provider directory, manual connection tests and APInex free-model refresh, but no shared provider-health/cooldown ledger or consistent record of observed rate-limit responses.
 - **User benefit:** See which free providers are currently responding and avoid repeatedly sending requests to a provider that is failing or rate-limited.
@@ -70,7 +74,8 @@ This file contains proposals only. Nothing below is implemented by this commit.
 ### IDEA-SWARM-001 — AI Swarm run history and safe replay
 
 - **Priority:** P1
-- **Status:** NEW
+- **Status:** REVIEWED
+- **Review rationale:** Agent Activity already persists a bounded 80-entry event history and the Swarm emits assignment, retry, agent and Skill events. The missing part is a structured run summary with grouped subtasks and a safe, user-confirmed retry of selected failures. Define the record schema and retention/redaction rules first so this does not duplicate the existing activity log.
 - **Estimated scope:** M
 - **Why it is new:** The Power Hub displays the current Swarm board and results, while the existing unified activity history covers chat, team calls, pipelines, comparisons and Local Coder. The Swarm path does not currently write a structured run record to that history.
 - **User benefit:** Revisit what the agents planned, see which subtask failed, and continue a useful run without rebuilding the whole request.
@@ -82,7 +87,8 @@ This file contains proposals only. Nothing below is implemented by this commit.
 ### IDEA-SKILL-001 — Imported Skill version comparison and rollback
 
 - **Priority:** P1
-- **Status:** NEW
+- **Status:** READY
+- **Review rationale:** Current Skill imports parse source/version/license metadata and flag duplicate names, but they do not compare content hashes or offer a reviewed update diff/rollback. This is a bounded local-only import enhancement using existing parsing, import preview and backup code. Acceptance can be covered by source/hash/diff/rollback regression tests; no network or paid model is required.
 - **Estimated scope:** M
 - **Why it is new:** Skill import already has a preview queue, metadata display and duplicate-name warnings. It does not provide a version-aware update/diff flow for an already imported Skill.
 - **User benefit:** Update a downloaded Skill without accumulating confusing duplicates or silently replacing instructions that were previously reviewed.
@@ -94,7 +100,8 @@ This file contains proposals only. Nothing below is implemented by this commit.
 ### IDEA-PLUGIN-001 — Plugin archive trust receipt
 
 - **Priority:** P1
-- **Status:** NEW
+- **Status:** REVIEWED
+- **Review rationale:** The actual catalog is src/plugin-marketplace.js (not src/plugin-repository-catalog.js) and downloads currently use branch-based GitHub ZIP URLs with an exact allowlist. Commit pinning is feasible, but repository metadata, license evidence and archive inspection need a concrete API/CORS and ZIP-extraction design. Keep downloaded content inert and do not claim a license is verified when metadata is absent.
 - **Estimated scope:** M
 - **Why it is new:** The marketplace restricts downloads to a curated repository allowlist, but its current archive URL is branch-based and the catalog does not provide a verified commit/hash, archive file inventory or permission/license receipt.
 - **User benefit:** Know exactly what is being downloaded before importing a Skill or using a desktop-required tool.
@@ -106,7 +113,8 @@ This file contains proposals only. Nothing below is implemented by this commit.
 ### IDEA-DEVICE-001 — Offline GGUF preflight and device benchmark
 
 - **Priority:** P1
-- **Status:** NEW
+- **Status:** REVIEWED
+- **Review rationale:** Native GGUF load and device RAM/ABI/storage checks already exist, but the current chat bridge does not expose a streaming token callback, so first-token latency cannot yet be measured as proposed. Narrow the initial benchmark to model-load time and end-to-end local response latency, with strict RAM abort/unload guards. Actual inference and thermal behavior still require device-level verification; CI alone cannot prove it.
 - **Estimated scope:** M
 - **Why it is new:** Device RAM/CPU/storage guardrails and safe model loading already exist, but the project still lacks a repeatable on-device acceptance report for actual model compatibility and inference performance.
 - **User benefit:** Choose a model based on measured behavior on the phone instead of relying only on approximate hardware thresholds.
@@ -118,7 +126,8 @@ This file contains proposals only. Nothing below is implemented by this commit.
 ### IDEA-OLLAMA-001 — Native trusted-endpoint broker for Ollama
 
 - **Priority:** P1
-- **Status:** NEW
+- **Status:** BLOCKED
+- **Review rationale:** The app currently validates Ollama endpoints before requests, but the manifest still grants broad cleartext traffic for trusted-LAN HTTP and the proposed DNS/IP-pinned native broker has no committed Android source path or tested transport contract in this branch snapshot. This is security-sensitive and must not proceed by weakening the existing endpoint policy. First design a native transport proof that preserves trusted-LAN Ollama and rejects redirects/rebinding.
 - **Estimated scope:** L
 - **Why it is new:** Current endpoint validation and redirect rejection are useful, but the handoff records a residual app-wide Android cleartext permission and no DNS resolution/IP pinning for remote HTTPS hostnames.
 - **User benefit:** Keep trusted-LAN PC Ollama working while reducing the network access granted to unrelated app requests.
@@ -130,7 +139,8 @@ This file contains proposals only. Nothing below is implemented by this commit.
 ### IDEA-CREATOR-001 — Mode-specific Creator Series continuity profiles
 
 - **Priority:** P2
-- **Status:** NEW
+- **Status:** READY
+- **Review rationale:** Creator Studio already has distinct What If, In My Town and Clips modes plus a local draft queue. A per-mode series-profile data model and bounded prompt injection can be added without changing video generation, publishing or the other modes. Keep profile keys mode-scoped and cover migration, switching and clearing behavior with deterministic local tests.
 - **Estimated scope:** M
 - **Why it is new:** What If, In My Town and Clips are deliberately separate modes and drafts are saved, but there is no reusable series-level continuity profile shared across episodes.
 - **User benefit:** Produce multiple episodes with consistent characters, locations, tone and visual rules without repeating the same setup every time.
@@ -147,7 +157,7 @@ This file contains proposals only. Nothing below is implemented by this commit.
 4. `IDEA-PROVIDER-001` and `IDEA-OLLAMA-001` — improve free-route reliability and network safety.
 5. Remaining ideas can be scheduled after dependency and scope review.
 
-**Pipeline status:** All entries start as `NEW`. The review stage must independently verify duplicates and current source before changing any item to `READY`. The implementation stage must not treat this file as approval to perform external, destructive, paid or publishing actions.
+**Pipeline status (reviewed 2026-11-22):** All 18 ideas were checked against current source and handoff records. The ledger now contains 8 READY, 7 REVIEWED, 3 BLOCKED and 0 DUPLICATE items. READY means the scope is sufficiently bounded for a separately tested implementation; it is not authorization to perform external, destructive, paid or publishing actions. REVIEWED means the idea needs narrower design or evidence before it can be scheduled. BLOCKED means a concrete external/native dependency or safety contract is missing.
 
 ---
 
@@ -162,7 +172,8 @@ These proposals were checked against the current source modules and the ten exis
 ### IDEA-CONTEXT-001 — Per-request context disclosure inspector
 
 - **Priority:** P0
-- **Status:** NEW
+- **Status:** REVIEWED
+- **Review rationale:** Project, shared-vault, Skill and opt-in memory context are composed by systemFor(), but they are not currently exposed as one immutable per-request manifest shared by preview and provider dispatch. The idea crosses chat, AI Team, Local Coder and provider paths. Define one canonical payload object and prove preview/request equality in each route before it becomes a small isolated implementation.
 - **Estimated scope:** M
 - **Why it is new:** `src/main.js` currently reports a project name and approximate file/snippet counts in `renderProjectContextStatus()`. The actual provider system prompt is assembled separately in `systemFor()` from project context, selected shared-vault references and general Skills. There is no per-request screen that shows the exact context sections and sizes that will accompany a specific provider call. This is broader than the separate REA disclosure rule because it covers ordinary chat, AI Team, Local Coder and other provider routes.
 - **User benefit:** Know what project notes, source files, snippets, saved references and Skills are being sent before a cloud model receives them; remove a section for one request without changing permanent settings.
@@ -174,7 +185,8 @@ These proposals were checked against the current source modules and the ten exis
 ### IDEA-PATCH-001 — Multi-file patch preview and transactional apply
 
 - **Priority:** P1
-- **Status:** NEW
+- **Status:** REVIEWED
+- **Review rationale:** The workspace stores multiple files, but Local Coder currently applies a draft only to the active file and Swarm returns analysis/results rather than a validated multi-file patch object. Atomic apply needs a versioned patch schema, per-file hash preconditions, snapshot rollback and storage-failure tests. First specify the producer/consumer contract and safe storage transaction; do not let AI output write or execute code automatically.
 - **Estimated scope:** L
 - **Why it is new:** The code workspace stores multiple files, but `applyLocalCoderDraft()` currently replaces and saves only the active editor file. AI Swarm produces plans and results but does not write workspace files. There is no structured, reviewable multi-file patch format with stale-file conflict detection and one explicit apply operation.
 - **User benefit:** Apply a coordinated change across several workspace files without manually copying each AI result or accidentally overwriting newer edits.
@@ -186,7 +198,8 @@ These proposals were checked against the current source modules and the ten exis
 ### IDEA-CHAT-001 — Fork a conversation from a selected message
 
 - **Priority:** P2
-- **Status:** NEW
+- **Status:** READY
+- **Review rationale:** Chat threads already have independent IDs, bounded message history and local persistence. A fork can be implemented as a local thread operation that copies only the selected prefix and adds optional parent/fork metadata; the source thread remains immutable. Existing thread/message caps and backward-compatible normalization provide a clear, isolated test surface.
 - **Estimated scope:** M
 - **Why it is new:** The current chat system supports creating, searching, switching and persisting separate threads through `makeChatThread()`, `createNewChat()` and `switchChatThread()`. It does not preserve parent/child lineage or create a new thread from a selected point in an existing conversation.
 - **User benefit:** Try a different prompt, model or approach from an earlier message while keeping the original conversation intact.
@@ -198,7 +211,8 @@ These proposals were checked against the current source modules and the ten exis
 ### IDEA-TEAM-001 — Agreement and contradiction synthesis for parallel AI Team
 
 - **Priority:** P1
-- **Status:** NEW
+- **Status:** READY
+- **Review rationale:** Parallel Team/Model Compare already returns individual provider-attributed answers and renders separate result cards. An opt-in synthesis action can be added after results using one explicitly selected local or verified-free evaluator, with a separate confirmation and source attribution. The existing provider free-model gate is available for a narrow regression-tested implementation; paid fallback must remain impossible.
 - **Estimated scope:** M
 - **Why it is new:** `runParallelTeamCalls()` currently returns individual provider answers, and `runCompare()` renders them as separate result cards. The Swarm coordinator has a task-planning synthesis step, but the user-facing parallel Team/Model Compare flows do not offer a separate evidence-linked agreement and contradiction report.
 - **User benefit:** See where selected models agree, where they conflict, which claims lack support and what needs human verification instead of comparing several long answers manually.
@@ -219,7 +233,8 @@ These proposals were compared with the current Agent Swarm, Skill selector, proj
 ### IDEA-AGENT-BUDGET-001 — Enforced per-run Agent Swarm request budget
 
 - **Priority:** P0
-- **Status:** NEW
+- **Status:** READY
+- **Review rationale:** runAgentSwarm() already centralizes provider requests in requestProvider() and counts modelCallCount, but estimateSwarmCallBudget() is advisory rather than a hard limit. A per-run request cap can be enforced at this single boundary, counting planning, retries, Skill expansion and synthesis, with an explicit partial-result state. Concurrent calls reserve the next slot synchronously; focused exact-count tests can verify the cap and preserve free/local routing.
 - **Estimated scope:** M
 - **Why it is new:** `src/agent-swarm.js` exposes `estimateSwarmCallBudget()` and returns expected/maximum call metrics, but its internal `requestProvider()` currently increments `modelCallCount` and forwards the call without enforcing a caller-selected hard ceiling. Retries and dynamic Skill expansion can therefore consume additional calls beyond the expected count.
 - **User benefit:** Prevent unexpectedly long agent runs, make retry/expansion behavior predictable, and let users cap how many provider requests one task may make.
@@ -231,7 +246,8 @@ These proposals were compared with the current Agent Swarm, Skill selector, proj
 ### IDEA-SKILL-TRACE-001 — Explainable Skill selection and per-run controls
 
 - **Priority:** P1
-- **Status:** NEW
+- **Status:** READY
+- **Review rationale:** The Skill selector already calculates ranked reasons, scores and stage compatibility; Session 24 already provides task-aware refresh. The missing slice is surfacing concise reason metadata and adding per-run pin/exclude IDs without changing saved profiles. It can be kept within the existing eight-Skill and prompt-character caps and covered by focused selector/event/UI contract tests.
 - **Estimated scope:** M
 - **Why it is new:** `src/skill-selector.js` already calculates selection scores and reason labels, but `src/agent-swarm.js` emits only selected IDs/names for most Skill events and the UI does not expose a compact per-run explanation with pin/exclude controls. Session 24 added task-aware refresh; this proposal does not repeat that selection behavior.
 - **User benefit:** Understand why a Skill was assigned to an agent, identify irrelevant instructions, and override one run without permanently changing Skill profiles.
@@ -243,7 +259,8 @@ These proposals were compared with the current Agent Swarm, Skill selector, proj
 ### IDEA-MEMORY-REVIEW-001 — Project memory lifecycle and duplicate review
 
 - **Priority:** P1
-- **Status:** NEW
+- **Status:** READY
+- **Review rationale:** Project memory already has bounded project-scoped records, sensitive-content rejection, backup/restore and a local UI with manual deletion. A backward-compatible archive/review metadata extension and deterministic duplicate suggestions can be implemented locally; archive/merge/delete remain explicit user actions. Existing v1 records must normalize unchanged and sensitive-content checks must run on edits/imports.
 - **Estimated scope:** M
 - **Why it is new:** `src/agent-memory.js` supports project-scoped records, sensitive-content rejection, relevance matching and backup/restore. The current UI displays recent records and supports manual deletion, but there is no review workflow for stale or near-duplicate records, no archive state, and no explicit lifecycle metadata beyond creation time.
 - **User benefit:** Keep project memory useful as code and decisions change, reduce repeated/conflicting notes, and prevent old assumptions from quietly influencing later agent work.
@@ -255,7 +272,8 @@ These proposals were compared with the current Agent Swarm, Skill selector, proj
 ### IDEA-SHIELD-DETAIL-001 — Detailed AgentShield findings and safe report
 
 - **Priority:** P1
-- **Status:** NEW
+- **Status:** READY
+- **Review rationale:** AgentShield already returns rule ID, severity, source and line numbers; current request preflight mainly presents a toast/summary and Skill import shows a generic block message. A shared detail panel can display the existing safe metadata without retaining matched text or secrets. Blocking severity remains fail-closed; tests can cover masking, rendering and no-bypass behavior.
 - **Estimated scope:** S
 - **Why it is new:** `src/agent-shield.js` returns rule IDs, severity, line numbers and messages, while current request preflight mainly shows a toast and records a summary in Agent Activity. Skill import reports a general blocked message. There is no consistent detailed findings view for the user to inspect and resolve.
 - **User benefit:** Understand what was flagged and where, distinguish a warning from a blocking finding, and correct problematic content without disabling security checks.
@@ -264,3 +282,38 @@ These proposals were compared with the current Agent Swarm, Skill selector, proj
 - **Risks:** A detailed report could accidentally reveal secrets or teach users to evade a detector. Mitigate by showing rule descriptions and safe remediation only, masking matched values, omitting sensitive excerpts and keeping blocking decisions unchanged.
 - **Acceptance criteria:** Multiple findings are individually visible with severity/source/line; safe reports contain no detected secret values; blocking findings remain blocked; warnings remain distinguishable; request and Skill-import paths use the same renderer; tests cover masking and no-bypass behavior.
 
+## Review summary — 2026-11-22
+
+| Status | Count |
+|---|---:|
+| READY | 8 |
+| REVIEWED | 7 |
+| BLOCKED | 3 |
+| DUPLICATE | 0 |
+| **Total** | **18** |
+
+### READY queue
+- IDEA-SKILL-001 — imported Skill content-hash comparison, reviewed update diff and rollback.
+- IDEA-CREATOR-001 — mode-isolated Creator series profiles.
+- IDEA-CHAT-001 — local conversation fork with parent lineage.
+- IDEA-TEAM-001 — opt-in, attributed synthesis using only local or verified-free evaluators.
+- IDEA-AGENT-BUDGET-001 — hard Agent Swarm request cap enforced at the central provider-call boundary.
+- IDEA-SKILL-TRACE-001 — surface existing Skill-selection reasons and per-run pins/exclusions.
+- IDEA-MEMORY-REVIEW-001 — local archive/review metadata and duplicate suggestions; no automatic deletion or merge.
+- IDEA-SHIELD-DETAIL-001 — detailed sanitized AgentShield findings without matched secret text.
+
+### REVIEWED queue
+- IDEA-AUTO-001 — the GitHub Actions generator/reviewer/executor pipeline already exists; distinguish it from the still-missing in-app WorkManager and authorization layer.
+- IDEA-PROVIDER-001 — narrow to passive observed health and actual Retry-After data before integrating broader fallback behavior.
+- IDEA-SWARM-001 — structured per-run history must add value beyond the existing 80-entry Agent Activity log.
+- IDEA-PLUGIN-001 — source is src/plugin-marketplace.js; pinning and archive inspection need a tested download/ZIP design.
+- IDEA-DEVICE-001 — first-token timing is not exposed by the current non-streaming local call path; start with load and end-to-end latency only.
+- IDEA-CONTEXT-001 — one immutable context manifest must drive both preview and the actual request across all provider routes.
+- IDEA-PATCH-001 — define a validated multi-file patch producer/consumer contract and transactional persistence before implementation.
+
+### BLOCKED queue
+- IDEA-REA-001 — real REA companion host/transport and documented pairing contract are absent; current code is a read-only contract validator only.
+- IDEA-OPENSHORTS-001 — live upload/recut tool schemas and documented file limits/retention contract have not been verified.
+- IDEA-OLLAMA-001 — DNS/IP-pinned native transport is not implemented; the current broad Android cleartext permission and trusted-LAN behavior need a tested security design first.
+
+**Audit boundary:** This review changed proposal statuses and rationale only. No application source, tests, provider allowlists, APKs, workflow files, PR metadata or main branch were changed. READY entries must still be implemented one at a time with their own tests and separate result records.
