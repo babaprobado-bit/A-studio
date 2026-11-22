@@ -469,7 +469,8 @@ export const SKILL_PROFILES = Object.freeze({
     skillIds: ['ext-marketing-skills-content','ext-anthropic-skills-document-work','ext-openmontage-video-pipeline','ext-humanizer-natural-writing','ext-hyperframes-scene-builder','ext-adhd-divergent-ideation']
   },
   'ecc-agent-systems': { name: 'ECC Agent Systems', description: 'Orkestrasyon, hafıza, hook yaşam döngüsü ve doğrulama.', skillIds: ['ecc-agent-harness','ecc-team-orchestration','ecc-continuous-learning','ecc-unified-memory','ecc-agent-security','ecc-security-scan','ecc-verification-loop','ecc-tdd-workflow'] },
-  'ecc-agent-security': { name: 'ECC Agent Security', description: 'Güvenlik ve mimari denetim.', skillIds: ['ecc-agent-security','ecc-security-scan','ecc-architecture-audit','ecc-hooks-lifecycle','ecc-verification-loop','sp-secure-defaults','sp-api-contract','sp-edge-review'] }
+  'ecc-agent-security': { name: 'ECC Agent Security', description: 'Güvenlik ve mimari denetim.', skillIds: ['ecc-agent-security','ecc-security-scan','ecc-architecture-audit','ecc-hooks-lifecycle','ecc-verification-loop','sp-secure-defaults','sp-api-contract','sp-edge-review'] },
+  'ecc-agent-lifecycle': { name: 'ECC Agent Lifecycle', description: 'Agent yaşam döngüsü, mimari, koordinasyon, hafıza ve doğrulama.', skillIds: ['ecc-agent-harness','ecc-team-orchestration','ecc-architecture-audit','ecc-hooks-lifecycle','ecc-continuous-learning','ecc-unified-memory','ecc-verification-loop','ecc-tdd-workflow'] }
 });
 
 function slug(value) {

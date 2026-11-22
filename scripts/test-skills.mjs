@@ -14,6 +14,13 @@ assert.equal(ECC_AGENT_SYSTEMS_PACK.length,10);
 assert.ok(ECC_AGENT_SYSTEMS_PACK.every(skill=>skill.group==='ECC Agent Systems'&&skill.license==='MIT'&&skill.metadata.upstreamCodeIncluded==='false'));
 assert.equal(getProfileSkillIds('ecc-agent-systems').length,8);
 assert.equal(getProfileSkillIds('ecc-agent-security').length,8);
+assert.equal(getProfileSkillIds('ecc-agent-lifecycle').length,8);
+assert.ok(getProfileSkillIds('ecc-agent-lifecycle').includes('ecc-architecture-audit'));
+assert.ok(getProfileSkillIds('ecc-agent-lifecycle').includes('ecc-hooks-lifecycle'));
+assert.ok(getProfileSkillIds('ecc-agent-systems').includes('ecc-unified-memory'));
+assert.ok(getProfileSkillIds('ecc-agent-security').includes('ecc-security-scan'));
+const eccProfileCoverage=new Set([...getProfileSkillIds('ecc-agent-systems'),...getProfileSkillIds('ecc-agent-security'),...getProfileSkillIds('ecc-agent-lifecycle')]);
+assert.ok(ECC_AGENT_SYSTEMS_PACK.every(skill=>eccProfileCoverage.has(skill.id)),'ECC profiles must collectively expose all ten built-in ECC Skills');
 assert.equal(EXTERNAL_SKILL_PACK.length, 30, 'external pack must contain exactly 30 original instruction adaptations');
 assert.deepEqual([...new Set(EXTERNAL_SKILL_PACK.map(skill => skill.group))].sort(), ['Code','Design','Research','Tokens','Writing & Video']);
 for (const group of ['Code','Research','Tokens','Design','Writing & Video']) {
@@ -30,7 +37,7 @@ for (const skill of EXTERNAL_SKILL_PACK) {
 }
 assert.equal(SKILL_CATALOG.filter(skill => skill.group === 'Superpowers').length, 15);
 assert.equal(SKILL_CATALOG.filter(skill => skill.group === 'Caveman').length, 22);
-for (const id of ['karpathy','superpowers','superpowers-development','planning','review','caveman','caveman-short','balanced','openshorts','creator-automation','external-code-pack','external-research-pack','external-tokens-pack','external-design-pack','external-writing-video-pack']) {
+for (const id of ['karpathy','superpowers','superpowers-development','planning','review','caveman','caveman-short','balanced','openshorts','creator-automation','external-code-pack','external-research-pack','external-tokens-pack','external-design-pack','external-writing-video-pack','ecc-agent-systems','ecc-agent-security','ecc-agent-lifecycle']) {
   assert.ok(SKILL_PROFILES[id], 'missing profile: ' + id);
   assert.ok(SKILL_PROFILES[id].skillIds.length <= MAX_SELECTED_SKILLS, 'profile exceeds eight Skills: ' + id);
   assert.equal(getProfileSkillIds(id).length, SKILL_PROFILES[id].skillIds.length);
