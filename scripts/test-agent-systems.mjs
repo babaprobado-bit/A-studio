@@ -6,7 +6,7 @@ import {selectSkillsForTask,buildTaskSkillContext,refreshTaskSkillContext} from 
 import {createAgentHookBus} from '../src/agent-hooks.js';
 import {createProjectMemoryRecord,normalizeProjectMemoryRecords,findRelevantProjectMemories,buildProjectMemoryContext,createProjectMemoryBackup,restoreProjectMemoryBackup} from '../src/agent-memory.js';
 import {scanAgentContent} from '../src/agent-shield.js';
-import {runAgentSwarm,parseSkillNeeds,fallbackSwarmTasks} from '../src/agent-swarm.js';
+import {runAgentSwarm,parseSkillNeeds,fallbackSwarmTasks,resolveSwarmProviderCallLimit} from '../src/agent-swarm.js';
 const basic='Merhaba, nasılsın?';
 const complex='Plan a multi-agent architecture. Implement orchestration and project memory. Add hooks and security checks, write tests, update docs, then verify the workflow.';
 assert.ok(scoreTaskComplexity(complex)>scoreTaskComplexity(basic));
@@ -88,6 +88,73 @@ assert.ok(refreshedDynamicSkills.includedIds.length<=8);
 assert.ok(refreshedDynamicSkills.charCount<=refreshedDynamicSkills.maxChars);
 assert.equal(parseSkillNeeds('Draft\nSKILL_NEEDS: none'),'');
 assert.equal(parseSkillNeeds('Draft\nSKILL_NEEDS: prompt injection security review'),'prompt injection security review');
+assert.equal(resolveSwarmProviderCallLimit(undefined,3),14);
+assert.equal(resolveSwarmProviderCallLimit('6',3),6);
+assert.throws(()=>resolveSwarmProviderCallLimit(2,3),/3 ile 100/);
+assert.throws(()=>resolveSwarmProviderCallLimit(101,3),/3 ile 100/);
+const cappedCalls=[],cappedEvents=[];
+const cappedSwarm=await runAgentSwarm({
+ providerIds:['gemini','groq','ollama'],task:'Run a bounded build and test workflow.',maxAgents:2,maxProviderCalls:3,
+ callProvider:async(providerId,prompt)=>{
+  cappedCalls.push({providerId,prompt});
+  if(prompt.includes('Yalnızca JSON döndür'))return JSON.stringify({tasks:[
+   {id:'build',title:'Build module',role:'developer',objective:'Implement a bounded module'},
+   {id:'tests',title:'Dependent tests',role:'tester',objective:'Test the module',dependsOn:['build']}
+  ]});
+  if(prompt.includes('Ajan katkıları'))return 'Bounded synthesis completed';
+  return 'Bounded worker result';
+ },
+ onEvent:async event=>cappedEvents.push(event)
+});
+assert.equal(cappedCalls.length,3,'planning + one worker + reserved synthesis must stay within the cap');
+assert.equal(cappedSwarm.metrics.modelCallCount,3);
+assert.equal(cappedSwarm.metrics.maxProviderCalls,3);
+assert.equal(cappedSwarm.metrics.budgetExhausted,true);
+assert.equal(cappedSwarm.status,'partial');
+assert.equal(cappedSwarm.metrics.completed,1);
+assert.equal(cappedSwarm.metrics.failed,1);
+assert.ok(cappedEvents.some(event=>event.type==='budget_exhausted'&&event.phase==='worker'));
+assert.match(cappedSwarm.summary,/Kısmi sonuç/);
+const retryCappedCalls=[];
+const retryCapped=await runAgentSwarm({
+ providerIds:['gemini','groq','ollama'],task:'Retry one bounded worker request.',maxAgents:2,maxProviderCalls:4,
+ callProvider:async(providerId,prompt)=>{
+  retryCappedCalls.push(prompt);
+  if(prompt.includes('Yalnızca JSON döndür'))return JSON.stringify({tasks:[
+   {id:'build',title:'Build the module',role:'developer',objective:'Build the module'},
+   {id:'tests',title:'Test the module',role:'tester',objective:'Test the module',dependsOn:['build']}
+  ]});
+  if(prompt.includes('Ajan katkıları'))return 'Retry-capped synthesis';
+  if(prompt.includes('Alt görev: Build the module')&&retryCappedCalls.filter(item=>item.includes('Alt görev: Build the module')).length===1)throw new Error('429 rate limit');
+  return 'Worker output after retry';
+ }
+});
+assert.equal(retryCappedCalls.length,4,'retry and synthesis must remain inside the hard cap');
+assert.equal(retryCapped.metrics.modelCallCount,4);
+assert.equal(retryCapped.metrics.retryCount,1);
+assert.equal(retryCapped.metrics.budgetExhausted,true);
+assert.equal(retryCapped.results.find(item=>item.title==='Build the module').retried,true);
+assert.ok(retryCapped.results.find(item=>item.title==='Test the module').error);
+const cappedExpansionCalls=[];
+const cappedExpansion=await runAgentSwarm({
+ providerIds:['gemini','groq','ollama'],task:'Build a secure local settings module.',maxAgents:2,maxProviderCalls:3,skills:SKILL_CATALOG,assignProviders:assignAgentProviders,
+ callProvider:async(providerId,prompt)=>{
+  cappedExpansionCalls.push(prompt);
+  if(prompt.includes('Yalnızca JSON döndür'))return JSON.stringify({tasks:[
+   {id:'builder',title:'Settings builder',role:'developer',objective:'Implement secure local settings'},
+   {id:'reviewer',title:'Settings reviewer',role:'reviewer',objective:'Review the settings',dependsOn:['builder']}
+  ]});
+  if(prompt.includes('Ajan katkıları'))return 'Capped expansion synthesis';
+  if(prompt.includes('Alt görev: Implement secure local settings'))return 'Initial settings result.\nSKILL_NEEDS: prompt injection security review and permission checks';
+  return 'Unexpected extra call';
+ }
+});
+const cappedExpansionWorker=cappedExpansion.results.find(item=>item.title==='Settings builder');
+assert.match(cappedExpansionWorker.answer,/Initial settings result/,'initial worker output must survive a denied Skill expansion');
+assert.ok(cappedExpansionWorker.skillExpansionError);
+assert.equal(cappedExpansion.metrics.dynamicSkillCalls,0,'a denied expansion is not a provider call');
+assert.equal(cappedExpansion.metrics.modelCallCount,3);
+assert.equal(cappedExpansion.metrics.budgetExhausted,true);
 const organized=organizeTaskPlan([
  {id:'build',title:'Build',role:'developer',objective:'Implement module',priority:5},
  {id:'tests',title:'Tests',role:'tester',objective:'Run regression tests',dependsOn:['build'],priority:5},
@@ -165,4 +232,7 @@ assert.equal(expansionSwarm.metrics.skillExpansionCount,1);
 assert.ok(expansionCalls.some(prompt=>prompt.includes('DYNAMIC SKILL EXPANSION')&&prompt.includes('ECC Agent Security Hardening')));
 const mainSource=readFileSync(new URL('../src/main.js',import.meta.url),'utf8');
 assert.ok(mainSource.includes("event.type==='skills_refreshed'"),'Swarm dynamic Skill refresh must be visible in agent activity');
+assert.ok(mainSource.includes('autoAgentMaxProviderCalls'),'Agent Swarm request budget must be configurable and passed by the UI');
+const indexSource=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+assert.ok(indexSource.includes('id=\"autoAgentMaxProviderCalls\"'),'Agent Systems panel must expose the saved request cap');
 console.log('Agent Systems tests passed, including staged dependencies, dynamic Skill refresh, role routing, cycle handling, and failed-dependency skipping.');

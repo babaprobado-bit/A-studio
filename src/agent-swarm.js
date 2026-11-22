@@ -87,6 +87,13 @@ export function estimateSwarmCallBudget(workerCount){
   const n=clamp(workerCount,2,MAX_AGENTS,3);
   return {expected:n+2,maximumWithRetries:n*4+2,retryAllowance:n*2,dynamicSkillAllowance:n};
 }
+export function resolveSwarmProviderCallLimit(value,workerCount){
+  const fallback=estimateSwarmCallBudget(workerCount).maximumWithRetries;
+  if(value===undefined||value===null||value==='')return fallback;
+  const limit=Number(value);
+  if(!Number.isSafeInteger(limit)||limit<3||limit>100)throw new RangeError('Agent Swarm istek sınırı 3 ile 100 arasında tam sayı olmalıdır.');
+  return limit;
+}
 export function isRetryableSwarmError(error){
   const message=String(error?.message||error||'');
   if(/\b(400|401|402|403|404)\b|invalid.?api.?key|unauthorized|insufficient.?credit|billing/i.test(message))return false;
@@ -138,22 +145,36 @@ function buildSynthesisPrompt(task,plan,results,board,skillContext=''){
     skillContext
   ].filter(Boolean).join('\n\n');
 }
-export async function runAgentSwarm({providerIds,task,history=[],maxAgents=3,maxConcurrency=2,isNative=false,deviceInfo=null,callProvider,onEvent=async()=>{},assignProviders=null,skills=[],preferredSkillIds=[]}){
+export async function runAgentSwarm({providerIds,task,history=[],maxAgents=3,maxConcurrency=2,maxProviderCalls, isNative=false,deviceInfo=null,callProvider,onEvent=async()=>{},assignProviders=null,skills=[],preferredSkillIds=[]}){
   if(!Array.isArray(providerIds)||typeof callProvider!=='function')throw new TypeError('Swarm için providerIds ve callProvider gerekir.');
   const providers=[...new Set(providerIds.filter(item=>typeof item==='string'&&item.trim()))];
   const mainTask=clean(task,3000),workerCount=clamp(maxAgents,2,MAX_AGENTS,3);
   if(!mainTask)throw new Error('Swarm görevi boş olamaz.');
   if(providers.length<2)throw new Error('Swarm için en az iki hazır AI motoru gerekir.');
+  const maxProviderCallLimit=resolveSwarmProviderCallLimit(maxProviderCalls,workerCount);
   const concurrency=resolveSwarmConcurrency({requested:maxConcurrency,isNative,deviceInfo});
   const started=Date.now(),board=[],results=[],lockedFiles=new Set(),fileOwners=new Map();
-  let retryCount=0,dynamicSkillCalls=0,skillExpansionCount=0,modelCallCount=0;
-  const requestProvider=async(...args)=>{modelCallCount++;return callProvider(...args);};
+  let retryCount=0,dynamicSkillCalls=0,skillExpansionCount=0,modelCallCount=0,budgetExhausted=false,budgetExhaustedRequests=0;
   const emit=async(type,data={})=>{try{await onEvent({type,at:Date.now(),...data});}catch{}};
+  const requestProvider=async(phase,...args)=>{
+    const workerRequest=phase==='worker'||phase==='skill-expansion';
+    const allowedCalls=workerRequest?maxProviderCallLimit-1:maxProviderCallLimit;
+    if(modelCallCount>=allowedCalls){
+      budgetExhausted=true;budgetExhaustedRequests++;
+      const error=new Error('Agent Swarm istek sınırına ulaşıldı ('+maxProviderCallLimit+'). Planlama ve son sentez için ayrılan çağrı korunur.');
+      error.code='SWARM_BUDGET_EXHAUSTED';
+      await emit('budget_exhausted',{phase,maxProviderCalls:maxProviderCallLimit,modelCallCount,reservedSynthesisCalls:phase==='synthesis'?0:1,blockedRequests:budgetExhaustedRequests});
+      throw error;
+    }
+    modelCallCount++;
+    if(phase==='skill-expansion')dynamicSkillCalls++;
+    return callProvider(...args);
+  };
   await emit('swarm_started',{coordinatorId:providers[0],workerCount,concurrency});
   const planningSkills=buildTaskSkillContext({task:mainTask,role:'architect',stage:'plan',skills,preferredSkillIds,maxSkills:4,maxChars:7600});
   await emit('skills_selected',{taskId:'coordinator-plan',role:'architect',stage:planningSkills.stage,skillIds:planningSkills.includedIds,skillNames:planningSkills.skills.map(item=>item.name)});
   let plan;
-  try{const raw=await requestProvider(providers[0],buildSwarmPlanPrompt(mainTask,workerCount,planningSkills.promptText),history);plan=parseSwarmPlan(raw,{task:mainTask,maxTasks:workerCount});}
+  try{const raw=await requestProvider('planning',providers[0],buildSwarmPlanPrompt(mainTask,workerCount,planningSkills.promptText),history);plan=parseSwarmPlan(raw,{task:mainTask,maxTasks:workerCount});}
   catch(error){plan={tasks:fallbackSwarmTasks(mainTask,workerCount),usedFallback:true,reason:clean(error?.message||'Koordinatör yanıt vermedi.',300)};}
   if(plan.usedFallback)await emit('plan_fallback',{reason:plan.reason});
   const tasks=plan.tasks.slice(0,workerCount);
@@ -192,7 +213,7 @@ export async function runAgentSwarm({providerIds,task,history=[],maxAgents=3,max
     let answer='',error='',retried=false,skillExpansionError='',dynamicSkillIds=[];
     const prompt=buildWorkerPrompt(item,mainTask,board,completedPrerequisites,skillSelection.promptText);
     for(let attempt=0;attempt<2;attempt++){
-      try{answer=String(await requestProvider(providerId,prompt,history)||'').trim();if(!answer)throw new Error('Ajan boş yanıt verdi.');error='';break;}
+      try{answer=String(await requestProvider('worker',providerId,prompt,history)||'').trim();if(!answer)throw new Error('Ajan boş yanıt verdi.');error='';break;}
       catch(err){error=clean(err?.message||'Ajan çağrısı başarısız.',500);if(attempt===0&&isRetryableSwarmError(err)){retried=true;retryCount++;await emit('agent_retry',{agentId,reason:error});continue;}break;}
     }
     if(!error){
@@ -207,9 +228,8 @@ export async function runAgentSwarm({providerIds,task,history=[],maxAgents=3,max
           let revised='',revisionError='';
           await emit('skills_expansion_started',{agentId,taskId:item.id,needs,addedSkillIds:expanded.addedSkillIds});
           for(let attempt=0;attempt<2;attempt++){
-            dynamicSkillCalls++;
             try{
-              revised=String(await requestProvider(providerId,buildSkillExpansionPrompt(item,mainTask,previousAnswer,expanded.promptText,needs),history)||'').trim();
+              revised=String(await requestProvider('skill-expansion',providerId,buildSkillExpansionPrompt(item,mainTask,previousAnswer,expanded.promptText,needs),history)||'').trim();
               if(!revised)throw new Error('Ek Skill talimatlarıyla gelen yanıt boş.');
               revisionError='';break;
             }catch(err){
@@ -255,11 +275,14 @@ export async function runAgentSwarm({providerIds,task,history=[],maxAgents=3,max
   const synthesisSkills=refreshTaskSkillContext({task:synthesisContext,role:'reviewer',stage:'review',skills,preferredSkillIds,previousSkillIds:[...new Set(completedSkillIds)].slice(0,4),maxSkills:MAX_SELECTED_SKILLS,maxChars:7600});
   await emit('skills_refreshed',{taskId:'coordinator-synthesis',role:'reviewer',stage:synthesisSkills.stage,refreshed:synthesisSkills.refreshed,previousSkillCount:completedSkillIds.length,skillIds:synthesisSkills.includedIds,addedSkillIds:synthesisSkills.addedSkillIds,addedSkillNames:synthesisSkills.skills.filter(item=>synthesisSkills.addedSkillIds.includes(item.id)).map(item=>item.name)});
   let summary='',summaryError='';
-  try{summary=String(await requestProvider(providers[0],buildSynthesisPrompt(mainTask,tasks,results,board,synthesisSkills.promptText),history)||'').trim();if(!summary)throw new Error('Koordinatör sentezi boş yanıt verdi.');}
+  try{summary=String(await requestProvider('synthesis',providers[0],buildSynthesisPrompt(mainTask,tasks,results,board,synthesisSkills.promptText),history)||'').trim();if(!summary)throw new Error('Koordinatör sentezi boş yanıt verdi.');}
   catch(error){summaryError=clean(error?.message||'Sentez başarısız.',400);summary='## Birleştirilmiş sonuç\n'+results.map(item=>'### '+item.title+'\n'+(item.error?'Hata: '+item.error:item.answer)).join('\n\n')+'\n\nKoordinatör sentezi alınamadı; ajan katkıları ayrı ayrı incelenmeli.';}
-  return {coordinatorId:providers[0],plan:tasks,planStages:taskStages.length,planWarnings:plan.warnings||[],planFallback:plan.usedFallback,results,summary,summaryError,assignments,skillSelections:[{taskId:'coordinator-plan',role:'architect',stage:planningSkills.stage,skillIds:planningSkills.includedIds,skillNames:planningSkills.skills.map(item=>item.name)},{taskId:'coordinator-synthesis',role:'reviewer',stage:synthesisSkills.stage,skillIds:synthesisSkills.includedIds,skillNames:synthesisSkills.skills.map(item=>item.name)},...tasks.map(item=>({taskId:item.id,role:item.roleGroup||item.role,stage:taskSkillContexts.get(item.id)?.stage,skillIds:taskSkillContexts.get(item.id)?.includedIds||[],skillNames:taskSkillContexts.get(item.id)?.skills.map(skill=>skill.name)||[],addedSkillIds:taskSkillContexts.get(item.id)?.addedSkillIds||[]}))],metrics:{
-    workerCount:tasks.length,completed:results.filter(item=>item&&!item.error).length,failed:results.filter(item=>item?.error&&!item.skipped).length,skipped:results.filter(item=>item?.skipped).length,
-    retryCount,dynamicSkillCalls,skillExpansionCount,modelCallCount,elapsedMs:Date.now()-started,fileConflictCount:tasks.reduce((sum,item)=>sum+item.files.length,0)-new Set(tasks.flatMap(item=>item.files)).size,
+  if(budgetExhausted)summary='## Kısmi sonuç · İstek sınırı doldu\n\n'+summary+'\n\nAgent Swarm '+maxProviderCallLimit+' gerçek sağlayıcı isteği sınırına ulaştı. Tamamlanan ajan çıktıları korundu; sınır nedeniyle tamamlanamayan alt görevler ayrı işaretlendi.';
+  const completed=results.filter(item=>item&&!item.error).length,failed=results.filter(item=>item?.error&&!item.skipped).length,skipped=results.filter(item=>item?.skipped).length;
+  const status=budgetExhausted||failed>0||skipped>0?'partial':'completed';
+  return {status,coordinatorId:providers[0],plan:tasks,planStages:taskStages.length,planWarnings:plan.warnings||[],planFallback:plan.usedFallback,results,summary,summaryError,assignments,budget:{maxProviderCalls:maxProviderCallLimit,usedCalls:modelCallCount,remainingCalls:Math.max(0,maxProviderCallLimit-modelCallCount),exhausted:budgetExhausted,blockedRequests:budgetExhaustedRequests,synthesisReserved:1},skillSelections:[{taskId:'coordinator-plan',role:'architect',stage:planningSkills.stage,skillIds:planningSkills.includedIds,skillNames:planningSkills.skills.map(item=>item.name)},{taskId:'coordinator-synthesis',role:'reviewer',stage:synthesisSkills.stage,skillIds:synthesisSkills.includedIds,skillNames:synthesisSkills.skills.map(item=>item.name)},...tasks.map(item=>({taskId:item.id,role:item.roleGroup||item.role,stage:taskSkillContexts.get(item.id)?.stage,skillIds:taskSkillContexts.get(item.id)?.includedIds||[],skillNames:taskSkillContexts.get(item.id)?.skills.map(skill=>skill.name)||[],addedSkillIds:taskSkillContexts.get(item.id)?.addedSkillIds||[]}))],metrics:{
+    workerCount:tasks.length,completed,failed,skipped,
+    retryCount,dynamicSkillCalls,skillExpansionCount,modelCallCount,maxProviderCalls:maxProviderCallLimit,budgetExhausted,budgetExhaustedRequests,callsRemaining:Math.max(0,maxProviderCallLimit-modelCallCount),elapsedMs:Date.now()-started,fileConflictCount:tasks.reduce((sum,item)=>sum+item.files.length,0)-new Set(tasks.flatMap(item=>item.files)).size,
     selectedSkillCount:planningSkills.includedIds.length+synthesisSkills.includedIds.length+[...taskSkillContexts.values()].reduce((sum,item)=>sum+item.includedIds.length,0),
     dynamicallyAddedSkillCount:synthesisSkills.addedSkillIds.length+[...taskSkillContexts.values()].reduce((sum,item)=>sum+item.addedSkillIds.length,0),
     expectedCalls:tasks.length+2,maxCallsWithRetries:tasks.length*4+2,stageCount:taskStages.length

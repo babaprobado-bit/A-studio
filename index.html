@@ -356,7 +356,8 @@
           <p class="muted">ECC’den uyarlanan beceriler mevcut Agent Swarm, proje hafızası, yaşam döngüsü hook’ları ve AgentShield kontrolleriyle çalışır. İçe aktarılan Skill dosyaları yalnızca metin talimatıdır, kod çalıştırmaz.</p>
           <label class="team-check"><input id="autoAgentAssignment" type="checkbox" checked> Karmaşık görevleri otomatik uzman ajanlara dağıt</label>
           <div class="row-actions"><label class="field-label" for="autoAgentMinComplexity">Dağıtım eşiği (30–90)</label><input id="autoAgentMinComplexity" class="input" type="number" min="30" max="90" value="55" style="max-width:100px"><label class="field-label" for="autoAgentMaxWorkers">Uzman sayısı</label><select id="autoAgentMaxWorkers" class="input" style="max-width:110px"><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option></select></div>
-          <p class="fineprint">Birden fazla gerçek model isteğinden önce tahmini çağrı sayısı gösterilir ve onay istenir. Yalnızca ücretsiz model izninden geçen sağlayıcılar veya yerel motorlar kullanılır.</p>
+          <div class="row-actions"><label class="field-label" for="autoAgentMaxProviderCalls">Görev başına gerçek istek sınırı (3–100)</label><input id="autoAgentMaxProviderCalls" class="input" type="number" min="3" max="100" step="1" value="14" style="max-width:100px"></div>
+          <p class="fineprint">Gerçek sağlayıcı istekleri merkezi sınırda sayılır. Planlama ve son sentez için birer çağrı korunur; sınır dolarsa tamamlanan ajan sonuçları saklanır. Yalnızca ücretsiz izinden geçen sağlayıcılar veya yerel motorlar kullanılır.</p>
           <div class="divider"></div>
           <label class="team-check"><input id="agentMemoryEnabled" type="checkbox" checked> Proje hafızasını bu cihazda etkinleştir</label>
           <label class="team-check"><input id="shareAgentMemory" type="checkbox"> Eşleşen hafıza kayıtlarını seçili AI modeline gönder</label>

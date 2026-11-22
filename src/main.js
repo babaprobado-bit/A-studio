@@ -79,6 +79,7 @@ const defaultSettings = {
   autoAgentAssignment: true,
   autoAgentMinComplexity: 55,
   autoAgentMaxWorkers: 3,
+  autoAgentMaxProviderCalls: 14,
   agentMemoryEnabled: true,
   shareAgentMemory: false,
   agentHooksEnabled: true,
@@ -754,11 +755,12 @@ async function submitChat(prompt,providerId){
     if(decision.eligible){
       const workerCount=Math.max(2,Math.min(5,Number(settings.autoAgentMaxWorkers)||3));
       const budget=estimateSwarmCallBudget(workerCount);
-      const approved=confirm('Otomatik uzman ataması: '+decision.score+'/100. Motorlar: '+pool.map(id=>providers[id].name).join(', ')+'.\n\nBeklenen istek: '+budget.expected+'. Dinamik ek Skill çağrısı ve hata tekrarlarıyla üst sınır: '+budget.maximumWithRetries+'. Kota veya yerel cihaz kaynağı kullanılabilir. Başlatılsın mı?');
+      const maxProviderCalls=Math.max(3,Math.min(100,Math.floor(Number(settings.autoAgentMaxProviderCalls)||budget.maximumWithRetries)));
+      const approved=confirm('Otomatik uzman ataması: '+decision.score+'/100. Motorlar: '+pool.map(id=>providers[id].name).join(', ')+'.\n\nBeklenen istek: '+budget.expected+'. Önerilen en yüksek istek: '+budget.maximumWithRetries+'. Bu görev için kesin sınır: '+maxProviderCalls+' gerçek istek. Planlama ve son sentez çağrıları korunur; sınır aşılmaz. Başlatılsın mı?');
       if(approved){
         loading.querySelector('p').textContent='Görev uzman ajanlara dağıtılıyor…';
         const result=await runAgentSwarm({
-          providerIds:pool,task:text,history:chatContext().slice(0,-1),maxAgents:workerCount,
+          providerIds:pool,task:text,history:chatContext().slice(0,-1),maxAgents:workerCount,maxProviderCalls,
           skills:skillLibrary,preferredSkillIds:selectedSkillIds,
           maxConcurrency:nativeApp?2:3,isNative:nativeApp,deviceInfo:deviceLocalState?.device||null,
           callProvider:(id,prompt,history)=>callProvider(id,prompt,history,{includeTaskSkills:false}),assignProviders:assignAgentProviders,
@@ -771,10 +773,11 @@ async function submitChat(prompt,providerId){
             if(event.type==='agent_started')await agentHooks.emit('beforeAgentRun',{taskId:event.agentId,providerId:event.providerId,role:event.role,source:'swarm'});
             if(event.type==='agent_completed')await agentHooks.emit('afterAgentRun',{taskId:event.agentId,providerId:event.providerId,status:event.status,source:'swarm'});
             if(event.type==='agent_retry')await logAgentActivity('Uzman ajan yeniden deniyor','Tekrar',event.reason);
+            if(event.type==='budget_exhausted')await logAgentActivity('Agent Swarm istek bütçesi','Sınır doldu',event.phase+' · '+event.modelCallCount+'/'+event.maxProviderCalls+' gerçek istek');
           }
         });
         answer=result.summary;answerProvider='AI Studio Agent Swarm';
-        await logAgentActivity('Otomatik Agent Atama',result.metrics.failed?'Kısmi başarı':'Tamamlandı',result.metrics.completed+'/'+result.metrics.workerCount+' uzman · '+result.metrics.expectedCalls+' beklenen çağrı · '+result.metrics.retryCount+' tekrar');
+        await logAgentActivity('Otomatik Agent Atama',result.status==='partial'?'Kısmi başarı':'Tamamlandı',result.metrics.completed+'/'+result.metrics.workerCount+' uzman · '+result.budget.usedCalls+'/'+result.budget.maxProviderCalls+' gerçek istek · '+result.metrics.retryCount+' tekrar');
       }else{
         await logAgentActivity('Otomatik Agent Atama','Atlandı','Onay verilmedi; tek model yanıtı kullanılacak.');
       }
@@ -949,6 +952,7 @@ function renderAgentSystems(){
   const auto=$('autoAgentAssignment');if(auto)auto.checked=settings.autoAgentAssignment!==false;
   const threshold=$('autoAgentMinComplexity');if(threshold)threshold.value=String(settings.autoAgentMinComplexity??55);
   const workers=$('autoAgentMaxWorkers');if(workers)workers.value=String(settings.autoAgentMaxWorkers??3);
+  const providerCalls=$('autoAgentMaxProviderCalls');if(providerCalls)providerCalls.value=String(Math.max(3,Math.min(100,Number(settings.autoAgentMaxProviderCalls)||14)));
   const hooks=$('agentHooksEnabled');if(hooks)hooks.checked=settings.agentHooksEnabled!==false;
   const shield=$('agentShieldEnabled');if(shield)shield.checked=settings.agentShieldEnabled!==false;
   const save=$('agentMemorySave');if(save)save.disabled=!project||settings.agentMemoryEnabled===false;
@@ -1747,7 +1751,7 @@ function updateDashboard(){const connected=Object.keys(providers).filter(provide
 }
 async function exportProjects(){downloadText('ai-studio-projects.json',JSON.stringify({format:'ai-studio-projects-v2',exportedAt:new Date().toISOString(),projects:projectList},null,2),'application/json;charset=utf-8');}
 function buildWorkspaceSnapshot(){
-  return {format:'ai-studio-workspace-v1',exportedAt:new Date().toISOString(),settings:{models:settings.models,team:settings.team,customEndpoint:settings.customEndpoint||'',ollamaUrl:settings.ollamaUrl,ollamaModel:settings.ollamaModel,localCoderEngine:['device','api'].includes(settings.localCoderEngine)?settings.localCoderEngine:'ollama',localCoderApiProvider:settings.localCoderApiProvider||'openai',systemPrompt:settings.systemPrompt,shareReusableContext:settings.shareReusableContext===true,shareVaultContext:settings.shareVaultContext===true,vaultBaseUrl:settings.vaultBaseUrl||'',swarmMaxAgents:settings.swarmMaxAgents,swarmConcurrency:settings.swarmConcurrency,openrouterChatModels:settings.openrouterChatModels,enabledPromptPluginIds:settings.enabledPromptPluginIds,cloudflareAccountId:settings.cloudflareAccountId||'',cloudflareModel:settings.cloudflareModel||''},projects:projectList,activeProjectId,chat:chatHistory,plugins:userPlugins.filter(p=>p.kind!=='builtin').map(p=>({name:p.name,prompt:p.prompt})),skills:createSkillBackupState({customSkills,selectedSkillIds,profileId:skillProfileId}),snippets:reusableSnippets,activity:agentActivity,codeFiles,activeCodeFileId};
+  return {format:'ai-studio-workspace-v1',exportedAt:new Date().toISOString(),settings:{models:settings.models,team:settings.team,customEndpoint:settings.customEndpoint||'',ollamaUrl:settings.ollamaUrl,ollamaModel:settings.ollamaModel,localCoderEngine:['device','api'].includes(settings.localCoderEngine)?settings.localCoderEngine:'ollama',localCoderApiProvider:settings.localCoderApiProvider||'openai',systemPrompt:settings.systemPrompt,shareReusableContext:settings.shareReusableContext===true,shareVaultContext:settings.shareVaultContext===true,vaultBaseUrl:settings.vaultBaseUrl||'',autoAgentAssignment:settings.autoAgentAssignment,autoAgentMinComplexity:settings.autoAgentMinComplexity,autoAgentMaxWorkers:settings.autoAgentMaxWorkers,autoAgentMaxProviderCalls:settings.autoAgentMaxProviderCalls,swarmMaxAgents:settings.swarmMaxAgents,swarmConcurrency:settings.swarmConcurrency,openrouterChatModels:settings.openrouterChatModels,enabledPromptPluginIds:settings.enabledPromptPluginIds,cloudflareAccountId:settings.cloudflareAccountId||'',cloudflareModel:settings.cloudflareModel||''},projects:projectList,activeProjectId,chat:chatHistory,plugins:userPlugins.filter(p=>p.kind!=='builtin').map(p=>({name:p.name,prompt:p.prompt})),skills:createSkillBackupState({customSkills,selectedSkillIds,profileId:skillProfileId}),snippets:reusableSnippets,activity:agentActivity,codeFiles,activeCodeFileId};
 }
 async function exportWorkspace(){
   await saveCurrentCodeFile(false);
@@ -1795,6 +1799,10 @@ async function importWorkspace(file){
     if(!isFreeApinexModelId(nextSettings.models.apinex))nextSettings.models.apinex=APINEX_DEFAULT_FREE_MODEL;
     nextSettings.swarmMaxAgents=Number.isFinite(Number(nextSettings.swarmMaxAgents))?Math.max(2,Math.min(10,Math.floor(Number(nextSettings.swarmMaxAgents)))):3;
     nextSettings.swarmConcurrency=Number.isFinite(Number(nextSettings.swarmConcurrency))?Math.max(1,Math.min(4,Math.floor(Number(nextSettings.swarmConcurrency)))):2;
+    nextSettings.autoAgentAssignment=nextSettings.autoAgentAssignment!==false;
+    nextSettings.autoAgentMinComplexity=Number.isFinite(Number(nextSettings.autoAgentMinComplexity))?Math.max(30,Math.min(90,Math.floor(Number(nextSettings.autoAgentMinComplexity)))):55;
+    nextSettings.autoAgentMaxWorkers=Number.isFinite(Number(nextSettings.autoAgentMaxWorkers))?Math.max(2,Math.min(5,Math.floor(Number(nextSettings.autoAgentMaxWorkers)))):3;
+    nextSettings.autoAgentMaxProviderCalls=Number.isFinite(Number(nextSettings.autoAgentMaxProviderCalls))?Math.max(3,Math.min(100,Math.floor(Number(nextSettings.autoAgentMaxProviderCalls)))):14;
     nextSettings.openrouterChatModels=Array.isArray(nextSettings.openrouterChatModels)?[...new Set(nextSettings.openrouterChatModels.filter(id=>typeof id==='string'&&(id.trim().toLowerCase()==='openrouter/free'||id.trim().toLowerCase().endsWith(':free'))))].slice(0,MAX_OPENROUTER_CHAT_MODELS):['openrouter/free'];
     if(!nextSettings.openrouterChatModels.length)nextSettings.openrouterChatModels=['openrouter/free'];
     nextSettings.enabledPromptPluginIds=Array.isArray(nextSettings.enabledPromptPluginIds)?[...new Set(nextSettings.enabledPromptPluginIds.filter(id=>typeof id==='string'))].slice(0,34):undefined;
@@ -2001,6 +2009,7 @@ $('skillProfileSelect').addEventListener('change',e=>applySkillProfile(e.target.
 $('autoAgentAssignment').addEventListener('change',e=>saveAgentSystemSetting('autoAgentAssignment',e.target.checked));
 $('autoAgentMinComplexity').addEventListener('change',e=>saveAgentSystemSetting('autoAgentMinComplexity',Math.max(30,Math.min(90,Number(e.target.value)||55))));
 $('autoAgentMaxWorkers').addEventListener('change',e=>saveAgentSystemSetting('autoAgentMaxWorkers',Math.max(2,Math.min(5,Number(e.target.value)||3))));
+$('autoAgentMaxProviderCalls').addEventListener('change',e=>{const value=Number(e.target.value);saveAgentSystemSetting('autoAgentMaxProviderCalls',Number.isFinite(value)?Math.max(3,Math.min(100,Math.floor(value))):14);});
 $('agentMemoryEnabled').addEventListener('change',e=>saveAgentSystemSetting('agentMemoryEnabled',e.target.checked));
 $('shareAgentMemory').addEventListener('change',e=>saveAgentSystemSetting('shareAgentMemory',e.target.checked));
 $('agentHooksEnabled').addEventListener('change',e=>saveAgentSystemSetting('agentHooksEnabled',e.target.checked));
