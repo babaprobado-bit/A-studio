@@ -769,6 +769,7 @@ async function submitChat(prompt,providerId){
           providerIds:pool,task:text,history:chatContext().slice(0,-1),maxAgents:workerCount,maxProviderCalls,
           skills:skillLibrary,preferredSkillIds:selectedSkillIds,pinnedSkillIds,excludedSkillIds,
           maxConcurrency:nativeApp?2:3,isNative:nativeApp,deviceInfo:deviceLocalState?.device||null,
+          shieldEnabled:settings.agentShieldEnabled!==false,
           callProvider:(id,prompt,history)=>callProvider(id,prompt,history,{includeTaskSkills:false}),assignProviders:assignAgentProviders,
           onEvent:async event=>{
             if(event.type==='assignment_made')await logAgentActivity('Uzman ataması · '+event.taskId,'Atandı',event.providerId+' · '+event.roleGroup);
@@ -780,6 +781,7 @@ async function submitChat(prompt,providerId){
             if(event.type==='agent_completed')await agentHooks.emit('afterAgentRun',{taskId:event.agentId,providerId:event.providerId,status:event.status,source:'swarm'});
             if(event.type==='agent_retry')await logAgentActivity('Uzman ajan yeniden deniyor','Tekrar',event.reason);
             if(event.type==='budget_exhausted')await logAgentActivity('Agent Swarm istek bütçesi','Sınır doldu',event.phase+' · '+event.modelCallCount+'/'+event.maxProviderCalls+' gerçek istek');
+            if(event.type==='shield_blocked')await logAgentActivity('AgentShield · '+event.phase,'Engellendi',(event.findings||[]).map(item=>item.message+' ('+item.severity+')').join(' · ')||'Güvenlik taraması yüksek riskli içerik buldu.');
           }
         });
         answer=result.summary;answerProvider='AI Studio Agent Swarm';
