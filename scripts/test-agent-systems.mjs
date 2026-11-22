@@ -65,6 +65,12 @@ const other=createProjectMemoryRecord({projectId:'p2',title:'Other',content:'Gro
 const records=normalizeProjectMemoryRecords([good.record,other.record]);
 assert.equal(findRelevantProjectMemories(records,'p1','Groq tests').length,1);
 assert.match(buildProjectMemoryContext(records,'p1','routing'),/Routing/);
+assert.equal(findRelevantProjectMemories(records,'p1','Groq tests',0).length,0,'a zero memory result limit must return no records');
+assert.equal(buildProjectMemoryContext(records,'p1','routing',{maxRecords:0}),'', 'zero maxRecords must disable project-memory context');
+assert.equal(buildProjectMemoryContext(records,'p1','routing',{maxChars:0}),'', 'zero maxChars must disable project-memory context');
+const turkishMemory=createProjectMemoryRecord({projectId:'p1',title:'İş Akışı',content:'İş akışı ve görev sırası.'});
+assert.equal(findRelevantProjectMemories([turkishMemory.record],'p1','İŞ AKIŞI').length,1,'Turkish dotted-I case folding must preserve memory search matches');
+
 const backup=createProjectMemoryBackup(records),restored=restoreProjectMemoryBackup(backup,[]);
 assert.equal(restored.imported,2);assert.equal(restoreProjectMemoryBackup(backup,restored.records).imported,0);
 const bus=createAgentHookBus(),seen=[];bus.on('beforeAgentRun',e=>seen.push(e.taskId));bus.on('*',e=>seen.push(e.event));

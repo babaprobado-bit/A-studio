@@ -15,8 +15,23 @@ export function normalizeProjectMemoryRecords(records){if(!Array.isArray(records
   if(out.length>=MAX_AGENT_MEMORY_RECORDS)break;
  }return out;}
 export function getProjectMemories(records,projectId){const id=clean(projectId,120);return id?normalizeProjectMemoryRecords(records).filter(x=>x.projectId===id).sort((a,b)=>b.createdAt.localeCompare(a.createdAt)):[];}
-export function findRelevantProjectMemories(records,projectId,query,limit=3){const words=[...new Set(clean(query,3000).toLowerCase().match(/[\p{L}\p{N}]{3,}/gu)||[])];if(!words.length)return [];
- return getProjectMemories(records,projectId).map(record=>{const title=record.title.toLowerCase(),all=(record.title+' '+record.tags.join(' ')+' '+record.content).toLowerCase();return {record,score:words.reduce((n,w)=>n+(all.includes(w)?(title.includes(w)?3:1):0),0)};}).filter(x=>x.score>0).sort((a,b)=>b.score-a.score||b.record.createdAt.localeCompare(a.record.createdAt)).slice(0,Math.max(0,Math.min(5,Number(limit)||3))).map(x=>x.record);}
-export function buildProjectMemoryContext(records,projectId,query,{maxRecords=3,maxChars=3000}={}){const found=findRelevantProjectMemories(records,projectId,query,maxRecords);if(!found.length)return '';let remaining=Math.max(0,Math.min(6000,Number(maxChars)||0));const lines=['AI STUDIO PROJECT MEMORY (local records; verify against current files):'];for(const item of found){const chunk='\n- '+item.title+': '+item.content;if(chunk.length<=remaining){lines.push(chunk);remaining-=chunk.length;}}return lines.length>1?lines.join('').slice(0,maxChars):'';}
+export function findRelevantProjectMemories(records,projectId,query,limit=3){
+ const normalizedQuery=clean(query,3000).toLocaleLowerCase('tr-TR');
+ const words=[...new Set(normalizedQuery.match(/[\p{L}\p{N}]{3,}/gu)||[])];
+ const requestedLimit=Number(limit),maxItems=Number.isFinite(requestedLimit)?Math.max(0,Math.min(5,Math.floor(requestedLimit))):3;
+ if(!words.length||maxItems===0)return [];
+ return getProjectMemories(records,projectId).map(record=>{
+  const title=record.title.toLocaleLowerCase('tr-TR'),all=(record.title+' '+record.tags.join(' ')+' '+record.content).toLocaleLowerCase('tr-TR');
+  return {record,score:words.reduce((n,w)=>n+(all.includes(w)?(title.includes(w)?3:1):0),0)};
+ }).filter(x=>x.score>0).sort((a,b)=>b.score-a.score||b.record.createdAt.localeCompare(a.record.createdAt)).slice(0,maxItems).map(x=>x.record);
+}
+export function buildProjectMemoryContext(records,projectId,query,{maxRecords=3,maxChars=3000}={}){
+ const requestedChars=Number(maxChars),charLimit=Number.isFinite(requestedChars)?Math.max(0,Math.min(6000,Math.floor(requestedChars))):3000;
+ if(charLimit===0)return '';
+ const found=findRelevantProjectMemories(records,projectId,query,maxRecords);if(!found.length)return '';
+ let remaining=charLimit;const lines=['AI STUDIO PROJECT MEMORY (local records; verify against current files):'];
+ for(const item of found){const chunk='\n- '+item.title+': '+item.content;if(chunk.length<=remaining){lines.push(chunk);remaining-=chunk.length;}}
+ return lines.length>1?lines.join('').slice(0,charLimit):'';
+}
 export function createProjectMemoryBackup(records){return {format:AGENT_MEMORY_FORMAT,version:1,exportedAt:new Date().toISOString(),records:normalizeProjectMemoryRecords(records)};}
 export function restoreProjectMemoryBackup(backup,existing=[]){if(!backup||backup.format!==AGENT_MEMORY_FORMAT||!Array.isArray(backup.records))throw Error('Hafıza yedeği biçimi tanınmadı.');const current=normalizeProjectMemoryRecords(existing),incoming=normalizeProjectMemoryRecords(backup.records),ids=new Set(current.map(x=>x.id)),merged=[...current];let imported=0;for(const item of incoming){if(ids.has(item.id))continue;ids.add(item.id);merged.push(item);imported++;}return {records:normalizeProjectMemoryRecords(merged.slice(-MAX_AGENT_MEMORY_RECORDS)),imported,rejected:backup.records.length-imported};}
