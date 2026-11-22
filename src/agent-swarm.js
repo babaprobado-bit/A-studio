@@ -46,12 +46,14 @@ function createFallbackPlan(task,limit,reason){
   const organized=organizeTaskPlan(fallbackSwarmTasks(task,limit),{maxTasks:limit});
   return {...organized,usedFallback:true,reason};
 }
-export function buildSwarmPlanPrompt(task,maxTasks=3,skillContext=''){
+export function buildSwarmPlanPrompt(task,maxTasks=3,skillContext='',suggestedRoles=[]){
   const count=clamp(maxTasks,2,MAX_AGENTS,3);
+  const roles=[...new Set((Array.isArray(suggestedRoles)?suggestedRoles:[]).filter(role=>typeof role==='string').map(role=>clean(role,40)).filter(Boolean))].slice(0,count);
   return [
     'AI Studio Swarm koordinatörüsün. Önce görevin türünü ve riskini belirle; sonra yalnızca gerekli uzman rolleriyle doğrulanabilir alt görevlere böl.',
     'Yalnızca JSON döndür: {"tasks":[{"id":"kisa-id","title":"başlık","role":"uzman","objective":"tek görev","acceptance":["kontrol"],"files":["relative/path"],"dependsOn":["onceki-id"],"priority":1}]}',
     'Tam olarak '+count+' görev üret. priority 1-5 arasıdır. dependsOn yalnızca listedeki görev IDlerini içersin. Bağımsız işleri paralel, ön koşulu olan işleri sıralı planla. Kod görevi varsa test; hassas/güvenlik işi varsa güvenlik incelemesi ekle. Bilmediğin dosya yolunu yazma.',
+    roles.length?'Görev analizinden önerilen uzman rolleri: '+roles.join(', ')+'. Bunları görev planında öncelikli rehber olarak kullan; göreve uymayan rolü ekleme ve her görev için tek bir uzmanlık belirle.':'Görev analizinden ek bir uzman rolü önerilmedi; göreve uygun en küçük uzman ekibini seç.',
     'Ajanlar dosya değiştiremez veya komut çalıştıramaz; analiz ve taslak üretir.',
     'Ana görev: '+clean(task,3000),
     skillContext
@@ -146,7 +148,7 @@ function buildSynthesisPrompt(task,plan,results,board,skillContext=''){
     skillContext
   ].filter(Boolean).join('\n\n');
 }
-export async function runAgentSwarm({providerIds,task,history=[],maxAgents=3,maxConcurrency=2,maxProviderCalls, isNative=false,deviceInfo=null,callProvider,onEvent=async()=>{},assignProviders=null,skills=[],preferredSkillIds=[],pinnedSkillIds=[],excludedSkillIds=[],shieldEnabled=true}){
+export async function runAgentSwarm({providerIds,task,history=[],maxAgents=3,maxConcurrency=2,maxProviderCalls, isNative=false,deviceInfo=null,callProvider,onEvent=async()=>{},assignProviders=null,skills=[],preferredSkillIds=[],pinnedSkillIds=[],excludedSkillIds=[],shieldEnabled=true,suggestedRoles=[]}){
   if(!Array.isArray(providerIds)||typeof callProvider!=='function')throw new TypeError('Swarm için providerIds ve callProvider gerekir.');
   const providers=[...new Set(providerIds.filter(item=>typeof item==='string'&&item.trim()))];
   const mainTask=clean(task,3000),workerCount=clamp(maxAgents,2,MAX_AGENTS,3);
@@ -176,7 +178,7 @@ export async function runAgentSwarm({providerIds,task,history=[],maxAgents=3,max
   await emit('skills_selected',{taskId:'coordinator-plan',role:'architect',stage:planningSkills.stage,skillIds:planningSkills.includedIds,skillNames:planningSkills.skills.map(item=>item.name),skillTrace:planningSkills.skillTrace,omittedSkills:planningSkills.omittedSkills,pinnedSkillIds:planningSkills.pinnedSkillIds,excludedSkillIds:planningSkills.excludedSkillIds});
   let plan;
   try{
-    const raw=await requestProvider('planning',providers[0],buildSwarmPlanPrompt(mainTask,workerCount,planningSkills.promptText),history);
+    const raw=await requestProvider('planning',providers[0],buildSwarmPlanPrompt(mainTask,workerCount,planningSkills.promptText,suggestedRoles),history);
     if(shieldEnabled){
       const report=scanAgentContent(raw,{source:'swarm-plan'});
       if(report.blocked){

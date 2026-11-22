@@ -18,17 +18,39 @@ export function classifyTaskIntent(task){
  const sensitive=match(t,/\b(password|secret|token|credential|private key|payment|billing|production|delete|wipe|security|api key|parola|sifre|odeme)\b|g[uü]venli\w*|gizlilik\w*|yetki\w*|sil\w*/i);
  return {signals,primaryIntent:signals[0]||'general',requiresResearch:signals.includes('research'),requiresPlanning:signals.includes('planning')||signals.length>=3,requiresImplementation:signals.includes('implementation'),requiresTesting:signals.includes('implementation')||signals.includes('testing')||signals.includes('security'),requiresSecurityReview:signals.includes('security')||sensitive,requiresDocumentation:signals.includes('docs'),requiresUxReview:signals.includes('ux'),requiresPerformanceReview:signals.includes('performance'),riskLevel:sensitive?'high':signals.includes('data')?'medium':'low'};
 }
+const ACTION_PREFIX=/^(?:plan|build|create|add|write|update|verify|run|connect|implement|integrate|review|audit|test|debug|refactor|compare|automate|document|secure|optimize|design|deploy|inspect|analyze|research|select|assign|orchestrate|validate|migrate|remove|fix|configure|araştır|karşılaştır|planla|tasarla|mimar|düzenle|sırala|oluştur|geliştir|uygula|kodla|ekle|yaz|bağla|güncelle|doğrula|sına|denetle|kontrol|incele|bul|değerlendir|seç|ata|böl|ayır|yönet|iyileştir|hızlandır|belgele|dokümante|temizle|kaldır|taşı|birleştir|çalıştır|tamamla|kaydet|tara|koru)/u;
+const STEP_WORDS=new Set(['first','then','after','before','finally','next','step','phase','sonra','ardından','önce','aşama','öncelikle','sırasıyla','once','finally']);
+const DOMAIN_WORDS=new Set(['android','api','provider','model','memory','hook','security','architecture','workflow','pipeline','offline','entegrasyon','mimari','ai','studio','ajan','agent','orchestrator','orkestrasyon','bağımlılık','skill','beceri','otomatik','sistem','görev']);
 export function scoreTaskComplexity(task){
- const t=textOf(task);if(!t)return 0;const words=t.split(/\s+/).length,signals=classifyTaskIntent(t),actions=(t.match(/\b(plan|build|create|add|write|update|verify|run|connect|implement|integrate|review|audit|test|debug|refactor|compare|automate|document|secure|optimize|design|deploy|incele|uygula|ekle|yaz|g[uü]ncelle|do[gğ]rula|ba[gğ]la)\b/g)||[]).length,steps=(t.match(/\b(first|then|after|before|finally|next|step|phase|sonra|ard[iı]ndan|[oö]nce|a[sş]ama)\b/g)||[]).length;
- let score=Math.min(24,Math.floor(words/30)*8)+Math.min(20,actions*3)+Math.min(16,steps*4)+Math.min(24,Math.max(0,signals.signals.length-1)*4);
- if(/[.!?;\n].*[.!?;\n]/s.test(t))score+=8;if(signals.riskLevel==='high')score+=8;else if(signals.riskLevel==='medium')score+=4;
- if(/\b(android|api|provider|model|memory|hook|security|architecture|workflow|pipeline|offline|entegrasyon|mimari)\b/.test(t))score+=6;
+ const t=textOf(task);if(!t)return 0;
+ const tokens=t.toLowerCase().match(/[\p{L}\p{N}_]+/gu)||[];
+ const words=tokens.length,signals=classifyTaskIntent(t);
+ const actions=tokens.filter(token=>ACTION_PREFIX.test(token)).length;
+ const steps=tokens.filter(token=>STEP_WORDS.has(token)).length;
+ const separators=(t.match(/[,;]|\b(?:and|ve|also|ayrıca)\b/giu)||[]).length;
+ const domainContext=tokens.some(token=>DOMAIN_WORDS.has(token));
+ let score=Math.min(16,Math.floor(words/12)*3)
+   +Math.min(35,actions*7)
+   +Math.min(24,Math.max(0,signals.signals.length-1)*6)
+   +Math.min(16,steps*4+Math.max(0,separators-1)*3);
+ if(/[.!?;\n].*[.!?;\n]/s.test(t))score+=6;
+ if(signals.riskLevel==='high')score+=8;else if(signals.riskLevel==='medium')score+=4;
+ if(domainContext)score+=6;
  return clamp(score,0,100,0);
 }
 export function selectAgentWorkflow({task,enabled=true,providerCount=0,minScore=55,maxAgents=3}={}){
  const score=scoreTaskComplexity(task),threshold=clamp(minScore,30,90,55),intent=classifyTaskIntent(task),eligible=Boolean(enabled&&providerCount>=2&&score>=threshold),roles=[];
- if(intent.requiresResearch)roles.push('researcher');if(intent.requiresPlanning)roles.push('architect');if(intent.requiresImplementation)roles.push('builder');if(intent.requiresTesting)roles.push('tester');if(intent.requiresSecurityReview)roles.push('security');if(intent.requiresPerformanceReview)roles.push('optimizer');if(intent.requiresUxReview)roles.push('ux');if(intent.requiresDocumentation)roles.push('documenter');if(eligible)roles.push('reviewer');
- return {eligible,score,threshold,mode:!eligible?'single-agent':intent.requiresResearch&&!intent.requiresImplementation?'research-review':'staged-swarm',roles:roles.slice(0,clamp(maxAgents,2,10,3)),intent,riskLevel:intent.riskLevel,reason:!enabled?'Otomatik atama kapalı.':providerCount<2?'İki uygun ücretsiz/yerel motor gerekli.':score<threshold?'Görev karmaşıklık eşiğinin altında.':'Uzman görev dağıtımı uygun.'};
+ // Keep the safety-critical reviewer in the suggested team even when the worker cap is small.
+ if(intent.requiresSecurityReview)roles.push('security');
+ if(intent.requiresImplementation)roles.push('builder');
+ if(intent.requiresTesting&&!roles.includes('tester'))roles.push('tester');
+ if(intent.requiresResearch)roles.push('researcher');
+ if(intent.requiresPlanning)roles.push('architect');
+ if(intent.requiresPerformanceReview)roles.push('optimizer');
+ if(intent.requiresUxReview)roles.push('ux');
+ if(intent.requiresDocumentation)roles.push('documenter');
+ if(eligible)roles.push('reviewer');
+ return {eligible,score,threshold,mode:!eligible?'single-agent':intent.requiresResearch&&!intent.requiresImplementation?'research-review':'staged-swarm',roles:[...new Set(roles)].slice(0,clamp(maxAgents,2,10,3)),intent,riskLevel:intent.riskLevel,reason:!enabled?'Otomatik atama kapalı.':providerCount<2?'İki uygun ücretsiz/yerel motor gerekli.':score<threshold?'Görev karmaşıklık eşiğinin altında.':'Uzman görev dağıtımı uygun.'};
 }
 export function shouldAutoDelegate({task,enabled=true,providerCount=0,minScore=55}={}){const r=selectAgentWorkflow({task,enabled,providerCount,minScore});return {eligible:r.eligible,score:r.score,threshold:r.threshold,reason:r.reason,mode:r.mode,roles:r.roles,riskLevel:r.riskLevel};}
 export function classifyAgentRole(task){const t=textOf(task);if(SIGNALS.security.test(t))return 'security';if(SIGNALS.testing.test(t))return 'test';if(SIGNALS.research.test(t))return 'research';if(SIGNALS.docs.test(t))return 'docs';if(SIGNALS.ux.test(t))return 'ux';if(SIGNALS.performance.test(t))return 'performance';if(SIGNALS.data.test(t))return 'data';if(SIGNALS.automation.test(t))return 'automation';if(SIGNALS.planning.test(t))return 'architecture';if(SIGNALS.implementation.test(t))return 'code';return 'general';}

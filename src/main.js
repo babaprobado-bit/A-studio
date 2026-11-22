@@ -769,7 +769,7 @@ async function submitChat(prompt,providerId){
           providerIds:pool,task:text,history:chatContext().slice(0,-1),maxAgents:workerCount,maxProviderCalls,
           skills:skillLibrary,preferredSkillIds:selectedSkillIds,pinnedSkillIds,excludedSkillIds,
           maxConcurrency:nativeApp?2:3,isNative:nativeApp,deviceInfo:deviceLocalState?.device||null,
-          shieldEnabled:settings.agentShieldEnabled!==false,
+          shieldEnabled:settings.agentShieldEnabled!==false,suggestedRoles:decision.roles,
           callProvider:(id,prompt,history)=>callProvider(id,prompt,history,{includeTaskSkills:false}),assignProviders:assignAgentProviders,
           onEvent:async event=>{
             if(event.type==='assignment_made')await logAgentActivity('Uzman ataması · '+event.taskId,'Atandı',event.providerId+' · '+event.roleGroup);
