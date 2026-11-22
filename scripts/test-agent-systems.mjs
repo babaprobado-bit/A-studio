@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {scoreTaskComplexity,shouldAutoDelegate,assignAgentProviders,classifyTaskIntent,selectAgentWorkflow,organizeTaskPlan,createDefaultTaskPlan} from '../src/agent-orchestrator.js';
 import {SKILL_CATALOG} from '../src/skill-library.js';
-import {selectSkillsForTask,buildTaskSkillContext,refreshTaskSkillContext} from '../src/skill-selector.js';
+import {selectSkillsForTask,buildTaskSkillContext,refreshTaskSkillContext,resolveSkillOverrideIds} from '../src/skill-selector.js';
 import {createAgentHookBus} from '../src/agent-hooks.js';
 import {createProjectMemoryRecord,normalizeProjectMemoryRecords,findRelevantProjectMemories,buildProjectMemoryContext,createProjectMemoryBackup,restoreProjectMemoryBackup} from '../src/agent-memory.js';
 import {scanAgentContent} from '../src/agent-shield.js';
@@ -73,6 +73,25 @@ const selectedVideoSkills=selectSkillsForTask({task:'Find trending YouTube video
 assert.equal(selectedVideoSkills.stage,'all');
 assert.ok(selectedVideoSkills.selectedIds.includes('vidiq-discovery'));
 assert.ok(selectedResearchSkills.skills.some(item=>item.group==='Research'));
+const resolvedSkillOverrides=resolveSkillOverrideIds(['ECC Agent Security','sp-test-first','not-installed'],SKILL_CATALOG);
+assert.deepEqual(resolvedSkillOverrides.validIds,['ecc-agent-security','sp-test-first']);
+assert.deepEqual(resolvedSkillOverrides.invalidValues,['not-installed']);
+const pinnedExcludedSelection=selectSkillsForTask({task:'Implement a small code module',role:'builder',skills:SKILL_CATALOG,maxSkills:4,pinnedSkillIds:['sp-test-first'],excludedSkillIds:['sp-api-contract']});
+assert.ok(pinnedExcludedSelection.selectedIds.includes('sp-test-first'),'a compatible pinned Skill must be selected');
+assert.ok(!pinnedExcludedSelection.selectedIds.includes('sp-api-contract'),'an excluded Skill must not be selected');
+const incompatiblePin=selectSkillsForTask({task:'Implement a REST API endpoint',role:'builder',skills:SKILL_CATALOG,pinnedSkillIds:['ecc-agent-security']});
+assert.ok(!incompatiblePin.selectedIds.includes('ecc-agent-security'),'a stage-incompatible pin must not override stage filtering');
+assert.ok(incompatiblePin.stageIncompatiblePinned.includes('ecc-agent-security'));
+const pinnedContext=buildTaskSkillContext({task:'Implement API code',role:'builder',skills:SKILL_CATALOG,pinnedSkillIds:['sp-test-first'],excludedSkillIds:['sp-api-contract'],maxSkills:8,maxChars:3500});
+assert.ok(pinnedContext.includedIds.includes('sp-test-first'));
+assert.ok(!pinnedContext.includedIds.includes('sp-api-contract'));
+assert.ok(pinnedContext.skillTrace.some(item=>item.id==='sp-test-first'&&item.source==='pinned'&&item.reasons.includes('bu çalıştırmada sabitlendi')));
+assert.ok(pinnedContext.omittedSkills.some(item=>item.id==='sp-api-contract'&&item.reason==='Bu çalıştırmada hariç tutuldu'));
+assert.ok(pinnedContext.charCount<=3500&&pinnedContext.includedIds.length<=8);
+const pinnedRefresh=refreshTaskSkillContext({task:'Implement API code and tests',role:'builder',skills:SKILL_CATALOG,pinnedSkillIds:['sp-test-first'],excludedSkillIds:['sp-api-contract'],maxSkills:8,maxChars:3500});
+assert.ok(pinnedRefresh.includedIds.includes('sp-test-first'));
+assert.ok(!pinnedRefresh.includedIds.includes('sp-api-contract'));
+assert.ok(pinnedRefresh.skillTrace.some(item=>item.id==='sp-test-first'&&item.source==='pinned'));
 const selectedContext=buildTaskSkillContext({task:'Implement secure API code and tests',role:'builder',skills:SKILL_CATALOG,preferredSkillIds:['karpathy-guidelines'],maxSkills:8,maxChars:3500});
 assert.ok(selectedContext.includedIds.length<=8);
 assert.ok(selectedContext.charCount<=3500);
@@ -84,6 +103,9 @@ assert.equal(refreshedDynamicSkills.stage,'review');
 assert.ok(refreshedDynamicSkills.includedIds.includes('ecc-agent-security'));
 assert.ok(refreshedDynamicSkills.includedIds.includes('ecc-security-scan'));
 assert.ok(refreshedDynamicSkills.addedSkillIds.includes('ecc-agent-security'));
+assert.ok(refreshedDynamicSkills.skillTrace.some(item=>item.id==='ecc-agent-security'&&item.source==='added'));
+const sameStageRefresh=refreshTaskSkillContext({task:'Implement API code and tests',role:'builder',skills:SKILL_CATALOG,previousSkillIds:initialDynamicSkills.includedIds,maxSkills:8});
+assert.ok(sameStageRefresh.skillTrace.some(item=>item.source==='retained'&&item.reasons.includes('önceki aşamadan korundu')));
 assert.ok(refreshedDynamicSkills.includedIds.length<=8);
 assert.ok(refreshedDynamicSkills.charCount<=refreshedDynamicSkills.maxChars);
 assert.equal(parseSkillNeeds('Draft\nSKILL_NEEDS: none'),'');
@@ -92,6 +114,12 @@ assert.equal(resolveSwarmProviderCallLimit(undefined,3),14);
 assert.equal(resolveSwarmProviderCallLimit('6',3),6);
 assert.throws(()=>resolveSwarmProviderCallLimit(2,3),/3 ile 100/);
 assert.throws(()=>resolveSwarmProviderCallLimit(101,3),/3 ile 100/);
+const traceEvents=[];
+await runAgentSwarm({providerIds:['gemini','groq','ollama'],task:'Implement API code and tests.',maxAgents:2,maxProviderCalls:3,skills:SKILL_CATALOG,pinnedSkillIds:['sp-test-first'],excludedSkillIds:['sp-api-contract'],callProvider:async(providerId,prompt)=>{if(prompt.includes('Yalnızca JSON döndür'))return JSON.stringify({tasks:[{id:'build',title:'Build API',role:'developer',objective:'Implement API code'},{id:'tests',title:'Test API',role:'tester',objective:'Test API'}]});if(prompt.includes('Ajan katkıları'))return 'Trace test synthesis';return 'Worker result';},onEvent:async event=>traceEvents.push(event)});
+const traceSelection=traceEvents.find(event=>event.type==='skills_refreshed'&&event.taskId==='build');
+assert.ok(traceSelection?.skillTrace.some(item=>item.id==='sp-test-first'&&item.source==='pinned'));
+assert.ok(traceSelection?.omittedSkills.some(item=>item.id==='sp-api-contract'&&item.reason==='Bu çalıştırmada hariç tutuldu'));
+assert.ok(!JSON.stringify(traceSelection).includes(SKILL_CATALOG.find(item=>item.id==='sp-test-first').content),'Skill trace events must never include full Skill bodies');
 const cappedCalls=[],cappedEvents=[];
 const cappedSwarm=await runAgentSwarm({
  providerIds:['gemini','groq','ollama'],task:'Run a bounded build and test workflow.',maxAgents:2,maxProviderCalls:3,
@@ -208,7 +236,7 @@ const failedDependencySwarm=await runAgentSwarm({
 assert.equal(failedDependencySwarm.metrics.failed,1);
 assert.equal(failedDependencySwarm.metrics.skipped,1);
 assert.equal(failureCalls.length,1);
-const expansionCalls=[];
+const expansionCalls=[],expansionEvents=[];
 const expansionSwarm=await runAgentSwarm({
  providerIds:['gemini','groq','ollama'],task:'Build a local settings module.',maxAgents:2,skills:SKILL_CATALOG,assignProviders:assignAgentProviders,
  callProvider:async(providerId,prompt)=>{
@@ -221,7 +249,8 @@ const expansionSwarm=await runAgentSwarm({
   if(prompt.includes('DYNAMIC SKILL EXPANSION'))return 'Revised settings result. CONFIDENCE: 92\nSKILL_NEEDS: none';
   if(prompt.includes('Alt görev: Implement local settings module'))return 'Initial settings output with a newly discovered issue.\nSKILL_NEEDS: prompt injection security review and permission checks';
   return 'Security review complete. CONFIDENCE: 88\nSKILL_NEEDS: none';
- }
+ },
+ onEvent:async event=>expansionEvents.push(event)
 });
 const expandedWorker=expansionSwarm.results.find(item=>item.title==='Settings builder');
 assert.ok(expandedWorker.dynamicSkillIds.includes('ecc-agent-security'));
@@ -230,9 +259,16 @@ assert.match(expandedWorker.answer,/Revised settings result/);
 assert.equal(expansionSwarm.metrics.dynamicSkillCalls,1);
 assert.equal(expansionSwarm.metrics.skillExpansionCount,1);
 assert.ok(expansionCalls.some(prompt=>prompt.includes('DYNAMIC SKILL EXPANSION')&&prompt.includes('ECC Agent Security Hardening')));
+const expandedTrace=expansionEvents.find(event=>event.type==='skills_expanded');
+assert.ok(expandedTrace?.skillTrace.some(item=>item.id==='ecc-agent-security'&&item.source==='added'&&item.reasons.includes('security uzmanlığı')),'dynamic Skill additions must include why they became relevant');
 const mainSource=readFileSync(new URL('../src/main.js',import.meta.url),'utf8');
 assert.ok(mainSource.includes("event.type==='skills_refreshed'"),'Swarm dynamic Skill refresh must be visible in agent activity');
 assert.ok(mainSource.includes('autoAgentMaxProviderCalls'),'Agent Swarm request budget must be configurable and passed by the UI');
+assert.ok(mainSource.includes('resolveSkillOverrideIds'),'per-run Skill overrides must be resolved against the installed catalog');
+assert.ok(mainSource.includes('event.skillTrace'),'Agent Activity must show concise Skill selection reasons');
+assert.ok(mainSource.includes("$('agentSkillPins').value=''")&&mainSource.includes("$('agentSkillExcludes').value=''"),'one-run Skill overrides must clear after a completed Swarm run');
+assert.ok(!mainSource.includes('settings.agentSkillPins')&&!mainSource.includes('settings.agentSkillExcludes'),'one-run overrides must not be persisted as profile settings');
 const indexSource=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+assert.ok(indexSource.includes('id=\"agentSkillPins\"')&&indexSource.includes('id=\"agentSkillExcludes\"'),'Agent Systems panel must expose one-run Skill pin/exclude controls');
 assert.ok(indexSource.includes('id=\"autoAgentMaxProviderCalls\"'),'Agent Systems panel must expose the saved request cap');
 console.log('Agent Systems tests passed, including staged dependencies, dynamic Skill refresh, role routing, cycle handling, and failed-dependency skipping.');

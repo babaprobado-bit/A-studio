@@ -37,14 +37,41 @@ function scoreSkill(skill,{taskTokens,role,stage,preferredIds,activeRules}){
  if(id==='karpathy-guidelines'&&stage!=='review')score+=0.35;
  return {skill,score,reasons:[...new Set(reasons)]};
 }
-export function selectSkillsForTask({task='',role='general',stage='',skills=[],preferredSkillIds=[],maxSkills=4,minScore=0.8}={}){
- const limit=Math.max(1,Math.min(MAX_SELECTED_SKILLS,Math.floor(Number(maxSkills)||4))),selectedStage=inferSkillStage(task,role,stage),sourceText=norm([task,role].join(' ')),taskTokens=tokens(sourceText),preferredIds=new Set(Array.isArray(preferredSkillIds)?preferredSkillIds:[]),activeRules=ROLE_ALIASES.filter(item=>item.pattern.test(sourceText));
- const normalized=(Array.isArray(skills)?skills:[]).map(item=>normalizeSkill(item)).filter(Boolean),candidates=normalized.filter(item=>selectedStage==='all'||item.stage==='all'||item.stage===selectedStage);
+export function resolveSkillOverrideIds(values,skills=[],{maxIds=MAX_SELECTED_SKILLS}={}){
+ const limit=Math.max(0,Math.min(MAX_SELECTED_SKILLS,Math.floor(Number(maxIds)||MAX_SELECTED_SKILLS)));
+ const catalog=(Array.isArray(skills)?skills:[]).map(item=>normalizeSkill(item)).filter(Boolean);
+ const byId=new Map(catalog.map(item=>[item.id,item]));
+ const byName=new Map(catalog.map(item=>[norm(item.name),item]));
+ const entries=(Array.isArray(values)?values:String(values??'').split(',')).flatMap(value=>String(value??'').split(',')).map(value=>value.trim()).filter(Boolean);
+ const validIds=[],invalidValues=[];
+ for(const entry of entries){const normalizedEntry=norm(entry),matches=catalog.filter(item=>norm(item.name).startsWith(normalizedEntry)),skill=byId.get(entry)||byName.get(normalizedEntry)||(matches.length===1?matches[0]:null);if(!skill){invalidValues.push(entry.slice(0,100));continue;}if(!validIds.includes(skill.id)&&validIds.length<limit)validIds.push(skill.id);}
+ return {validIds,invalidValues,limitReached:entries.length>validIds.length+invalidValues.length};
+}
+
+function buildSkillTrace({includedIds=[],ranked=[],pinnedSkillIds=[],excludedSkillIds=[],addedSkillIds=[],retainedSkillIds=[],skills=[],stage='',maxSkills=MAX_SELECTED_SKILLS,charExcludedIds=[]}={}){
+ const catalog=new Map((Array.isArray(skills)?skills:[]).map(item=>normalizeSkill(item)).filter(Boolean).map(item=>[item.id,item]));
+ const rankMap=new Map((Array.isArray(ranked)?ranked:[]).map(item=>[item.id,item]));
+ const included=new Set(includedIds),pinned=new Set(pinnedSkillIds),excluded=new Set(excludedSkillIds);
+ const added=new Set(addedSkillIds),retained=new Set(retainedSkillIds);
+ const trace=includedIds.slice(0,MAX_SELECTED_SKILLS).map(id=>{const skill=catalog.get(id),rank=rankMap.get(id),source=pinned.has(id)?'pinned':added.has(id)?'added':retained.has(id)?'retained':'automatic',reasons=(rank?.reasons||[]).slice(0,3);if(source==='added')reasons.push('yeni görev ihtiyacına göre eklendi');if(source==='retained')reasons.push('önceki aşamadan korundu');return {id,name:skill?.name||rank?.name||id,score:Number(rank?.score)||0,reasons,source};});
+ const omitted=[];
+ for(const id of excludedSkillIds){const skill=catalog.get(id);omitted.push({id,name:skill?.name||id,reason:'Bu çalıştırmada hariç tutuldu'});}
+ for(const id of pinnedSkillIds){if(included.has(id)||excluded.has(id))continue;const skill=catalog.get(id);omitted.push({id,name:skill?.name||id,reason:skill&&stage!=='all'&&skill.stage!=='all'&&skill.stage!==stage?'Aşama uyumsuzluğu nedeniyle sabitlenemedi':'Skill sayısı veya içerik bütçesi sınırı'});}
+ for(const id of charExcludedIds){if(omitted.some(item=>item.id===id))continue;const skill=catalog.get(id);omitted.push({id,name:skill?.name||id,reason:'İçerik karakter sınırı'});}
+ for(const item of ranked||[]){if(included.has(item.id)||excluded.has(item.id)||omitted.some(row=>row.id===item.id))continue;omitted.push({id:item.id,name:item.name||item.id,reason:includedIds.length>=maxSkills?'Skill sayısı sınırı':'Seçim puanı veya aşama filtresi'});}
+ return {skillTrace:trace.slice(0,MAX_SELECTED_SKILLS),omittedSkills:omitted.slice(0,12),pinnedSkillIds:[...pinned].slice(0,MAX_SELECTED_SKILLS),excludedSkillIds:[...excluded].slice(0,MAX_SELECTED_SKILLS)};
+}
+
+export function selectSkillsForTask({task='',role='general',stage='',skills=[],preferredSkillIds=[],pinnedSkillIds=[],excludedSkillIds=[],maxSkills=4,minScore=0.8}={}){
+ const limit=Math.max(1,Math.min(MAX_SELECTED_SKILLS,Math.floor(Number(maxSkills)||4))),selectedStage=inferSkillStage(task,role,stage),sourceText=norm([task,role].join(' ')),taskTokens=tokens(sourceText),preferredIds=new Set(Array.isArray(preferredSkillIds)?preferredSkillIds:[]),pinnedIds=new Set(Array.isArray(pinnedSkillIds)?pinnedSkillIds:[]),excludedIds=new Set(Array.isArray(excludedSkillIds)?excludedSkillIds:[]),activeRules=ROLE_ALIASES.filter(item=>item.pattern.test(sourceText));
+ const normalized=(Array.isArray(skills)?skills:[]).map(item=>normalizeSkill(item)).filter(Boolean),stageCandidates=normalized.filter(item=>selectedStage==='all'||item.stage==='all'||item.stage===selectedStage),candidates=stageCandidates.filter(item=>!excludedIds.has(item.id));
  const roleKey=ROLE_ALIASES.find(item=>item.pattern.test(norm(role)))?.key||'general';
- const ranked=candidates.map(skill=>scoreSkill(skill,{taskTokens,role:roleKey,stage:selectedStage,preferredIds,activeRules})).sort((a,b)=>b.score-a.score||a.skill.name.localeCompare(b.skill.name));
- const selected=ranked.filter(item=>item.score>=minScore).slice(0,limit);
+ const ranked=candidates.map(skill=>{const scored=scoreSkill(skill,{taskTokens,role:roleKey,stage:selectedStage,preferredIds,activeRules});if(pinnedIds.has(skill.id)){scored.score+=1000;scored.reasons=['bu çalıştırmada sabitlendi',...scored.reasons];}return scored;}).sort((a,b)=>b.score-a.score||a.skill.name.localeCompare(b.skill.name));
+ const selected=ranked.filter(item=>pinnedIds.has(item.skill.id)||item.score>=minScore).slice(0,limit);
  if(selected.length<Math.min(2,limit)){for(const id of (FALLBACK_IDS[selectedStage]||FALLBACK_IDS.all)){if(selected.length>=Math.min(2,limit))break;const item=ranked.find(candidate=>candidate.skill.id===id&&!selected.some(chosen=>chosen.skill.id===id));if(item)selected.push({...item,score:item.score+0.1,reasons:[...item.reasons,'güvenli temel Skill']});}}
- return {task:String(task??''),role,stage:selectedStage,skills:selected.map(item=>item.skill),selectedIds:selected.map(item=>item.skill.id),ranked:ranked.slice(0,Math.max(limit,12)).map(item=>({id:item.skill.id,name:item.skill.name,score:Number(item.score.toFixed(2)),reasons:item.reasons})),omittedByCount:ranked.length>selected.length};
+ const stageIncompatiblePinned=[...pinnedIds].filter(id=>normalized.some(skill=>skill.id===id)&&!stageCandidates.some(skill=>skill.id===id));
+ const missingPinned=[...pinnedIds].filter(id=>!normalized.some(skill=>skill.id===id));
+ return {task:String(task??''),role,stage:selectedStage,skills:selected.map(item=>item.skill),selectedIds:selected.map(item=>item.skill.id),ranked:ranked.slice(0,Math.max(limit,12)).map(item=>({id:item.skill.id,name:item.skill.name,score:Number(item.score.toFixed(2)),reasons:item.reasons})),omittedByCount:ranked.length>selected.length,pinnedSkillIds:[...pinnedIds],excludedSkillIds:[...excludedIds],stageIncompatiblePinned,missingPinned};
 }
 export function buildTaskSkillContext(options={}){
  const selection=selectSkillsForTask(options),maxChars=Math.max(0,Math.min(24000,Number(options.maxChars)||10000));
@@ -52,23 +79,26 @@ export function buildTaskSkillContext(options={}){
  const blocks=[];let used=0;const includedIds=[],excludedIds=[];
  for(const item of selection.skills){const block='### '+item.name+' ['+item.stage+']\n'+item.content,separator=blocks.length?'\n\n':'';const remaining=budget-used-separator.length;if(remaining<100){excludedIds.push(item.id);continue;}const clipped=block.length>remaining?block.slice(0,remaining):block;blocks.push(clipped);used+=separator.length+clipped.length;includedIds.push(item.id);if(clipped.length<block.length){excludedIds.push(item.id);break;}}
  const promptText=blocks.length?header+blocks.join('\n\n')+footer:'';
- return {...selection,promptText,includedIds,excludedIds,charCount:promptText.length,maxChars,omittedByChars:excludedIds.length>0};
+ const trace=buildSkillTrace({includedIds,ranked:selection.ranked,pinnedSkillIds:selection.pinnedSkillIds,excludedSkillIds:selection.excludedSkillIds,skills:options.skills,stage:selection.stage,maxSkills:Math.min(MAX_SELECTED_SKILLS,Number(options.maxSkills)||4),charExcludedIds:excludedIds});
+ return {...selection,promptText,includedIds,excludedIds,charCount:promptText.length,maxChars,omittedByChars:excludedIds.length>0,...trace};
 }
 
 export function refreshTaskSkillContext({
-  task='',role='general',stage='',skills=[],preferredSkillIds=[],previousSkillIds=[],
+  task='',role='general',stage='',skills=[],preferredSkillIds=[],pinnedSkillIds=[],excludedSkillIds=[],previousSkillIds=[],
   maxSkills=MAX_SELECTED_SKILLS,maxChars=10000,minScore=0.8
 }={}){
   const limit=Math.max(1,Math.min(MAX_SELECTED_SKILLS,Math.floor(Number(maxSkills)||MAX_SELECTED_SKILLS)));
-  const fresh=selectSkillsForTask({task,role,stage,skills,preferredSkillIds,maxSkills:limit,minScore});
+  const fresh=selectSkillsForTask({task,role,stage,skills,preferredSkillIds,pinnedSkillIds,excludedSkillIds,maxSkills:limit,minScore});
   const catalog=new Map((Array.isArray(skills)?skills:[]).map(item=>normalizeSkill(item)).filter(Boolean).map(item=>[item.id,item]));
   const allowed=skill=>fresh.stage==='all'||skill.stage==='all'||skill.stage===fresh.stage;
   const priorIds=[...new Set(Array.isArray(previousSkillIds)?previousSkillIds:[])];
-  const previous=priorIds.map(id=>catalog.get(id)).filter(skill=>skill&&allowed(skill));
+  const excludedSet=new Set(fresh.excludedSkillIds);
+  const previous=priorIds.map(id=>catalog.get(id)).filter(skill=>skill&&allowed(skill)&&!excludedSet.has(skill.id));
   const manualIds=[...new Set(Array.isArray(preferredSkillIds)?preferredSkillIds:[])];
-  const manual=manualIds.map(id=>catalog.get(id)).filter(skill=>skill&&allowed(skill));
+  const manual=manualIds.map(id=>catalog.get(id)).filter(skill=>skill&&allowed(skill)&&!excludedSet.has(skill.id));
+  const pinned=[...new Set(fresh.pinnedSkillIds)].map(id=>catalog.get(id)).filter(skill=>skill&&allowed(skill)&&!excludedSet.has(skill.id));
   const merged=[],seen=new Set();
-  for(const skill of [...manual,...fresh.skills,...previous]){
+  for(const skill of [...pinned,...manual,...fresh.skills,...previous]){
     if(!seen.has(skill.id)&&merged.length<limit){seen.add(skill.id);merged.push(skill);}
   }
   const charLimit=Math.max(0,Math.min(24000,Number(maxChars)||10000));
@@ -89,9 +119,10 @@ export function refreshTaskSkillContext({
   const previousSet=new Set(priorIds);
   const addedSkillIds=includedIds.filter(id=>!previousSet.has(id));
   const retainedSkillIds=includedIds.filter(id=>previousSet.has(id));
+  const trace=buildSkillTrace({includedIds,ranked:fresh.ranked,pinnedSkillIds:fresh.pinnedSkillIds,excludedSkillIds:fresh.excludedSkillIds,addedSkillIds,retainedSkillIds,skills,stage:fresh.stage,maxSkills:limit,charExcludedIds:excludedIds});
   return {
     ...fresh,skills:merged,selectedIds:merged.map(item=>item.id),includedIds,excludedIds,
     promptText,charCount:promptText.length,maxChars:charLimit,omittedByChars:excludedIds.length>0,
-    previousSkillIds:priorIds,addedSkillIds,retainedSkillIds,refreshed:priorIds.length>0
+    previousSkillIds:priorIds,addedSkillIds,retainedSkillIds,refreshed:priorIds.length>0,...trace
   };
 }

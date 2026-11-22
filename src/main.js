@@ -17,7 +17,7 @@ import { buildSharedVaultContext } from './shared-vault-context.js';
 import { fitModelContext } from './model-context.js';
 import { encryptWorkspaceBackup, decryptWorkspaceBackup } from './encrypted-backup.js';
 import { SKILL_CATALOG, SKILL_PROFILES, parseSkillMarkdown, normalizeSkill, prepareSkillImportQueue, buildStageSkillContext, getProfileSkillIds, createSkillBackupState, restoreSkillBackupState, MAX_SELECTED_SKILLS, MAX_CUSTOM_SKILLS, MAX_STAGE_SKILL_CHARS } from './skill-library.js';
-import { buildTaskSkillContext } from './skill-selector.js';
+import { buildTaskSkillContext, resolveSkillOverrideIds } from './skill-selector.js';
 import { PLUGIN_REPOSITORY_CATALOG, getPluginRepositoryArchiveUrl, getPluginRepositoryById, isAllowedPluginRepositoryDownload } from './plugin-marketplace.js';
 import { runAgentSwarm, estimateSwarmCallBudget } from './agent-swarm.js';
 import { shouldAutoDelegate, assignAgentProviders } from './agent-orchestrator.js';
@@ -756,20 +756,26 @@ async function submitChat(prompt,providerId){
       const workerCount=Math.max(2,Math.min(5,Number(settings.autoAgentMaxWorkers)||3));
       const budget=estimateSwarmCallBudget(workerCount);
       const maxProviderCalls=Math.max(3,Math.min(100,Math.floor(Number(settings.autoAgentMaxProviderCalls)||budget.maximumWithRetries)));
-      const approved=confirm('Otomatik uzman ataması: '+decision.score+'/100. Motorlar: '+pool.map(id=>providers[id].name).join(', ')+'.\n\nBeklenen istek: '+budget.expected+'. Önerilen en yüksek istek: '+budget.maximumWithRetries+'. Bu görev için kesin sınır: '+maxProviderCalls+' gerçek istek. Planlama ve son sentez çağrıları korunur; sınır aşılmaz. Başlatılsın mı?');
+      const pinResolution=resolveSkillOverrideIds(($('agentSkillPins')?.value||'').split(','),skillLibrary);
+      const excludeResolution=resolveSkillOverrideIds(($('agentSkillExcludes')?.value||'').split(','),skillLibrary);
+      const pinnedSkillIds=pinResolution.validIds,excludedSkillIds=excludeResolution.validIds;
+      const invalidSkillNames=[...pinResolution.invalidValues,...excludeResolution.invalidValues];
+      if(invalidSkillNames.length)showToast('Tanımadığım Skill adları yok sayıldı: '+invalidSkillNames.slice(0,3).join(', '));
+      const skillOverrideSummary=(pinnedSkillIds.length?'\nSabitlenecek Skill: '+pinnedSkillIds.length:'')+(excludedSkillIds.length?'\nHariç tutulacak Skill: '+excludedSkillIds.length:'');
+      const approved=confirm('Otomatik uzman ataması: '+decision.score+'/100. Motorlar: '+pool.map(id=>providers[id].name).join(', ')+'.\n\nBeklenen istek: '+budget.expected+'. Önerilen en yüksek istek: '+budget.maximumWithRetries+'. Bu görev için kesin sınır: '+maxProviderCalls+' gerçek istek. Planlama ve son sentez çağrıları korunur; sınır aşılmaz.'+skillOverrideSummary+'\n\nBaşlatılsın mı?');
       if(approved){
         loading.querySelector('p').textContent='Görev uzman ajanlara dağıtılıyor…';
         const result=await runAgentSwarm({
           providerIds:pool,task:text,history:chatContext().slice(0,-1),maxAgents:workerCount,maxProviderCalls,
-          skills:skillLibrary,preferredSkillIds:selectedSkillIds,
+          skills:skillLibrary,preferredSkillIds:selectedSkillIds,pinnedSkillIds,excludedSkillIds,
           maxConcurrency:nativeApp?2:3,isNative:nativeApp,deviceInfo:deviceLocalState?.device||null,
           callProvider:(id,prompt,history)=>callProvider(id,prompt,history,{includeTaskSkills:false}),assignProviders:assignAgentProviders,
           onEvent:async event=>{
             if(event.type==='assignment_made')await logAgentActivity('Uzman ataması · '+event.taskId,'Atandı',event.providerId+' · '+event.roleGroup);
-            if(event.type==='skills_selected')await logAgentActivity('Otomatik Skill seçimi · '+event.taskId,'Seçildi',event.skillNames.join(' · '));
-            if(event.type==='skills_expanded')await logAgentActivity('Ajan ek Skill istedi · '+event.taskId,'Eklendi',event.skillNames.join(' · '));
+            if(event.type==='skills_selected')await logAgentActivity('Otomatik Skill seçimi · '+event.taskId,'Seçildi',(event.skillTrace||[]).map(item=>item.name+' ['+item.source+']: '+item.reasons.join(', ')).join(' · ')+' | Atlanan: '+(event.omittedSkills||[]).map(item=>item.name+' ('+item.reason+')').join(', '));
+            if(event.type==='skills_expanded')await logAgentActivity('Ajan ek Skill istedi · '+event.taskId,'Eklendi',(event.skillTrace||[]).map(item=>item.name+' ['+item.source+']: '+item.reasons.join(', ')).join(' · ')||event.skillNames.join(' · '));
             if(event.type==='skills_expansion_failed')await logAgentActivity('Ajan ek Skill istedi · '+event.taskId,'Başarısız',event.reason);
-            if(event.type==='skills_refreshed')await logAgentActivity('Dinamik Skill yenileme · '+event.taskId,event.addedSkillNames?.length?'Yeni Skill eklendi':'Skill bağlamı güncellendi',(event.addedSkillNames||[]).join(' · ')||event.skillIds.length+' Skill etkin');
+            if(event.type==='skills_refreshed')await logAgentActivity('Dinamik Skill yenileme · '+event.taskId,event.addedSkillNames?.length?'Yeni Skill eklendi':'Skill bağlamı güncellendi',(event.skillTrace||[]).map(item=>item.name+' ['+item.source+']: '+item.reasons.join(', ')).join(' · ')+' | Atlanan: '+(event.omittedSkills||[]).map(item=>item.name+' ('+item.reason+')').join(', '));
             if(event.type==='agent_started')await agentHooks.emit('beforeAgentRun',{taskId:event.agentId,providerId:event.providerId,role:event.role,source:'swarm'});
             if(event.type==='agent_completed')await agentHooks.emit('afterAgentRun',{taskId:event.agentId,providerId:event.providerId,status:event.status,source:'swarm'});
             if(event.type==='agent_retry')await logAgentActivity('Uzman ajan yeniden deniyor','Tekrar',event.reason);
@@ -777,6 +783,7 @@ async function submitChat(prompt,providerId){
           }
         });
         answer=result.summary;answerProvider='AI Studio Agent Swarm';
+        if($('agentSkillPins'))$('agentSkillPins').value='';if($('agentSkillExcludes'))$('agentSkillExcludes').value='';
         await logAgentActivity('Otomatik Agent Atama',result.status==='partial'?'Kısmi başarı':'Tamamlandı',result.metrics.completed+'/'+result.metrics.workerCount+' uzman · '+result.budget.usedCalls+'/'+result.budget.maxProviderCalls+' gerçek istek · '+result.metrics.retryCount+' tekrar');
       }else{
         await logAgentActivity('Otomatik Agent Atama','Atlandı','Onay verilmedi; tek model yanıtı kullanılacak.');
