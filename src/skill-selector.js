@@ -1,6 +1,7 @@
 import {normalizeSkill,MAX_SELECTED_SKILLS} from './skill-library.js';
 
 const STOP_WORDS=new Set(['and','the','for','with','from','that','this','then','than','into','your','you','are','was','have','has','will','can','should','must','use','only','when','where','what','which','bir','ve','ile','icin','için','olarak','gibi','daha','sonra','önce','bunu','bunun','şunu','şunun','görev','iş','yap','et','olan','olur','üzerinde','hakkında']);
+const boundedInteger=(value,fallback,max)=>{if(value===undefined||value===null||value==='')return fallback;const n=Number(value);return Number.isFinite(n)?Math.max(0,Math.min(max,Math.floor(n))):fallback;};
 const ROLE_STAGE={architect:'plan',architecture:'plan',planner:'plan',planning:'plan',researcher:'plan',research:'plan',builder:'code',developer:'code',coder:'code',code:'code',implementation:'code',implementer:'code',tester:'review',test:'review',qa:'review',reviewer:'review',review:'review',security:'review',auditor:'review',documenter:'review',docs:'review',ux:'review',optimizer:'review',performance:'review'};
 const ROLE_ALIASES=[
  {key:'code',pattern:/\b(code|coding|developer|builder|implement|implementation|program|kod|geliştir|uygula|yazılım)\b/i,ids:['sp-test-first','sp-minimal-diff','sp-api-contract','sp-codebase-map','cv-readable','cv-small-functions','ecc-tdd-workflow','ext-superpowers-development-loop','ext-karpathy-principles'],groups:['Code','Superpowers']},
@@ -38,7 +39,7 @@ function scoreSkill(skill,{taskTokens,role,stage,preferredIds,activeRules}){
  return {skill,score,reasons:[...new Set(reasons)]};
 }
 export function resolveSkillOverrideIds(values,skills=[],{maxIds=MAX_SELECTED_SKILLS}={}){
- const limit=Math.max(0,Math.min(MAX_SELECTED_SKILLS,Math.floor(Number(maxIds)||MAX_SELECTED_SKILLS)));
+ const limit=boundedInteger(maxIds,MAX_SELECTED_SKILLS,MAX_SELECTED_SKILLS);
  const catalog=(Array.isArray(skills)?skills:[]).map(item=>normalizeSkill(item)).filter(Boolean);
  const byId=new Map(catalog.map(item=>[item.id,item]));
  const byName=new Map(catalog.map(item=>[norm(item.name),item]));
@@ -74,10 +75,10 @@ export function selectSkillsForTask({task='',role='general',stage='',skills=[],p
  return {task:String(task??''),role,stage:selectedStage,skills:selected.map(item=>item.skill),selectedIds:selected.map(item=>item.skill.id),ranked:ranked.slice(0,Math.max(limit,12)).map(item=>({id:item.skill.id,name:item.skill.name,score:Number(item.score.toFixed(2)),reasons:item.reasons})),omittedByCount:ranked.length>selected.length,pinnedSkillIds:[...pinnedIds],excludedSkillIds:[...excludedIds],stageIncompatiblePinned,missingPinned};
 }
 export function buildTaskSkillContext(options={}){
- const selection=selectSkillsForTask(options),maxChars=Math.max(0,Math.min(24000,Number(options.maxChars)||10000));
+ const selection=selectSkillsForTask(options),maxChars=boundedInteger(options.maxChars,10000,24000);
  const header='\n\n--- AI STUDIO AUTO-SELECTED SKILLS ('+selection.stage.toUpperCase()+'/'+String(selection.role).toUpperCase()+') ---\n',footer='\n--- END AUTO-SELECTED SKILLS ---',budget=Math.max(0,maxChars-header.length-footer.length);
  const blocks=[];let used=0;const includedIds=[],excludedIds=[];
- for(const item of selection.skills){const block='### '+item.name+' ['+item.stage+']\n'+item.content,separator=blocks.length?'\n\n':'';const remaining=budget-used-separator.length;if(remaining<100){excludedIds.push(item.id);continue;}const clipped=block.length>remaining?block.slice(0,remaining):block;blocks.push(clipped);used+=separator.length+clipped.length;includedIds.push(item.id);if(clipped.length<block.length){excludedIds.push(item.id);break;}}
+ for(const item of selection.skills){const block='### '+item.name+' ['+item.stage+']\n'+item.content,separator=blocks.length?'\n\n':'';const remaining=budget-used-separator.length;if(remaining<100){excludedIds.push(item.id);continue;}if(block.length>remaining){excludedIds.push(item.id);continue;}blocks.push(block);used+=separator.length+block.length;includedIds.push(item.id);}
  const promptText=blocks.length?header+blocks.join('\n\n')+footer:'';
  const trace=buildSkillTrace({includedIds,ranked:selection.ranked,pinnedSkillIds:selection.pinnedSkillIds,excludedSkillIds:selection.excludedSkillIds,skills:options.skills,stage:selection.stage,maxSkills:Math.min(MAX_SELECTED_SKILLS,Number(options.maxSkills)||4),charExcludedIds:excludedIds});
  return {...selection,promptText,includedIds,excludedIds,charCount:promptText.length,maxChars,omittedByChars:excludedIds.length>0,...trace};
@@ -101,7 +102,7 @@ export function refreshTaskSkillContext({
   for(const skill of [...pinned,...manual,...fresh.skills,...previous]){
     if(!seen.has(skill.id)&&merged.length<limit){seen.add(skill.id);merged.push(skill);}
   }
-  const charLimit=Math.max(0,Math.min(24000,Number(maxChars)||10000));
+  const charLimit=boundedInteger(maxChars,10000,24000);
   const header='\n\n--- AI STUDIO DYNAMIC SKILLS ('+fresh.stage.toUpperCase()+'/'+String(role).toUpperCase()+') ---\n';
   const footer='\n--- END DYNAMIC SKILLS ---';
   const budget=Math.max(0,charLimit-header.length-footer.length);
@@ -111,9 +112,8 @@ export function refreshTaskSkillContext({
     const separator=blocks.length?'\n\n':'';
     const remaining=budget-used-separator.length;
     if(remaining<100){excludedIds.push(item.id);continue;}
-    const clipped=block.length>remaining?block.slice(0,remaining):block;
-    blocks.push(clipped);used+=separator.length+clipped.length;includedIds.push(item.id);
-    if(clipped.length<block.length){excludedIds.push(item.id);break;}
+    if(block.length>remaining){excludedIds.push(item.id);continue;}
+    blocks.push(block);used+=separator.length+block.length;includedIds.push(item.id);
   }
   const promptText=blocks.length?header+blocks.join('\n\n')+footer:'';
   const previousSet=new Set(priorIds);
