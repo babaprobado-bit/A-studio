@@ -1,6 +1,6 @@
 # AI Studio — Android + Private Web Workspace
 
-AI Studio 1.1.4 is an Android-first workspace for multi-provider AI and coding workflows. The app opens in its standard AI chat interface. Creator Studio keeps What If, In My Town and Clips independent and adds a separate local Social Media draft planner. AI Power Hub adds a 10-engine Swarm coordinator, 34 prompt templates, free-only OpenRouter multi-chat and a 13-provider access directory. The existing Skill Library, Local Coder engines, project/chat/editor/backup/vault features remain in place.
+AI Studio 1.1.6 is an Android-first workspace for multi-provider AI and coding workflows. The app opens in its standard AI chat interface. Creator Studio keeps What If, In My Town and Clips independent and adds a separate local Social Media draft planner. AI Power Hub adds a 10-engine Swarm coordinator, 36 prompt templates, free-only OpenRouter multi-chat and a 9-provider free-access directory. The existing Skill Library, Local Coder engines, project/chat/editor/backup/vault features remain in place.
 
 ## Current Local Coder modes
 
@@ -17,14 +17,14 @@ AI Studio 1.1.4 is an Android-first workspace for multi-provider AI and coding w
 
 ## Existing workspace features
 
-- Real provider adapters for OpenAI, Anthropic, Google Gemini, DeepSeek, Groq, OpenRouter and Ollama; separate optional Cohere Trial and Cloudflare Workers AI routes in AI Power Hub.
+- The chat provider selector contains 15 configured routes: OpenAI, Anthropic, Gemini, DeepSeek, Groq, OpenRouter, APInex, NVIDIA NIM Developer, Z.ai, Merkium, Requesty, Hugging Face, custom OpenAI-compatible API, PC Ollama and on-device GGUF. AI Power Hub separately documents nine free/free-tier API providers; Cloudflare Workers AI is an optional separately configured route.
 - Encrypted Android API-key storage through Android secure storage. Browser preview holds keys in memory only.
-- Demo mode enabled by default. Multi-provider/team runs that may make paid requests require confirmation.
-- All ten AI Team engines, parallel team requests and sequential text pipelines.
+- Demo mode is removed; real-model requests are used. Multi-provider/team runs that may incur provider charges require explicit confirmation.
+- Ten default AI Team selections, parallel team requests and sequential text pipelines. The wider provider selector has 15 configured routes.
 - AI Swarm: task planning, up to ten bounded specialist calls, a shared result board, conflict-aware task scheduling, transient retry and final synthesis. Native Android concurrency is capped at two and drops to one when reported free RAM is below 900 MiB. Swarm proposes changes but does not write files or run shell commands.
-- Plugin Library: 34 searchable, enable/disable prompt templates. Templates are text instructions, not executable plugins.
+- Plugin Library: 36 searchable, enable/disable prompt templates. Templates are text instructions, not executable plugins.
 - OpenRouter Multi-Chat: compare up to four models concurrently; only openrouter/free or :free IDs with zero listed input/output prices are accepted.
-- 13-provider directory separates genuine free-tier, trial, account-dependent, unverified and non-free API routes; unknown free quotas are not presented as guaranteed.
+- The nine-entry free API directory distinguishes free-tier, free-model, developer-access and free-plan conditions. It does not claim that all routes have unlimited or guaranteed quotas.
 - Local project notes, chat history, shared project context and opt-in selected code/snippet context.
 - Multi-file code workspace; up to 100 files and 100 KB per file.
 - Snippet Vault, source/license notes, reusable code catalog, activity history.
@@ -46,17 +46,15 @@ The app's initial screen is the existing AI chat. The Chat tab is first in the b
 
 ## Build Android APK
 
-Regular debug APK:
-1. GitHub Actions → Build Android Demo APK → Run workflow.
-2. Download artifact AI-Studio-Demo-APK.
-3. Extract app-debug.apk.
+The repository currently provides one Android APK workflow:
 
-Native GGUF debug APK:
-1. Use separate workflow Build Android APK with on-device Local Coder.
-2. Download artifact AI-Studio-1.1.4-Native-GGUF-APK only after the Native workflow completes successfully.
-3. That artifact targets Android 10+ / arm64 devices. Model weights are not bundled; download a supported GGUF model through the in-app model manager.
+1. Open GitHub Actions → **Build Android APK with on-device Local Coder** → Run workflow.
+2. Wait for the native llama.cpp/llama.kt build, web build and regression checks to finish successfully.
+3. Download artifact **AI-Studio-1.1.6-Full-Native-GGUF-APK** and extract `app-debug.apk`.
 
-Repository does not commit generated android/ project. GitHub Actions creates it with npx cap add android, configures native bridge, syncs Capacitor and runs Gradle. Workflows produce debug builds, not signed store releases.
+The artifact targets Android 10+ / arm64 devices. Model weights are not bundled; download a supported GGUF model through the in-app model manager. There is no separate Demo APK workflow.
+
+Repository does not commit generated `android/` project. GitHub Actions creates it with `npx cap add android`, configures the native bridge, syncs Capacitor and runs Gradle. The workflow produces a debug build, not a signed store release.
 
 ## Tests
 
@@ -77,7 +75,7 @@ JavaScript tests and mock plugins do not prove Kotlin/NDK compilation or real ph
 The durable project memory and exact next prompts live here:
 
 - docs/HANDOFF/README.md — read first; repository/branch status and latest session checkpoints.
-- docs/HANDOFF/SESSION_20_AI_POWER_HUB_2026-11-17.md — Agent Swarm, 34 prompt plugins, OpenRouter free multi-chat, provider directory, optional Cohere/Cloudflare routes and regression gates.
+- docs/HANDOFF/SESSION_20_AI_POWER_HUB_2026-11-17.md — Agent Swarm, 36 prompt plugins, OpenRouter free multi-chat, provider directory, optional Cloudflare route and regression gates.
 - docs/HANDOFF/PROJECT_STATE.md — architecture, source map, existing features, limits and security notes.
 - docs/HANDOFF/SESSION_1_NATIVE_APK.md — finish native build and obtain GGUF APK.
 - docs/HANDOFF/SESSION_2_DEVICE_TESTING.md — physical-phone and airplane-mode proof.
@@ -166,7 +164,7 @@ Still not implemented: unattended agents continuously inventing tasks; unrestric
 ## Workspace 0.9: shared project context and opt-in file reuse
 
 - Choose one saved project as the active context. Its notes are included in the system context for real single-chat, parallel-team, sequential-pipeline, comparison, and Local Coder provider calls.
-- Project notes are sent to the selected provider when a real model request is made. Demo mode produces templates and does not run inference.
+- Project notes are sent to the selected provider when a real model request is made. The application uses real-model inference; no demo response mode is available.
 - A separate opt-in switch can attach short excerpts from up to three saved code files and two saved snippets. It is off by default to avoid sending code unexpectedly. Context size is bounded; it is a reference for the model, not proof the model has read or executed files.
 - The selected project is persisted locally and included in standard/encrypted workspace backups. Older backups remain compatible; when no active ID exists, the first imported project becomes active.
 - Local file reuse still does not copy third-party code automatically. Check licenses and source notes before adding third-party snippets to a shipped project.
@@ -196,7 +194,7 @@ This is **encrypted-at-rest shared storage, not end-to-end encryption**: the aut
 
 ### AI Studio model-context link
 
-The private website can optionally attach up to three relevant shared-vault notes to live model calls. The switch in the **Şifreli ortak AI kasası** panel is **off by default**. When enabled, the browser sends only a bounded, task-relevant selection to whichever provider is active; Demo mode does not call a real model. Refreshing the web app fetches the latest 30 vault notes, and search filters only the visible list, not the context pool. Avoid putting API keys or sensitive personal data in notes.
+The private website can optionally attach up to three relevant shared-vault notes to live model calls. The switch in the **Şifreli ortak AI kasası** panel is **off by default**. When enabled, the browser sends only a bounded, task-relevant selection to whichever provider is active; The app uses real-model inference. Refreshing the web app fetches the latest 30 vault notes, and search filters only the visible list, not the context pool. Avoid putting API keys or sensitive personal data in notes.
 
 
 ### Android ↔ shared vault
@@ -237,5 +235,5 @@ The Android app has a mobile connection panel in Tools. Create an agent token in
 ### Local Coder online API mode
 
 - Local Coder can choose one of the existing OpenAI, Claude, Gemini, DeepSeek, Groq or OpenRouter API adapters. The matching provider key must be saved on the device.
-- Each online run sends three requests (Plan, Code, Review). The app asks for explicit confirmation before the run; Demo mode remains on by default until the user approves a real API run. Provider quotas or charges may apply.
+- Each online run sends three requests (Plan, Code, Review). The app asks for explicit confirmation before the run. Provider quotas or charges may apply.
 - PC/Ollama remains the default engine. Device GGUF mode runs locally after a one-time model download and does not call cloud APIs. These three engines are separate choices.
