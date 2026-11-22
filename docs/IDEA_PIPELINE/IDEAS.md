@@ -207,3 +207,60 @@ These proposals were checked against the current source modules and the ten exis
 - **Risks:** Additional quota use, evaluator hallucinations and prompt injection embedded in model outputs. Mitigate with opt-in execution, visible request count, free/local-only evaluator selection, treating all source answers as untrusted data and retaining source attribution.
 - **Acceptance criteria:** No evaluator request occurs automatically; paid or unverified model IDs are rejected before network access; synthesis identifies the source provider for every disagreement; failed synthesis leaves original answers intact; tests cover partial failures and malicious instruction text in model outputs.
 
+---
+
+## Fresh ideas — 2026-11-22
+
+**Source snapshot:** `feature/android-offline-skills-v1` @ `58e6a6e0d3cdd5295a19d82c3af309126fc93ad7`  
+**Main snapshot:** `aab010319b6500002844bd24b11da85dd9ca3b00`
+
+These proposals were compared with the current Agent Swarm, Skill selector, project-memory and AgentShield source modules. They are proposals only. No application code is changed by this update. Keep all provider selection on the existing verified-free/local routes; do not introduce paid fallback.
+
+### IDEA-AGENT-BUDGET-001 — Enforced per-run Agent Swarm request budget
+
+- **Priority:** P0
+- **Status:** NEW
+- **Estimated scope:** M
+- **Why it is new:** `src/agent-swarm.js` exposes `estimateSwarmCallBudget()` and returns expected/maximum call metrics, but its internal `requestProvider()` currently increments `modelCallCount` and forwards the call without enforcing a caller-selected hard ceiling. Retries and dynamic Skill expansion can therefore consume additional calls beyond the expected count.
+- **User benefit:** Prevent unexpectedly long agent runs, make retry/expansion behavior predictable, and let users cap how many provider requests one task may make.
+- **Technical approach:** Add a validated per-run `maxProviderCalls` limit and route every planning, worker, retry, Skill-expansion and synthesis request through one budget gate. Reserve or explicitly account for planning/synthesis calls so workers cannot consume the entire budget before finalization. When exhausted, stop issuing requests, emit a `budget_exhausted` event, retain completed/partial results and return a clear reason. Keep request-count budgeting separate from monetary quota claims; do not estimate provider prices or weaken existing free-model allowlists.
+- **Dependencies:** `runAgentSwarm()`, `requestProvider()`, `estimateSwarmCallBudget()`, Swarm UI settings/events and existing regression tests.
+- **Risks:** A too-small limit may prevent synthesis or leave dependent tasks incomplete; concurrent workers may race for the final slot. Mitigate with atomic reservation before each request, visible minimum/maximum validation, explicit partial-run status and deterministic concurrency tests.
+- **Acceptance criteria:** No provider call begins after the configured limit; retries and dynamic Skill expansion count against the same limit; concurrent workers cannot exceed it; partial results remain visible; default behavior stays backward-compatible; tests verify exact call counts and no paid fallback.
+
+### IDEA-SKILL-TRACE-001 — Explainable Skill selection and per-run controls
+
+- **Priority:** P1
+- **Status:** NEW
+- **Estimated scope:** M
+- **Why it is new:** `src/skill-selector.js` already calculates selection scores and reason labels, but `src/agent-swarm.js` emits only selected IDs/names for most Skill events and the UI does not expose a compact per-run explanation with pin/exclude controls. Session 24 added task-aware refresh; this proposal does not repeat that selection behavior.
+- **User benefit:** Understand why a Skill was assigned to an agent, identify irrelevant instructions, and override one run without permanently changing Skill profiles.
+- **Technical approach:** Carry bounded reason metadata from `selectSkillsForTask()` and `refreshTaskSkillContext()` into `skills_selected` and `skills_refreshed` events. Add per-run `pinnedSkillIds` and `excludedSkillIds` inputs, validate them against the installed catalog, and preserve the existing hard eight-Skill and prompt-character limits. Show selected, added, retained and omitted Skills with concise reasons in Agent Activity; do not expose full Skill bodies in logs.
+- **Dependencies:** `src/skill-selector.js`, `src/agent-swarm.js`, Agent Activity UI in `src/main.js`, and `scripts/test-agent-systems.mjs`.
+- **Risks:** Over-pinning can displace more relevant Skills; long explanations can clutter the UI or leak imported Skill content. Mitigate with ID-only references, short reason labels, fixed caps and clear warnings when a pin is excluded by stage or budget.
+- **Acceptance criteria:** Each selected Skill shows a concise selection reason; newly added Skills show why they became relevant; per-run pin/exclude choices do not mutate saved profiles; the eight-Skill and character caps remain enforced; older activity records still render.
+
+### IDEA-MEMORY-REVIEW-001 — Project memory lifecycle and duplicate review
+
+- **Priority:** P1
+- **Status:** NEW
+- **Estimated scope:** M
+- **Why it is new:** `src/agent-memory.js` supports project-scoped records, sensitive-content rejection, relevance matching and backup/restore. The current UI displays recent records and supports manual deletion, but there is no review workflow for stale or near-duplicate records, no archive state, and no explicit lifecycle metadata beyond creation time.
+- **User benefit:** Keep project memory useful as code and decisions change, reduce repeated/conflicting notes, and prevent old assumptions from quietly influencing later agent work.
+- **Technical approach:** Add backward-compatible optional `updatedAt`, `archivedAt` and `reviewedAt` metadata. Provide deterministic local-only suggestions for likely duplicates or old records using normalized titles/tags and bounded token overlap; treat suggestions as hints, not semantic truth. Let the user open, edit, archive, restore or delete each record. Keep archived records out of `buildProjectMemoryContext()` by default and require explicit user confirmation before merge or deletion. Re-run sensitive-content checks on edits and imports.
+- **Dependencies:** `src/agent-memory.js`, memory settings/rendering in `src/main.js`, preference migration and `scripts/test-agent-systems.mjs`.
+- **Risks:** False duplicate matches, accidental loss of useful historical context and backup compatibility issues. Mitigate with deterministic explainable matches, no automatic merge/delete, version-tolerant normalization and round-trip backup tests.
+- **Acceptance criteria:** Existing v1 memory records load unchanged; duplicate/stale candidates are suggestions only; archived records are excluded from default context but remain restorable; edits/imports retain sensitive-data rejection; no model/API call is required for review.
+
+### IDEA-SHIELD-DETAIL-001 — Detailed AgentShield findings and safe report
+
+- **Priority:** P1
+- **Status:** NEW
+- **Estimated scope:** S
+- **Why it is new:** `src/agent-shield.js` returns rule IDs, severity, line numbers and messages, while current request preflight mainly shows a toast and records a summary in Agent Activity. Skill import reports a general blocked message. There is no consistent detailed findings view for the user to inspect and resolve.
+- **User benefit:** Understand what was flagged and where, distinguish a warning from a blocking finding, and correct problematic content without disabling security checks.
+- **Technical approach:** Add a reusable findings presentation model and compact detail panel for request preflight and Skill import. Show source, rule ID, severity, line number and a short remediation hint. If an excerpt is shown, mask secret-like values before rendering and never persist raw matched text. Offer export/copy of a sanitized report only after user action. Preserve all existing blocking severities and fail-closed behavior; do not add an override that bypasses critical/high findings.
+- **Dependencies:** `src/agent-shield.js`, AgentShield preflight and Skill-import flows in `src/main.js`, Agent Activity rendering and security regression tests.
+- **Risks:** A detailed report could accidentally reveal secrets or teach users to evade a detector. Mitigate by showing rule descriptions and safe remediation only, masking matched values, omitting sensitive excerpts and keeping blocking decisions unchanged.
+- **Acceptance criteria:** Multiple findings are individually visible with severity/source/line; safe reports contain no detected secret values; blocking findings remain blocked; warnings remain distinguishable; request and Skill-import paths use the same renderer; tests cover masking and no-bypass behavior.
+
