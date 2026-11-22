@@ -20,6 +20,20 @@ assert.equal(classifyAgentRole({role:'architect',objective:'Kapsamı ve görev s
 assert.equal(classifyAgentRole({role:'documenter',objective:'Kullanım ve sınırlamaları belgele.'}),'docs');
 const turkishOrchestrationTask='AI Studio için görevleri planla, ajanları seç, bağımlılıkları düzenle, hataları denetle ve sonuçları doğrula.';
 assert.ok(scoreTaskComplexity(turkishOrchestrationTask)>=55,'multi-step Turkish orchestration requests must reach the default delegation threshold');
+const naturalTurkishTask='AI Studio uygulamasını geliştirmek, ajan görevlerini düzenlemek, testleri çalıştırmak ve belgeleri güncellemek istiyorum.';
+const naturalTurkishIntent=classifyTaskIntent(naturalTurkishTask);
+assert.ok(naturalTurkishIntent.requiresImplementation&&naturalTurkishIntent.requiresPlanning&&naturalTurkishIntent.requiresTesting&&naturalTurkishIntent.requiresDocumentation,'inflected Turkish verbs must map to their task intents');
+assert.ok(scoreTaskComplexity(naturalTurkishTask)>=55,'natural Turkish multi-step tasks must reach the default delegation threshold');
+assert.equal(classifyTaskIntent('API entegrasyonunu araştırıp karşılaştırmak ve en iyi seçeneği belirlemek.').requiresResearch,true);
+assert.equal(classifyTaskIntent('Güvenlik açıklarını incelemek ve gizliliği korumak.').requiresDocumentation,false,'security vulnerabilities must not be mistaken for documentation');
+assert.equal(classifyTaskIntent('Güvenlik açıklarını incelemek ve gizliliği korumak.').requiresSecurityReview,true);
+assert.equal(classifyTaskIntent('Veritabanı şemasını güncellemek ve migration çalıştırmak.').signals.includes('data'),true);
+assert.equal(classifyAgentRole({role:'DevOps engineer',objective:'Build deployment pipeline'}),'automation');
+const compactHighRiskPlan=createDefaultTaskPlan('Research the payment API, plan the architecture, implement the integration, test permissions, document the workflow, and review security.',{maxTasks:3});
+assert.equal(compactHighRiskPlan.length,3);
+assert.ok(compactHighRiskPlan.some(item=>item.id==='implement'&&/Mimari plan|Kapsamı ve görev sırasını belirle/.test(item.objective)),'fallback plans must fold omitted prerequisites into the dependent task instead of silently dropping them');
+assert.ok(compactHighRiskPlan.every(item=>item.dependsOn.every(id=>compactHighRiskPlan.some(parent=>parent.id===id))),'fallback plans must not retain dependencies outside their bounded task set');
+
 assert.equal(shouldAutoDelegate({task:turkishOrchestrationTask,providerCount:4}).eligible,true,'eligible Turkish multi-step tasks must use Agent Swarm');
 const titleCaseTask='Implement API, Add Regression Tests, Document Workflow and Verify Result';
 const lowerCaseTask='implement API, add regression tests, document workflow and verify result';

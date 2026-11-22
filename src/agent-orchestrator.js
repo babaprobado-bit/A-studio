@@ -1,6 +1,24 @@
 const clamp=(v,min,max,d)=>{const n=Number(v);return Number.isFinite(n)?Math.max(min,Math.min(max,Math.floor(n))):d;};
 const textOf=v=>typeof v==='string'?v:[v?.title,v?.role,v?.objective,v?.description,v?.goal].filter(Boolean).join(' ').toLowerCase();
 const match=(t,re)=>re.test(t);
+const TURKISH_SIGNAL_STEMS={
+ implementation:['oluştur','geliştir','uygula','kodla','ekle','bağla','güncelle','düzelt','yapılandır','kur'],
+ research:['araştır','karşılaştır','incele','değerlendir','keşfet','sorgula'],
+ planning:['planla','tasarla','düzenle','sırala','belirle','mimar'],
+ testing:['doğrula','sına','denetle','kontrol','test','çalıştır','hataayııkla'],
+ security:['güven','gizlilik','gizlili','yetki','izin','şifre','sifre','parola','erişim','kimlikdoğrula','zafiyet'],
+ docs:['belge','dokümant','kılavuz'],
+ ux:['arayüz','erişilebilir','kullanılabilir'],
+ performance:['performans','bellek','hızlandır','iyileştir','optimize','gecikme'],
+ data:['veritaban','veri','şema','sorgu','migration','aktar'],
+ automation:['otomasyon','otomatik','tetikle','zamanla']
+};
+function hasTurkishSignal(text,signal){
+ const normalized=text.toLocaleLowerCase('tr-TR');
+ const tokens=normalized.match(/[\p{L}\p{N}_]+/gu)||[];
+ if(signal==='automation'&&/iş\s+akış/u.test(normalized))return true;
+ return (TURKISH_SIGNAL_STEMS[signal]||[]).some(stem=>tokens.some(token=>token.startsWith(stem)));
+}
 const SIGNALS={
  implementation:/\b(build|create|write|implement|integrate|develop|code|fix|refactor|add|update|olu[sş]tur|geli[sş]tir|uygula|kodla|ekle|yaz|ba[gğ]la|g[uü]ncelle)\b/i,
  research:/\b(research|investigate|compare|evaluate|find|search|analyze|ara[sş]t[iı]r|kar[sş][iı]la[sş]t[iı]r|incele|bul|de[gğ]erlendir)\b/i,
@@ -14,8 +32,8 @@ const SIGNALS={
  automation:/\b(automate|automation|workflow|pipeline|schedule|trigger|otomasyon|i[sş] ak[iı][sş][iı])\b/i
 };
 export function classifyTaskIntent(task){
- const t=textOf(task),signals=Object.keys(SIGNALS).filter(k=>match(t,SIGNALS[k]));
- const sensitive=match(t,/\b(password|secret|token|credential|private key|payment|billing|production|delete|wipe|security|api key|parola|sifre|odeme)\b|g[uü]venli\w*|gizlilik\w*|yetki\w*|sil\w*/i);
+ const t=textOf(task),signals=Object.keys(SIGNALS).filter(k=>match(t,SIGNALS[k])||hasTurkishSignal(t,k));
+ const sensitive=match(t,/\\b(password|secret|token|credential|private key|payment|billing|production|delete|wipe|security|api key|parola|sifre|odeme)\\b|g[uü]venli\\w*|gizlilik\\w*|yetki\\w*|sil\\w*/i)||hasTurkishSignal(t,'security');
  return {signals,primaryIntent:signals[0]||'general',requiresResearch:signals.includes('research'),requiresPlanning:signals.includes('planning')||signals.length>=3,requiresImplementation:signals.includes('implementation'),requiresTesting:signals.includes('implementation')||signals.includes('testing')||signals.includes('security'),requiresSecurityReview:signals.includes('security')||sensitive,requiresDocumentation:signals.includes('docs'),requiresUxReview:signals.includes('ux'),requiresPerformanceReview:signals.includes('performance'),riskLevel:sensitive?'high':signals.includes('data')?'medium':'low'};
 }
 const ACTION_PREFIX=/^(?:plan|build|create|add|write|update|verify|run|connect|implement|integrate|review|audit|test|debug|refactor|compare|automate|document|secure|optimize|design|deploy|inspect|analyze|research|select|assign|orchestrate|validate|migrate|remove|fix|configure|araştır|karşılaştır|planla|tasarla|mimar|düzenle|sırala|oluştur|geliştir|uygula|kodla|ekle|yaz|bağla|güncelle|doğrula|sına|denetle|kontrol|incele|bul|değerlendir|seç|ata|böl|ayır|yönet|iyileştir|hızlandır|belgele|dokümante|temizle|kaldır|taşı|birleştir|çalıştır|tamamla|kaydet|tara|koru)/u;
@@ -62,9 +80,9 @@ export function classifyAgentRole(task){
   ['ux',/^(ux|user experience|ux specialist)(?:[-_\s].*)?$/i],
   ['performance',/^(performance|optimizer|perf|performans|optimizasyon)(?:[-_\s].*)?$/i],
   ['data',/^(data|database|veri)(?:[-_\s].*)?$/i],
-  ['automation',/^(automation|automator|workflow|otomasyon)(?:[-_\s].*)?$/i],
+  ['automation',/^(automation|automator|workflow|otomasyon|devops|sre|platform engineer|site reliability)(?:[-_\\s].*)?$/i],
   ['architecture',/^(architect|architecture|planner|planning|mimar|mimari)(?:[-_\s].*)?$/i],
-  ['code',/^(builder|developer|implementer|coder|programmer|code|uygulay[iı]c[iı]|geli[sş]tirici)(?:[-_\s].*)?$/i],
+  ['code',/^(builder|developer|implementer|coder|programmer|software engineer|backend|frontend|full stack|mobile developer|code|uygulay[iı]c[iı]|geli[sş]tirici)(?:[-_\\s].*)?$/i],
   ['general',/^(general|reviewer|review|auditor)(?:[-_\s].*)?$/i]
  ];
  for(const value of [task?.roleGroup,task?.role]){
@@ -73,17 +91,17 @@ export function classifyAgentRole(task){
   const match=roleGroups.find(([,pattern])=>pattern.test(explicit));
   if(match)return match[0];
  }
- const t=textOf(task);
- if(SIGNALS.security.test(t))return 'security';
- if(SIGNALS.testing.test(t))return 'test';
- if(SIGNALS.research.test(t))return 'research';
- if(SIGNALS.docs.test(t))return 'docs';
- if(SIGNALS.ux.test(t))return 'ux';
- if(SIGNALS.performance.test(t))return 'performance';
- if(SIGNALS.data.test(t))return 'data';
- if(SIGNALS.automation.test(t))return 'automation';
- if(SIGNALS.planning.test(t))return 'architecture';
- if(SIGNALS.implementation.test(t))return 'code';
+ const t=textOf(task),signals=classifyTaskIntent(t).signals;
+ if(signals.includes('security'))return 'security';
+ if(signals.includes('testing'))return 'test';
+ if(signals.includes('research'))return 'research';
+ if(signals.includes('docs'))return 'docs';
+ if(signals.includes('ux'))return 'ux';
+ if(signals.includes('performance'))return 'performance';
+ if(signals.includes('data'))return 'data';
+ if(signals.includes('automation'))return 'automation';
+ if(signals.includes('planning'))return 'architecture';
+ if(signals.includes('implementation'))return 'code';
  return 'general';
 }
 export function organizeTaskPlan(input,{maxTasks=10}={}){
@@ -97,7 +115,21 @@ export function createDefaultTaskPlan(task,{maxTasks=3}={}){
  if(i.requiresResearch)add('research','Araştırma','researcher','Gereksinimleri ve seçenekleri doğrula.');if(i.requiresPlanning)add('design','Mimari plan','architect','Kapsamı ve görev sırasını belirle.',i.requiresResearch?['research']:[],3);
  const prior=raw.length?[raw.at(-1).id]:[];if(i.requiresImplementation)add('implement','Uygulama','builder','En küçük güvenli çözümü hazırla.',prior,5);const impl=raw.find(x=>x.id==='implement');
  if(i.requiresTesting)add('verify','Test ve doğrulama','tester','Normal, sınır ve hata senaryolarını doğrula.',impl?['implement']:prior,5);if(i.requiresSecurityReview)add('security','Güvenlik incelemesi','security','Gizlilik ve güvenlik risklerini denetle.',impl?['implement']:prior,5);if(i.requiresPerformanceReview)add('performance','Performans','optimizer','RAM, CPU ve gecikmeyi değerlendir.',impl?['implement']:prior,3);if(i.requiresUxReview)add('ux','UX incelemesi','ux','Kullanılabilirliği değerlendir.',impl?['implement']:prior,3);if(i.requiresDocumentation)add('docs','Dokümantasyon','documenter','Kullanım ve sınırlamaları belgele.',impl?['implement']:prior,2);if(raw.length<2)add('review','Son inceleme','reviewer','Çıktıyı ve kalan riskleri denetle.',raw.map(x=>x.id),2);
- const selected=raw.sort((a,b)=>b.priority-a.priority||a.id.localeCompare(b.id)).slice(0,clamp(maxTasks,2,10,3));return organizeTaskPlan(selected,{maxTasks}).tasks;
+ const limit=clamp(maxTasks,2,10,3),byId=new Map(raw.map(item=>[item.id,item]));
+ const selected=raw.sort((a,b)=>b.priority-a.priority||a.id.localeCompare(b.id)).slice(0,limit);
+ const selectedIds=new Set(selected.map(item=>item.id));
+ const collectMissingPrerequisites=(id,visited=new Set())=>{
+  if(selectedIds.has(id)||visited.has(id))return [];
+  visited.add(id);
+  const prerequisite=byId.get(id);if(!prerequisite)return [];
+  return [...prerequisite.dependsOn.flatMap(parent=>collectMissingPrerequisites(parent,visited)),prerequisite];
+ };
+ for(const item of selected){
+  const folded=[...new Map(item.dependsOn.flatMap(id=>collectMissingPrerequisites(id)).map(dep=>[dep.id,dep])).values()];
+  if(folded.length)item.objective='Ön koşul kapsamı: '+folded.map(dep=>dep.title+': '+dep.objective).join(' | ')+'. '+item.objective;
+  item.dependsOn=item.dependsOn.filter(id=>selectedIds.has(id));
+ }
+ return organizeTaskPlan(selected,{maxTasks:limit}).tasks;
 }
 const affinity={security:['groq','gemini','ollama','device','openrouter','apinex'],test:['groq','ollama','device','gemini','openrouter','apinex'],research:['gemini','groq','openrouter','apinex','ollama','device'],docs:['gemini','groq','ollama','openrouter','apinex','device'],ux:['gemini','groq','ollama','device','openrouter','apinex'],performance:['ollama','device','groq','gemini','openrouter','apinex'],architecture:['gemini','groq','ollama','device','openrouter','apinex'],code:['ollama','device','groq','gemini','openrouter','apinex'],data:['ollama','device','groq','gemini','openrouter','apinex'],automation:['groq','gemini','ollama','device','openrouter','apinex'],general:['groq','gemini','ollama','device','openrouter','apinex']};
 export function assignAgentProviders(tasks,providers){const pool=[...new Set((Array.isArray(providers)?providers:[]).filter(Boolean))].slice(1);if(!Array.isArray(tasks)||!pool.length)return [];const loads=new Map(pool.map(id=>[id,0]));return tasks.map((task,index)=>{const group=task?.roleGroup||classifyAgentRole(task),rank=affinity[group]||affinity.general;const best=pool.map((id,order)=>{const key=id.toLowerCase().replace(/[^a-z0-9]/g,''),alias=key.includes('ollama')?'ollama':key.includes('device')||key.includes('gguf')?'device':key.includes('groq')?'groq':key.includes('gemini')?'gemini':key.includes('openrouter')?'openrouter':key.includes('apinex')?'apinex':key;return {id,order,fit:rank.indexOf(alias)<0?0:rank.length-rank.indexOf(alias),load:loads.get(id)||0};}).sort((a,b)=>b.fit-a.fit||a.load-b.load||a.order-b.order)[0];loads.set(best.id,(loads.get(best.id)||0)+1);return {taskId:String(task?.id||'task-'+(index+1)),providerId:best.id,roleGroup:group,reason:group+' rol uyumu; mevcut yük '+(best.load||0)};});}
