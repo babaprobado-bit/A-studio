@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {scoreTaskComplexity,shouldAutoDelegate,assignAgentProviders,classifyTaskIntent,selectAgentWorkflow,organizeTaskPlan,createDefaultTaskPlan} from '../src/agent-orchestrator.js';
+import {scoreTaskComplexity,shouldAutoDelegate,assignAgentProviders,classifyTaskIntent,classifyAgentRole,selectAgentWorkflow,organizeTaskPlan,createDefaultTaskPlan} from '../src/agent-orchestrator.js';
 import {SKILL_CATALOG} from '../src/skill-library.js';
 import {selectSkillsForTask,buildTaskSkillContext,refreshTaskSkillContext,resolveSkillOverrideIds} from '../src/skill-selector.js';
 import {createAgentHookBus} from '../src/agent-hooks.js';
@@ -10,6 +10,14 @@ import {runAgentSwarm,parseSkillNeeds,fallbackSwarmTasks,resolveSwarmProviderCal
 const basic='Merhaba, nasılsın?';
 const complex='Plan a multi-agent architecture. Implement orchestration and project memory. Add hooks and security checks, write tests, update docs, then verify the workflow.';
 assert.ok(scoreTaskComplexity(complex)>scoreTaskComplexity(basic));
+const shortTurkishComplex='API geliştir, test et ve güvenliği denetle.';
+assert.ok(scoreTaskComplexity(shortTurkishComplex)>=55,'short multi-stage Turkish requests must reach the default delegation threshold');
+assert.equal(selectAgentWorkflow({task:shortTurkishComplex,providerCount:3}).eligible,true,'Turkish implementation, testing and security tasks must enter Swarm');
+assert.equal(selectAgentWorkflow({task:basic,providerCount:3}).eligible,false,'simple chat must remain single-agent');
+assert.equal(classifyAgentRole({id:'research',role:'researcher',title:'Araştırma',objective:'Gereksinimleri ve seçenekleri doğrula.'}),'research','researcher role must take precedence over generic verify wording');
+assert.equal(classifyAgentRole({id:'implement',role:'builder',title:'Uygulama',objective:'En küçük güvenli çözümü hazırla.'}),'code','builder role must take precedence over security wording');
+assert.equal(classifyAgentRole({role:'architect',objective:'Kapsamı ve görev sırasını belirle.'}),'architecture');
+assert.equal(classifyAgentRole({role:'documenter',objective:'Kullanım ve sınırlamaları belgele.'}),'docs');
 const turkishOrchestrationTask='AI Studio için görevleri planla, ajanları seç, bağımlılıkları düzenle, hataları denetle ve sonuçları doğrula.';
 assert.ok(scoreTaskComplexity(turkishOrchestrationTask)>=55,'multi-step Turkish orchestration requests must reach the default delegation threshold');
 assert.equal(shouldAutoDelegate({task:turkishOrchestrationTask,providerCount:4}).eligible,true,'eligible Turkish multi-step tasks must use Agent Swarm');
@@ -28,6 +36,14 @@ assert.equal(shouldAutoDelegate({task:complex,providerCount:3,minScore:40}).elig
 assert.equal(shouldAutoDelegate({task:complex,providerCount:3,enabled:false}).eligible,false);
 const assignments=assignAgentProviders([{id:'code',role:'developer',title:'Implement code'},{id:'test',role:'tester',title:'Regression tests'}],['gemini','groq','ollama']);
 assert.equal(assignments[0].providerId,'ollama');assert.equal(assignments[1].providerId,'groq');
+const explicitRoleAssignments=assignAgentProviders([
+ {id:'research',role:'researcher',title:'Araştırma',objective:'Gereksinimleri ve seçenekleri doğrula.'},
+ {id:'build',role:'builder',title:'Uygulama',objective:'En küçük güvenli çözümü hazırla.'}
+],['gemini','groq','ollama']);
+assert.equal(explicitRoleAssignments[0].roleGroup,'research');
+assert.equal(explicitRoleAssignments[0].providerId,'groq','research work should use research-affinity routing');
+assert.equal(explicitRoleAssignments[1].roleGroup,'code');
+assert.equal(explicitRoleAssignments[1].providerId,'ollama','builder work should use code-affinity routing');
 const good=createProjectMemoryRecord({projectId:'p1',title:'Routing',content:'Use Gemini for planning and Groq for tests.'});
 assert.equal(good.ok,true);
 assert.equal(createProjectMemoryRecord({projectId:'p1',title:'Key',content:'api_key=abcDEFGHIJKLMNOPQRSTUVWXYZ'}).ok,false);
@@ -209,6 +225,9 @@ const fallbackPlan=createDefaultTaskPlan('Build an API, add regression tests and
 assert.ok(fallbackPlan.some(item=>item.role==='builder'));
 assert.ok(fallbackPlan.some(item=>item.role==='tester'));
 assert.ok(fallbackPlan.some(item=>item.role==='security'));
+assert.equal(fallbackPlan.find(item=>item.id==='implement')?.roleGroup,'code');
+assert.equal(fallbackPlan.find(item=>item.id==='verify')?.roleGroup,'test');
+assert.equal(fallbackPlan.find(item=>item.id==='security')?.roleGroup,'security');
 assert.equal(fallbackSwarmTasks('test',10).length,10);
 const stagedCalls=[];
 const stagedSwarm=await runAgentSwarm({

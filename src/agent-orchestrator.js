@@ -31,7 +31,7 @@ export function scoreTaskComplexity(task){
  const domainContext=tokens.some(token=>DOMAIN_WORDS.has(token));
  let score=Math.min(16,Math.floor(words/12)*3)
    +Math.min(35,actions*7)
-   +Math.min(24,Math.max(0,signals.signals.length-1)*6)
+   +Math.min(36,Math.max(0,signals.signals.length-1)*9)
    +Math.min(16,steps*4+Math.max(0,separators-1)*3);
  if(/[.!?;\n].*[.!?;\n]/s.test(t))score+=6;
  if(signals.riskLevel==='high')score+=8;else if(signals.riskLevel==='medium')score+=4;
@@ -53,7 +53,39 @@ export function selectAgentWorkflow({task,enabled=true,providerCount=0,minScore=
  return {eligible,score,threshold,mode:!eligible?'single-agent':intent.requiresResearch&&!intent.requiresImplementation?'research-review':'staged-swarm',roles:[...new Set(roles)].slice(0,clamp(maxAgents,2,10,3)),intent,riskLevel:intent.riskLevel,reason:!enabled?'Otomatik atama kapalı.':providerCount<2?'İki uygun ücretsiz/yerel motor gerekli.':score<threshold?'Görev karmaşıklık eşiğinin altında.':'Uzman görev dağıtımı uygun.'};
 }
 export function shouldAutoDelegate({task,enabled=true,providerCount=0,minScore=55}={}){const r=selectAgentWorkflow({task,enabled,providerCount,minScore});return {eligible:r.eligible,score:r.score,threshold:r.threshold,reason:r.reason,mode:r.mode,roles:r.roles,riskLevel:r.riskLevel};}
-export function classifyAgentRole(task){const t=textOf(task);if(SIGNALS.security.test(t))return 'security';if(SIGNALS.testing.test(t))return 'test';if(SIGNALS.research.test(t))return 'research';if(SIGNALS.docs.test(t))return 'docs';if(SIGNALS.ux.test(t))return 'ux';if(SIGNALS.performance.test(t))return 'performance';if(SIGNALS.data.test(t))return 'data';if(SIGNALS.automation.test(t))return 'automation';if(SIGNALS.planning.test(t))return 'architecture';if(SIGNALS.implementation.test(t))return 'code';return 'general';}
+export function classifyAgentRole(task){
+ const roleGroups=[
+  ['security',/^(security|sec|g[uü]venlik)(?:[-_\s].*)?$/i],
+  ['test',/^(test|tester|qa|test[çc]i)(?:[-_\s].*)?$/i],
+  ['research',/^(research|researcher|investigator|ara[sş]t[iı]rmac[iı])(?:[-_\s].*)?$/i],
+  ['docs',/^(docs?|documenter|documentation|dok[uü]mantasyon)(?:[-_\s].*)?$/i],
+  ['ux',/^(ux|user experience|ux specialist)(?:[-_\s].*)?$/i],
+  ['performance',/^(performance|optimizer|perf|performans|optimizasyon)(?:[-_\s].*)?$/i],
+  ['data',/^(data|database|veri)(?:[-_\s].*)?$/i],
+  ['automation',/^(automation|automator|workflow|otomasyon)(?:[-_\s].*)?$/i],
+  ['architecture',/^(architect|architecture|planner|planning|mimar|mimari)(?:[-_\s].*)?$/i],
+  ['code',/^(builder|developer|implementer|coder|programmer|code|uygulay[iı]c[iı]|geli[sş]tirici)(?:[-_\s].*)?$/i],
+  ['general',/^(general|reviewer|review|auditor)(?:[-_\s].*)?$/i]
+ ];
+ for(const value of [task?.roleGroup,task?.role]){
+  const explicit=String(value||'').trim();
+  if(!explicit)continue;
+  const match=roleGroups.find(([,pattern])=>pattern.test(explicit));
+  if(match)return match[0];
+ }
+ const t=textOf(task);
+ if(SIGNALS.security.test(t))return 'security';
+ if(SIGNALS.testing.test(t))return 'test';
+ if(SIGNALS.research.test(t))return 'research';
+ if(SIGNALS.docs.test(t))return 'docs';
+ if(SIGNALS.ux.test(t))return 'ux';
+ if(SIGNALS.performance.test(t))return 'performance';
+ if(SIGNALS.data.test(t))return 'data';
+ if(SIGNALS.automation.test(t))return 'automation';
+ if(SIGNALS.planning.test(t))return 'architecture';
+ if(SIGNALS.implementation.test(t))return 'code';
+ return 'general';
+}
 export function organizeTaskPlan(input,{maxTasks=10}={}){
  const warnings=[],seen=new Set(),tasks=(Array.isArray(input)?input:[]).slice(0,clamp(maxTasks,2,10,10)).map((x,i)=>{if(!x||typeof x!=='object')return null;const id=String(x.id||'task-'+(i+1)).toLowerCase().replace(/[^a-z0-9_-]/g,'-').slice(0,48),objective=String(x.objective||x.description||x.goal||'').trim();if(!id||!objective||seen.has(id)){warnings.push('Geçersiz/yinelenen görev atlandı: '+id);return null;}seen.add(id);return {id,title:String(x.title||'Görev '+(i+1)).slice(0,100),role:String(x.role||'Uzman ajan'),roleGroup:x.roleGroup||classifyAgentRole(x),objective,acceptance:Array.isArray(x.acceptance)?x.acceptance.slice(0,6):['Somut çıktı ve doğrulama adımı ver.'],files:Array.isArray(x.files)?x.files.slice(0,8):[],dependsOn:[...new Set((Array.isArray(x.dependsOn)?x.dependsOn:Array.isArray(x.dependencies)?x.dependencies:[]).map(String))].filter(v=>v!==id),priority:clamp(x.priority,1,5,3),order:i};}).filter(Boolean);
  const ids=new Set(tasks.map(x=>x.id));for(const x of tasks)x.dependsOn=x.dependsOn.filter(id=>{if(ids.has(id))return true;warnings.push(x.id+' bilinmeyen bağımlılığı kaldırdı: '+id);return false;});
