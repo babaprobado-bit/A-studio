@@ -111,13 +111,13 @@ const nativeFinalizer = nativeSource.slice(nativeFinalizerStart, nativeFinalizer
 assert.ok(nativeFinalizer.indexOf('verifyDownloadedModelSha256') >= 0 &&
   nativeFinalizer.indexOf('verifyDownloadedModelSha256') < nativeFinalizer.indexOf('finalizeDownloadedModel(fileName, expectedSha256)'),
   'native SHA-256 verification must finish before the .part file is promoted');
-assert.match(nativeSource, /DownloadManager\\.COLUMN_LOCAL_URI/,
+assert.ok(nativeSource.includes('DownloadManager.COLUMN_LOCAL_URI'),
   'native finalization must inspect DownloadManager local URI when the requested .part path is not present');
-assert.match(nativeSource, /StandardCopyOption\\.ATOMIC_MOVE/,
+assert.ok(nativeSource.includes('StandardCopyOption.ATOMIC_MOVE'),
   'native finalization must attempt an atomic move before using its safe copy fallback');
-assert.match(nativeSource, /private fun copyFileSync\\(/,
+assert.ok(nativeSource.includes('private fun copyFileSync('),
   'native finalization must retain a flushed copy fallback when Android rejects a file move');
-assert.match(nativeSource, /status = "install_failed"/,
+assert.ok(nativeSource.includes('status = "install_failed"'),
   'a completed download that cannot be installed must be reported as an install failure, not a successful 100% download');
 const nativeReconcileStart = nativeSource.indexOf('private fun reconcileDownloads()');
 const nativeReconcileEnd = nativeSource.indexOf('private fun importModelFromUri(', nativeReconcileStart);
