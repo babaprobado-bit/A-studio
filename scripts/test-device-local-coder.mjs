@@ -521,6 +521,29 @@ assert.deepEqual(installRetryCancelArgs, {
 assert.equal(installRetryClient.activeDownloadId, null,
   'manual cleanup after an installation failure must clear the retained id');
 
+const resumeFinalizedPlugin = {
+  getDeviceInfo: fake.getDeviceInfo,
+  listModels: async () => ({
+    models: [{
+      fileName: DEVICE_MODEL_CATALOG[0].fileName,
+      sizeBytes: DEVICE_MODEL_CATALOG[0].sizeBytes,
+      loaded: false
+    }]
+  }),
+  listActiveDownloads: async () => ({ downloads: [] }),
+  downloadModel: async () => {
+    throw new Error('a recovered model must not enqueue a duplicate download');
+  }
+};
+const resumeFinalizedClient = new DeviceLocalCoder(true, resumeFinalizedPlugin);
+resumeFinalizedClient.activeDownloadId = 405;
+resumeFinalizedClient.activeDownloadFileName = DEVICE_MODEL_CATALOG[0].fileName;
+const resumedFinalizedModels = await resumeFinalizedClient.download(DEVICE_MODEL_CATALOG[0]);
+assert.equal(resumedFinalizedModels[0].fileName, DEVICE_MODEL_CATALOG[0].fileName,
+  'a model finalized during refresh must be returned as a successful resumed download');
+assert.equal(resumeFinalizedClient.activeDownloadId, null,
+  'a successfully reconciled install must clear the old download record');
+
 let failDownload = true;
 const retryPlugin = {
   getDeviceInfo: fake.getDeviceInfo,

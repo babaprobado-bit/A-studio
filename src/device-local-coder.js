@@ -222,6 +222,8 @@ export class DeviceLocalCoder {
       throw new Error('Başka bir model aktarımı sürüyor. Önce onu tamamla.');
     }
 
+    const previouslyActiveDownloadId = this.activeDownloadId;
+    const previouslyActiveFileName = this.activeDownloadFileName;
     this.downloadStarting = true;
     let downloadId = null;
     let terminalStatus = false;
@@ -238,7 +240,14 @@ export class DeviceLocalCoder {
       if (!catalogModel || !expectedSha256) {
         throw new Error('Yalnızca sabit SHA-256 özeti bulunan katalog modelleri indirilebilir.');
       }
-      if (this.models.some(item => item.fileName === model.fileName)) throw new Error('Bu model zaten telefonda bulunuyor. Listeden yükleyebilirsin.');
+      if (this.models.some(item => item.fileName === model.fileName)) {
+        // A previous install-failed download may be finalized during refresh(). Treat that
+        // recovered file as a successful resume instead of reporting it as a duplicate.
+        if (previouslyActiveDownloadId !== null && previouslyActiveFileName === model.fileName) {
+          return this.models;
+        }
+        throw new Error('Bu model zaten telefonda bulunuyor. Listeden yükleyebilirsin.');
+      }
       const free = Number(this.device?.freeStorageBytes || 0);
       const requiredStorageBytes = Number(catalogModel.sizeBytes) * 1.15;
       if (!Number.isFinite(free) || free <= 0) {
