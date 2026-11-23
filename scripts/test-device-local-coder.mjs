@@ -197,6 +197,10 @@ const nativeImportEnd = nativeSource.indexOf('@PluginMethod', nativeImportStart)
 const nativeImportSource = nativeSource.slice(nativeImportStart, nativeImportEnd);
 assert.ok(!nativeImportSource.includes('verifyDownloadedModelSha256'),
   'user-selected offline GGUF imports must not require a catalogue checksum');
+assert.match(nativeSource, /private fun finalizeDownloadedModel\(fileName: String, expectedSha256: String\? = null\)/,
+  'shared finalization must support offline imports without weakening pinned catalogue downloads');
+assert.match(nativeSource, /if \(!expectedSha256\.isNullOrBlank\(\)\) \{/,
+  'an existing catalogue model must still be verified against its pinned digest when provided');
 assert.match(nativeImportSource, /declaredSize > maxImportedModelBytes/,
   'the declared imported-file size must be rejected above the native 8 GB cap');
 assert.match(nativeImportSource, /copiedBytes > maxImportedModelBytes/,

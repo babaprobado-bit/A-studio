@@ -268,12 +268,24 @@ class LocalLlmPlugin : Plugin() {
         throw IllegalStateException("İndirilen model dosyası eksik.")
     }
 
-    private fun finalizeDownloadedModel(fileName: String, expectedSha256: String?) {
+    private fun finalizeDownloadedModel(fileName: String, expectedSha256: String? = null) {
         val partial = partialModelFile(fileName)
         val destination = safeModelFile(fileName)
         if (destination.exists()) {
             try {
-                verifyDownloadedModelSha256(destination, expectedSha256)
+                // Catalogue downloads always pass their pinned digest. User-selected offline
+                // GGUF imports have no catalogue digest, so validate their GGUF header instead.
+                if (!expectedSha256.isNullOrBlank()) {
+                    verifyDownloadedModelSha256(destination, expectedSha256)
+                } else {
+                    RandomAccessFile(destination, "r").use { input ->
+                        val magic = ByteArray(4)
+                        input.readFully(magic)
+                        if (String(magic, Charsets.US_ASCII) != "GGUF") {
+                            throw IllegalStateException("Mevcut model dosyasının GGUF başlığı geçersiz.")
+                        }
+                    }
+                }
                 partial.delete()
                 return
             } catch (_: Exception) {
