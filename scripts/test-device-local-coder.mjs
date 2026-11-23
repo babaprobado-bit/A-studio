@@ -478,6 +478,41 @@ await assert.rejects(
 assert.equal(guardedDownloadCalls, 1,
   'a modified catalogue URL must never reach Android DownloadManager');
 
+let installRetryCancelArgs = null;
+const installRetryPlugin = {
+  getDeviceInfo: fake.getDeviceInfo,
+  listModels: async () => ({ models: [] }),
+  downloadModel: async () => ({ downloadId: 404 }),
+  downloadStatus: async () => ({
+    status: 'install_failed',
+    progress: 99,
+    reason: 'simulated final-file move failure'
+  }),
+  cancelDownload: async args => {
+    installRetryCancelArgs = args;
+    return { cancelled: true, completed: false };
+  }
+};
+const installRetryClient = new DeviceLocalCoder(true, installRetryPlugin);
+await assert.rejects(
+  () => installRetryClient.download(DEVICE_MODEL_CATALOG[0]),
+  /simulated final-file move failure/
+);
+assert.equal(installRetryClient.activeDownloadId, 404,
+  'a completed download whose final file could not be installed must keep its id for retry or cancellation');
+assert.equal(installRetryClient.activeDownloadFileName, DEVICE_MODEL_CATALOG[0].fileName);
+assert.equal(installRetryClient.downloadLoopActive, false);
+assert.deepEqual(
+  await installRetryClient.cancelDownload(),
+  { cancelled: true, completed: false }
+);
+assert.deepEqual(installRetryCancelArgs, {
+  downloadId: 404,
+  fileName: DEVICE_MODEL_CATALOG[0].fileName
+});
+assert.equal(installRetryClient.activeDownloadId, null,
+  'manual cleanup after an installation failure must clear the retained id');
+
 let failDownload = true;
 const retryPlugin = {
   getDeviceInfo: fake.getDeviceInfo,

@@ -29,6 +29,8 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.FileInputStream
 import java.io.RandomAccessFile
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
@@ -134,21 +136,151 @@ class LocalLlmPlugin : Plugin() {
         }
     }
 
-    private fun finalizeCatalogueDownload(fileName: String, expectedSha256: String?) {
-        val partial = partialModelFile(fileName)
-        if (!partial.isFile || partial.length() < 1024 * 1024) {
-            throw IllegalStateException("İndirilen model dosyası eksik.")
+    private fun copyFileSync(source: File, destination: File) {
+        FileInputStream(source).use { input ->
+            FileOutputStream(destination, false).use { output ->
+                input.copyTo(output, 1024 * 1024)
+                output.fd.sync()
+            }
         }
-        verifyDownloadedModelSha256(partial, expectedSha256)
-        finalizeDownloadedModel(fileName)
+        if (!destination.isFile || destination.length() != source.length()) {
+            destination.delete()
+            throw IllegalStateException("Model dosyasının güvenli kopyası oluşturulamadı.")
+        }
     }
 
-    private fun finalizeDownloadedModel(fileName: String) {
+    /** Recover DownloadManager's actual local URI if a device did not write to the requested .part path. */
+    private fun recoverPartialFromDownloadUri(fileName: String, localUri: String?) {
+        val uriText = localUri?.trim().orEmpty()
+        if (uriText.isBlank()) return
+
+        val uri = Uri.parse(uriText)
+        val partial = partialModelFile(fileName)
+        val sourceFile = if (uri.scheme.equals("file", ignoreCase = true)) {
+            uri.path?.let { File(it) }
+        } else null
+
+        if (sourceFile != null) {
+            val sameFile = try {
+                sourceFile.canonicalFile == partial.canonicalFile
+            } catch (_: Exception) {
+                false
+            }
+            if (sameFile) return
+            if (!sourceFile.isFile || sourceFile.length() < 1024 * 1024) return
+        }
+
+        val input = if (sourceFile != null) {
+            FileInputStream(sourceFile)
+        } else {
+            try { context.contentResolver.openInputStream(uri) } catch (_: Exception) { null }
+        } ?: return
+
+        val staging = File(partial.parentFile, partial.name + ".recovering")
+        if (staging.exists() && !staging.delete()) {
+            input.close()
+            throw IllegalStateException("İndirilen dosyanın geçici kurtarma kopyası temizlenemedi.")
+        }
+        try {
+            input.use { source ->
+                FileOutputStream(staging, false).use { output ->
+                    source.copyTo(output, 1024 * 1024)
+                    output.fd.sync()
+                }
+            }
+            if (!staging.isFile || staging.length() < 1024 * 1024) {
+                throw IllegalStateException("Android indirme yöneticisinin yerel dosyası eksik.")
+            }
+            if (partial.exists() && !partial.delete()) {
+                throw IllegalStateException("İndirilen modelin geçici dosyası yenilenemedi.")
+            }
+            try {
+                Files.move(staging.toPath(), partial.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            } catch (_: Exception) {
+                copyFileSync(staging, partial)
+                staging.delete()
+            }
+        } catch (error: Exception) {
+            staging.delete()
+            throw error
+        }
+    }
+
+    /** Move atomically when supported; otherwise copy, flush and verify the destination length. */
+    private fun moveModelFile(source: File, destination: File) {
+        try {
+            Files.move(source.toPath(), destination.toPath(), StandardCopyOption.ATOMIC_MOVE)
+            return
+        } catch (_: Exception) {
+            // Some Android storage providers do not support atomic moves.
+        }
+        try {
+            Files.move(source.toPath(), destination.toPath())
+            return
+        } catch (_: Exception) {
+            // Fall back to a flushed copy below.
+        }
+
+        val staging = File(source.parentFile, source.name + ".recovering")
+        if (staging.exists() && !staging.delete()) {
+            throw IllegalStateException("Model kurulumunun geçici dosyası temizlenemedi.")
+        }
+        try {
+            copyFileSync(source, staging)
+            try {
+                Files.move(staging.toPath(), destination.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            } catch (_: Exception) {
+                copyFileSync(staging, destination)
+                staging.delete()
+            }
+            if (!destination.isFile || destination.length() != source.length()) {
+                destination.delete()
+                throw IllegalStateException("Modelin tamamlanmış dosyası doğrulanamadı.")
+            }
+            if (source.exists()) source.delete()
+        } catch (error: Exception) {
+            staging.delete()
+            throw error
+        }
+    }
+
+    private fun finalizeCatalogueDownload(
+        fileName: String,
+        expectedSha256: String?,
+        localUri: String? = null
+    ) {
+        val partial = partialModelFile(fileName)
+        recoverPartialFromDownloadUri(fileName, localUri)
+
+        if (partial.isFile && partial.length() >= 1024 * 1024) {
+            verifyDownloadedModelSha256(partial, expectedSha256)
+            finalizeDownloadedModel(fileName, expectedSha256)
+            return
+        }
+
+        // A process may stop after the final move but before clearing its durable download record.
+        // Accept an already-installed file only after verifying its pinned checksum.
+        val destination = safeModelFile(fileName)
+        if (destination.isFile && destination.length() >= 1024 * 1024) {
+            verifyDownloadedModelSha256(destination, expectedSha256)
+            return
+        }
+        throw IllegalStateException("İndirilen model dosyası eksik.")
+    }
+
+    private fun finalizeDownloadedModel(fileName: String, expectedSha256: String?) {
         val partial = partialModelFile(fileName)
         val destination = safeModelFile(fileName)
         if (destination.exists()) {
-            partial.delete()
-            return
+            try {
+                verifyDownloadedModelSha256(destination, expectedSha256)
+                partial.delete()
+                return
+            } catch (_: Exception) {
+                if (!destination.delete()) {
+                    throw IllegalStateException("Önceki bozuk model dosyası değiştirilemedi.")
+                }
+            }
         }
         if (!partial.isFile || partial.length() < 1024 * 1024) {
             throw IllegalStateException("İndirilen model dosyası eksik.")
@@ -160,8 +292,9 @@ class LocalLlmPlugin : Plugin() {
                 throw IllegalStateException("İndirilen dosyanın GGUF başlığı geçersiz.")
             }
         }
-        if (!partial.renameTo(destination)) {
-            throw IllegalStateException("Model dosyası tamamlanmış konuma taşınamadı.")
+        moveModelFile(partial, destination)
+        if (!destination.isFile || destination.length() < 1024 * 1024) {
+            throw IllegalStateException("Model tamamlanmış konuma kaydedilemedi.")
         }
     }
 
@@ -234,11 +367,20 @@ class LocalLlmPlugin : Plugin() {
                     }
                     val index = cursor.getColumnIndex(DownloadManager.COLUMN_STATUS)
                     if (index < 0) continue
+                    val localUriIndex = cursor.getColumnIndex(DownloadManager.COLUMN_LOCAL_URI)
+                    val localUri = if (localUriIndex >= 0) cursor.getString(localUriIndex) else null
                     when (cursor.getInt(index)) {
                         DownloadManager.STATUS_SUCCESSFUL -> {
-                            try { finalizeCatalogueDownload(fileName, preferences.getString(sha256PreferenceKey(fileName), null)) }
-                            catch (_: Exception) { partialModelFile(fileName).delete() }
-                            clearDownloadRecord(fileName)
+                            try {
+                                finalizeCatalogueDownload(
+                                    fileName,
+                                    preferences.getString(sha256PreferenceKey(fileName), null),
+                                    localUri
+                                )
+                                clearDownloadRecord(fileName)
+                            } catch (_: Exception) {
+                                // Keep the completed task and partial file so the next refresh can retry installation.
+                            }
                         }
                         DownloadManager.STATUS_FAILED -> {
                             partialModelFile(fileName).delete()
@@ -258,13 +400,17 @@ class LocalLlmPlugin : Plugin() {
         val trackedNames = preferenceSnapshot.filterValues { it is Long }.keys +
             preferenceSnapshot.filter { (key, value) -> key.endsWith(".gguf.pending") && value == true }
                 .keys.map { it.removeSuffix(".pending") }
-        modelDirectory().listFiles { file -> file.isFile && file.name.endsWith(".gguf.part", ignoreCase = true) }
-            ?.forEach { partial ->
-                val modelName = partial.name.removeSuffix(".part")
-                if (modelName !in trackedNames && !activeImportFileNames.contains(modelName)) {
-                    partial.delete()
-                }
+        modelDirectory().listFiles { file ->
+            file.isFile && (
+                file.name.endsWith(".gguf.part", ignoreCase = true) ||
+                    file.name.endsWith(".gguf.part.recovering", ignoreCase = true)
+                )
+        }?.forEach { partial ->
+            val modelName = partial.name.removeSuffix(".recovering").removeSuffix(".part")
+            if (modelName !in trackedNames && !activeImportFileNames.contains(modelName)) {
+                partial.delete()
             }
+        }
     }
 
     private fun importModelFromUri(uri: Uri, cancelFlag: AtomicBoolean): JSObject {
@@ -689,10 +835,12 @@ class LocalLlmPlugin : Plugin() {
             val reasonIndex = cursor.getColumnIndex(DownloadManager.COLUMN_REASON)
             val downloadedIndex = cursor.getColumnIndex(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR)
             val totalIndex = cursor.getColumnIndex(DownloadManager.COLUMN_TOTAL_SIZE_BYTES)
+            val localUriIndex = cursor.getColumnIndex(DownloadManager.COLUMN_LOCAL_URI)
             if (statusIndex < 0) throw IllegalStateException("İndirme durumu okunamadı.")
             val statusCode = cursor.getInt(statusIndex)
             val downloaded = if (downloadedIndex >= 0) cursor.getLong(downloadedIndex) else 0L
             val total = if (totalIndex >= 0) cursor.getLong(totalIndex) else -1L
+            val localUri = if (localUriIndex >= 0) cursor.getString(localUriIndex) else null
             var reason = if (reasonIndex >= 0) cursor.getInt(reasonIndex).toString() else ""
             var status = when (statusCode) {
                 DownloadManager.STATUS_SUCCESSFUL -> "complete"
@@ -701,21 +849,30 @@ class LocalLlmPlugin : Plugin() {
             }
             if (statusCode == DownloadManager.STATUS_SUCCESSFUL) {
                 try {
-                    finalizeCatalogueDownload(fileName, preferences.getString(sha256PreferenceKey(fileName), null))
+                    finalizeCatalogueDownload(
+                        fileName,
+                        preferences.getString(sha256PreferenceKey(fileName), null),
+                        localUri
+                    )
                     clearDownloadRecord(fileName)
                 } catch (error: Exception) {
-                    partialModelFile(fileName).delete()
-                    clearDownloadRecord(fileName)
-                    status = "failed"
-                    reason = error.message ?: "İndirilen model doğrulanamadı."
+                    // Keep the completed download and its ID so finalization can be retried or cancelled.
+                    status = "install_failed"
+                    reason = error.message ?: "İndirilen model doğrulanamadı veya telefona kaydedilemedi."
                 }
             } else if (statusCode == DownloadManager.STATUS_FAILED) {
                 partialModelFile(fileName).delete()
                 clearDownloadRecord(fileName)
             }
-            val progress = if (status == "complete") 100 else if (total > 0) {
+            val rawProgress = if (total > 0) {
                 (downloaded * 100.0 / total).toInt().coerceIn(0, 100)
             } else 0
+            // Only show 100% once the verified GGUF is installed under its final filename.
+            val progress = when (status) {
+                "complete" -> 100
+                "install_failed" -> rawProgress.coerceAtMost(99)
+                else -> rawProgress
+            }
             call.resolve(JSObject().apply {
                 put("status", status); put("progress", progress); put("downloadedBytes", downloaded)
                 put("totalBytes", total); put("reason", reason)

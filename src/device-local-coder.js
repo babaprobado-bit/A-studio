@@ -298,6 +298,11 @@ export class DeviceLocalCoder {
           completed = true;
           break;
         }
+        if (status.status === 'install_failed') {
+          terminalStatus = true;
+          preserveDownloadState = true;
+          throw new Error(status.reason || 'Model indirildi ancak GGUF dosyası telefona kurulamadı.');
+        }
         if (status.status === 'failed') {
           terminalStatus = true;
           throw new Error(status.reason || 'Model indirmesi başarısız oldu.');

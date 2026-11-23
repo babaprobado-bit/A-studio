@@ -1117,7 +1117,7 @@ async function refreshDeviceLocalModels(quiet=false){
     renderDeviceLocalModelManager();syncAiTeamProviderUI();
     const recommendation=deviceLocalState.recommendation;
     if($('onDeviceModelStatus'))$('onDeviceModelStatus').textContent=deviceLocalCoder.activeDownloadId!==null
-      ?(deviceLocalCoder.activeDownloadFileName+' indirmesi devam ediyor. Aynı modeli seçip "İndirmeyi sürdür" düğmesiyle kaldığı yerden takip edebilir veya iptal edebilirsin.')
+      ?(deviceLocalCoder.activeDownloadFileName+' aktarım kaydı bulundu. İndirme tamamlandıysa GGUF doğrulaması ve kurulumu yeniden denenir; istersen işlemi iptal edebilirsin.')
       :deviceLocalState.device?.supported
         ?(recommendation.isUnderpowered
           ?'Telefon profili: '+recommendation.capabilityTier+'. '+recommendation.recommendationReason+' En küçük modeli denemeden önce boş RAM ve depolamayı kontrol et.'
@@ -1144,7 +1144,16 @@ async function downloadSelectedDeviceModel(){
     await deviceLocalCoder.download(model,status=>{
       if(cancelButton)cancelButton.disabled=false;
       const percent=Number(status.progress||0);
-      if($('onDeviceModelStatus'))$('onDeviceModelStatus').textContent='Model indiriliyor: %'+percent+' · '+formatModelBytes(status.downloadedBytes||0)+' / '+(Number(status.totalBytes)>0?formatModelBytes(status.totalBytes):'hesaplanıyor');
+      if(!$('onDeviceModelStatus'))return;
+      if(status.status==='install_failed'){
+        $('onDeviceModelStatus').textContent='İndirme tamamlandı ama model doğrulanıp telefona kaydedilemedi: '+(status.reason||'Kurulum yeniden denenebilir veya işlem iptal edilebilir.');
+        return;
+      }
+      if(status.status==='complete'){
+        $('onDeviceModelStatus').textContent='GGUF doğrulandı ve telefona kaydedildi.';
+        return;
+      }
+      $('onDeviceModelStatus').textContent='Model indiriliyor: %'+percent+' · '+formatModelBytes(status.downloadedBytes||0)+' / '+(Number(status.totalBytes)>0?formatModelBytes(status.totalBytes):'hesaplanıyor');
     });
     await refreshDeviceLocalModels(true);
     const fileName=model.fileName;
@@ -1158,7 +1167,7 @@ async function downloadSelectedDeviceModel(){
       ?'Model indirmesi iptal edildi. Yarım kalan dosya temizlendi.'
       :'İndirme tamamlanamadı: '+detail+(canRetryCancel?' İndirme görevi hâlâ etkin olabilir; aşağıdaki iptal düğmesiyle tekrar deneyebilirsin.':'');
     if(cancelled)await refreshDeviceLocalModels(true);
-    showToast(cancelled?'Model indirmesi iptal edildi.':'Model indirilemedi.');
+    showToast(cancelled?'Model indirmesi iptal edildi.':'Model indirilemedi: '+detail);
   }finally{
     button.disabled=false;
     if(cancelButton){
